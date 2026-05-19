@@ -1,0 +1,24 @@
+:80 {
+    respond /health 200
+
+    @ai path /api/v1/ai/*
+    handle @ai {
+        reverse_proxy ai:8000
+    }
+
+    @media path /api/v1/media/*
+    handle @media {
+        reverse_proxy media:3000
+    }
+
+    @audit path /api/v1/reports/* /api/v1/audit/*
+    handle @audit {
+        reverse_proxy audit:3000
+    }
+
+    handle /api/v1/* {
+        reverse_proxy core-api:3000
+    }
+
+    respond "MAT-Inspect API Gateway" 200
+}
