@@ -444,37 +444,47 @@ See `PRD.md` Section 9 for the complete trigger list.
 
 ---
 
-## 9. OFFLINE OPERATION (PWA)
+## 9. CONNECTIVITY TOLERANCE (PWA)
 
-### 9.1 Offline Submission Queue
+The PWA assumes reliable WiFi or LTE in the MAT lab (confirmed during the client meeting). It is tolerant of short network drops but is not a full offline-first application. If pilot reveals connectivity is unreliable, the offline scope can be upgraded in v2.
 
-**Trigger:** PWA detects network failure during submission
+### 9.1 Short-Drop Submission Tolerance
+
+**Trigger:** PWA detects a network failure during submission (timeout or HTTP error)
 **Behavior:**
-- PWA stores the full Inspection payload (with audio, photos as blobs) in IndexedDB
-- Background sync attempts every 30 seconds
-- On reconnection, submissions are uploaded in chronological order
-- Operator is shown a clear "queued offline" indicator
+- Operator's tap on Submit immediately shows "Submitting..." optimistic state
+- Submission payload (including photos and voice clip references) is held in memory and `sessionStorage`
+- PWA retries the POST with exponential backoff: 1 second, 2 seconds, 4 seconds, 8 seconds, then prompts the operator
+- Idempotency-Key is generated at the moment of tap, so retries do not create duplicates
+- After 15 minutes of retries with no success, operator sees a clear "submission failed, retry?" UI; submission data is preserved across page refresh
 
 **Validation:**
-- HMAC signature is computed before queueing (uses the session key at submission time, not sync time)
-- If the operator's session has expired by sync time, the submission still succeeds because the HMAC was signed when the session was valid
-- Server validates HMAC against the session that was active at `started_at`
+- HMAC signature is computed at the moment of tap, not on each retry
+- The Idempotency-Key is bound to the HMAC, so the server treats a retried submission as the same logical write
+- Server validates HMAC against the session that was active at `startedAt`
 
 **Acceptance Criteria:**
-- AC-9.1.1: Up to 10 inspections can be queued before storage limits
-- AC-9.1.2: Queue survives PWA close and reopen
-- AC-9.1.3: Queued submissions display in operator history with "pending sync" badge
+- AC-9.1.1: A 30-second WiFi drop during submission is transparent to the operator; submission succeeds on the first retry after reconnection
+- AC-9.1.2: A page refresh during a drop preserves the submission and the retry continues
+- AC-9.1.3: After 15 minutes with no connectivity, operator is asked to retry manually; data is not lost
 
-### 9.2 Offline Checklist Cache
+### 9.2 Checklist Caching
 
 **Behavior:**
-- Active checklist templates are cached locally on first load
-- Service worker refreshes cache when network is available
-- Cache invalidation: TTL of 24 hours, or explicit force-refresh on demand
+- Checklist templates are cached by the browser's HTTP cache (1-hour TTL, with `stale-while-revalidate`)
+- No service worker required for this; standard HTTP semantics handle it
+- On a cold start with no connectivity, the PWA shows a "no connection" error; this is acceptable because the operator cannot submit an inspection offline anyway
 
 **Acceptance Criteria:**
-- AC-9.2.1: Checklist for any of the 10 equipment items loads from cache when offline
-- AC-9.2.2: Operator is warned when using cached templates older than 7 days (rare but possible if device offline for a week)
+- AC-9.2.1: Loading the same equipment's checklist within an hour does not hit the server
+- AC-9.2.2: After 1 hour, the next request revalidates against the server (or serves the cached version with a warning if the server is unreachable)
+
+### 9.3 Connectivity Failure Path
+
+If the PWA cannot reach the server on initial load (e.g., operator scans QR before joining the lab WiFi):
+- Show a clear, branded "Connect to lab WiFi to start inspection" screen
+- Provide a retry button
+- Do not attempt to render a checklist UI from stale cache without confirmation; an inspection performed against an out-of-date template is a compliance risk
 
 ---
 

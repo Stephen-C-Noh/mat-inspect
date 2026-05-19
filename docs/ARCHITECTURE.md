@@ -9,7 +9,8 @@
 - v1: Two-semester plan, broad architecture
 - v2: Tightened to one semester, AI removed
 - v3: AI required by sponsor; voice-to-text feature added back to MVP
-- v4 (this document): Added development staging infrastructure on team-owned hardware (Section 12.7); forced migration to school infrastructure made an explicit Sprint 4 deliverable
+- v4: Added development staging infrastructure on team-owned hardware (Section 12.7); forced migration to school infrastructure made an explicit Sprint 4 deliverable
+- v5 (this document): Reviewer feedback applied. Audit chain implementation specifics (Section 8.4), Whisper accuracy escalation path (Section 9.1), offline-first downgraded to short-drop tolerance (Section 10.1), SPOF acknowledgement with managed-services recommendation (Section 12.3), CI gates enforced with explicit severity thresholds (Section 14)
 
 ---
 
@@ -344,11 +345,49 @@ Endpoints without a declared permission fail closed.
 
 ### 8.4 Audit Log Integrity
 
-The audit log is the legal record.
+The audit log is the legal record. Naive hash-chain implementations have five common failure modes that each break the chain's evidentiary value. The implementation below defends against each.
 
-Each AuditEvent stores `prev_hash` and `this_hash` (sha256). On startup, Audit Service verifies chain integrity. On export, the report includes the chain segment so an auditor can verify independently.
+**Failure modes guarded against:**
+- Non-deterministic JSON serialization (key-order changes → different hash for same data)
+- Mutable fields contaminating the hash input (`updated_at` triggers re-hash)
+- Concurrent inserts forking the chain (two writers compute hash against same `prev_hash`)
+- Wrong hash construction (mixing `prev_hash` with `this_hash`, hashing wrong serialization)
+- Timestamp inconsistency (different precision or timezone across services)
 
-The audit_db role has INSERT only; UPDATE and DELETE revoked at the Postgres role level. Schema migrations use a separate elevated role used only by the deploy process.
+**Implementation rules:**
+
+1. **Single writer.** Only the Audit Service has INSERT privilege on `audit_events`. Every other service emits an event over the bus or HTTP; Audit Service persists. No other path exists.
+
+2. **Canonical JSON.** Hash inputs are serialized via RFC 8785 JSON Canonicalization Scheme (npm: `jcs`). Fixed key order, fixed number formatting, no whitespace. The same logical record always produces the same byte sequence.
+
+3. **Immutable hash inputs only.** The hash input is exactly: `id`, `timestamp`, `actor_id`, `action`, `resource_type`, `resource_id`, `payload_summary`, `prev_hash`. Nothing else. No `updated_at`, no derived fields, no fields the database can change after insert.
+
+4. **Timestamp normalization.** All timestamps in UTC, ISO 8601 with microsecond precision (`2026-05-19T18:31:42.123456Z`). One format, generated once on the writer side, never re-computed.
+
+5. **Serialized chain extension.** Writers serialize on a Postgres advisory lock keyed on the chain identifier:
+
+   ```sql
+   BEGIN;
+   SELECT pg_advisory_xact_lock(hashtext('audit_chain_v1'));
+   SELECT this_hash AS prev_hash
+     FROM audit_events
+     ORDER BY id DESC LIMIT 1;
+   -- application computes this_hash = sha256(canonical_json(event_fields) || prev_hash)
+   INSERT INTO audit_events (id, prev_hash, this_hash, timestamp, actor_id, action,
+                             resource_type, resource_id, payload_summary)
+     VALUES (...);
+   COMMIT;
+   ```
+
+   The advisory lock serializes the *chain extension*, not the whole table; the lock is released at COMMIT. Concurrent writers queue behind each other rather than racing.
+
+6. **Defense-in-depth CHECK constraint.** A Postgres function `verify_audit_hash(event_row, prev_hash)` recomputes the hash from canonical JSON and the supplied `prev_hash`; a CHECK constraint on the table calls this function. Even if application code has a bug, the database rejects malformed entries.
+
+7. **Chain verification.** On startup, Audit Service verifies the last 1000 events. A nightly job verifies the full chain. Any break triggers a CRITICAL alert to Admin and freezes new writes until manual review.
+
+8. **No schema changes touch the chain.** Migrations on `audit_events` use a separate Postgres role (`audit_migrator`) and require an out-of-band approval. The migration role has DDL privileges only, not INSERT. Operational writes use the `audit_writer` role which has only INSERT.
+
+This is the level of specificity required for the audit log to actually have evidentiary value in an Alberta OHS inspection.
 
 ### 8.5 AI-Specific Security Considerations
 
@@ -432,6 +471,17 @@ Controls:
 - `notes_source` field tracks whether the operator edited the AI output (this matters for compliance audits).
 - If AI Service is down or returns an error, fall back gracefully to typed notes. The operator is never blocked by AI failure.
 
+**Accuracy tuning and escalation path:**
+
+- A `confidence_threshold` config (default 0.6) flags any transcript below it with a "review carefully" warning in the PWA.
+- During Sprint 0's equipment walkaround, the team records 10 to 15 second test clips in the actual MAT lab with typical background noise. Run them through `small.en` and compute word error rate against ground-truth transcripts. If WER exceeds 20 percent, escalate before Sprint 3.
+- Escalation options if accuracy is poor in real conditions:
+  1. **Tune the confidence threshold up** (e.g., 0.75): more clips get flagged for review, fewer auto-accepted; quality goes up, perceived AI value goes down.
+  2. **Move to `medium.en`** (769 MB model, ~3 GB RAM): meaningfully better accuracy but 3x slower on CPU. Requires a larger VM (16 GB RAM, 4 vCPU; roughly double the Azure cost) or a GPU-enabled VM.
+  3. **Pre-processing step:** add a noise reduction pass (e.g., `rnnoise` via WebAssembly on the client before upload). Free, ~200 KB to ship.
+  4. **Accept that typed notes are the primary path** and AI is a "nice to have." This is always the floor; the system never depends on AI accuracy.
+- The Sprint 0 acoustic test result is recorded in an ADR so the decision is defensible at capstone presentation.
+
 ### 9.2 Secondary Feature: Photo Defect Hint (Stretch, only if Sprint 3 finishes early)
 
 **Use case:** When operator uploads a photo of a defect, AI suggests a category (tire wear, hydraulic leak, structural damage, oil contamination). Operator confirms or overrides.
@@ -466,9 +516,16 @@ This isolation is enforced by the fact that AI Service is a separate container w
 
 ### 10.1 Operator PWA
 
-- Framework: **Next.js 15+** with App Router, static export with service worker for offline.
+- Framework: **Next.js 15+** with App Router.
 - Mobile-first. Large tap targets, glove-friendly.
-- Offline-capable: checklists cached locally; submissions queued in IndexedDB if offline; voice clips queued and uploaded when network returns.
+- **Connectivity model: tolerant of short network drops, not full offline-first.** Assumes reliable WiFi or LTE in the lab (confirmed at client meeting; Section 6 of the meeting questions makes WiFi coverage a hard requirement for project go-ahead). The PWA tolerates drops up to roughly 15 minutes by queueing submissions in memory and retrying on reconnection.
+  - Optimistic UI: operator sees "Submitted, syncing..." immediately on tap; the actual POST happens in the background with retry.
+  - Idempotency-Key is generated client-side at tap time, so retries do not create duplicates.
+  - Photos and voice clips are uploaded with exponential backoff (1s, 2s, 4s, 8s, then user-visible error).
+  - If a submission cannot reach the server after 15 minutes, the operator sees a clear failure state and is asked to retry manually. The submission payload is preserved in `sessionStorage` so a page refresh does not lose data.
+  - This is intentionally simpler than full IndexedDB offline-first persistence. Saves an estimated 3 to 5 days of Sprint 3 work.
+- If pilot reveals connectivity issues that the short-drop model does not cover, **escalate to full offline-first in v2.** Not for capstone.
+- Checklists are cached on first load via standard HTTP caching (1 hour TTL), not via service worker, to keep the implementation simple.
 - QR scanner: `html5-qrcode` via `getUserMedia`.
 - Audio capture: `MediaRecorder` API, webm/opus codec.
 - State: Zustand.
@@ -540,14 +597,37 @@ A VM in AWS under an educational account if available. Functionally similar to A
 
 **The AI Service tightens the spec slightly.** Whisper `small.en` needs 1.5 GB RAM in process and benefits from at least 2 vCPU. A 4 GB VM is tight; 8 GB is comfortable. Recommend asking for 8 GB.
 
-### 12.3 Production Topology
+### 12.3 Production Topology and Single-Point-of-Failure Posture
 
-Docker Compose on the chosen host. Stack composition:
+**Honest assessment:** a single-VM deployment is a single point of failure. If the VM dies mid-shift, no inspections can be submitted. For a system that enforces equipment safety in an industrial training environment, that matters.
+
+The capstone scope cannot deliver active-active high availability. But the architecture supports a meaningful posture improvement at low cost: **move the persistent layer to managed services on Azure, keep the stateless services on one VM.**
+
+**Recommended production posture (Azure path):**
+
+| Component | Hosting | Reason |
+|-----------|---------|--------|
+| Postgres | Azure Database for PostgreSQL (Flexible Server, Burstable B1ms tier) | Managed backups, point-in-time recovery, automated patching, replicated storage |
+| Object storage (photos, voice clips, PDF exports) | Azure Blob Storage with lifecycle policies | Geo-redundant storage, automated tiering, no self-hosted MinIO operational burden |
+| Stateless services (Caddy, Keycloak, Core API, Media, Audit, AI) | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM) | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts |
+| Observability (Prometheus, Grafana, Loki, Promtail) | Same VM | Loss of monitoring during the rebuild window is acceptable for capstone scope |
+
+This eliminates the worst SPOF (the data layer). If the VM dies, a replacement is spun up, pulls the same code from Git, points at the same managed Postgres and Blob Storage, and the system is back without data loss.
+
+**Recommended production posture (campus VM path, if Azure is not available):**
+
+| Component | Hosting | Reason |
+|-----------|---------|--------|
+| Postgres | Docker container on the campus VM, **but with PITR backup configured** to a SAIT-managed off-host target (e.g., NFS share, S3, Azure Blob, whatever SAIT IT provides) | Continuous WAL archiving so RPO is minutes, not 24 hours |
+| Object storage | Self-hosted MinIO with daily `mc mirror` to a SAIT-managed backup target | |
+| Everything else | Same VM | |
+
+The campus path has more residual SPOF than the Azure path. If campus is the only option, document this explicitly to the sponsor and SAIT IT.
+
+**Stack composition (containers running on the VM, either path):**
 
 - Caddy (1 container)
 - Keycloak (1 container)
-- PostgreSQL (1 container, three schemas)
-- MinIO (1 container)
 - Core API (1 container)
 - Media Service (1 container)
 - Audit / Report Service (1 container)
@@ -555,16 +635,16 @@ Docker Compose on the chosen host. Stack composition:
 - Prometheus, Grafana, Loki, Promtail (4 containers)
 - Uptime Kuma (1 container)
 
-Total: 12 containers. Memory budget on an 8 GB VM:
+On the Azure path, Postgres and MinIO are NOT in this list (they are managed services). On the campus path, add 1 Postgres container + 1 MinIO container (total 12 containers).
+
+**Memory budget on an 8 GB VM (Azure path with managed DB/storage):**
 - Keycloak ~700 MB
-- Postgres ~400 MB
-- MinIO ~200 MB
 - AI Service (Whisper loaded) ~1.5 GB
 - Each Node service ~150 MB (3 services = ~450 MB)
 - Caddy, Prometheus, Grafana, Loki, Promtail, Uptime Kuma combined ~1 GB
-- Total ~4.3 GB, leaving 3.7 GB of headroom.
+- Total ~3.7 GB, leaving 4.3 GB of headroom (more on the Azure path because Postgres and MinIO are not in-process).
 
-Staging runs the same compose file on a second instance.
+Staging runs the same compose file on a second instance (or a second resource group on Azure).
 
 ### 12.4 Reverse Proxy and TLS
 
@@ -574,16 +654,36 @@ Caddy:
 
 ### 12.5 Backup Strategy
 
-- PostgreSQL: `pg_dump` nightly to MinIO, retained 30 days locally; copy synced to Azure Blob Storage (or SAIT's institutional backup) with 1-year lifecycle.
-- MinIO: `mc mirror` nightly to a second target.
-- Configuration: All in Git. No unique server state outside backed-up volumes.
-- Restore drill: documented and tested in staging during Sprint 4.
+**Azure path:**
+- Postgres: managed automated backups with point-in-time recovery, 7-day retention default, configurable up to 35 days
+- Blob Storage: GRS (geo-redundant) replication by default
+- Configuration: All in Git. No unique server state outside the managed services.
+
+**Campus VM path:**
+- Postgres: `pg_dump` nightly + WAL archiving every 5 minutes to off-host storage. RPO ~5 minutes.
+- MinIO: `mc mirror` nightly to off-host target.
+- Configuration: All in Git.
+
+**Restore drill cadence:** documented and **tested twice**, once in Sprint 4 and again in the week before production cutover in Sprint 6. A restore that worked in July does not prove a restore works in August; configurations drift.
 
 ### 12.6 Disaster Recovery
 
-- RPO: 24 hours (last nightly backup).
-- RTO: 4 hours on a replacement VM with the documented runbook.
-- DR runbook tested in Sprint 4 and delivered at handover.
+**RPO (Recovery Point Objective):**
+- Azure path: under 5 minutes (PITR on managed Postgres)
+- Campus path: under 5 minutes if WAL archiving is set up; otherwise 24 hours
+
+**RTO (Recovery Time Objective):**
+- Azure path: 1 hour to rebuild the stateless VM; data is already preserved
+- Campus path: 4 hours on a replacement VM with the documented runbook
+
+**DR runbook contents:**
+- Step-by-step rebuild procedure
+- Where backups live and how to restore them
+- DNS update steps (if hostname needs to point to a new IP)
+- Smoke-test checklist (verify each service is functional)
+- Contact list (SAIT IT, sponsor, Anthropic Azure support if applicable)
+
+The runbook is rehearsed in Sprint 4 and Sprint 6 (week before cutover), and delivered at handover.
 
 ### 12.7 Development Staging Infrastructure
 
@@ -656,23 +756,85 @@ Distributed tracing is deferred; request ID correlation in logs is sufficient at
 
 ## 14. CI/CD Pipeline
 
-GitHub-hosted (free Actions minutes for the educational case).
+GitHub-hosted (free Actions minutes for the educational case). **Security controls are enforced in CI, not aspirational.** The pipeline fails the build if any rule is violated; there is no `--no-verify`-style escape hatch on `main`.
 
-### 14.1 Pipeline Stages
+### 14.1 Mandatory Pipeline Stages
 
-1. **Lint and format**: ESLint, Prettier; Ruff for Python.
-2. **Type check**: TypeScript strict mode; mypy for Python.
-3. **Unit tests**: Vitest (TS), pytest (Python). 70 percent coverage target for business logic.
-4. **Integration tests**: Postgres and MinIO in containers; tests run against real dependencies.
-5. **Build container image**: Multi-stage Dockerfile, non-root user, Alpine base for Node services; `python:3.12-slim` for AI Service.
-6. **Security scan**: Trivy on image, Semgrep on source, Gitleaks on history.
-7. **Push image**: GitHub Container Registry (ghcr.io).
-8. **Deploy to staging**: Auto on merge to `main` (SSH + `docker compose pull && up -d`).
-9. **Deploy to production**: Manual approval, tag-based.
+Every PR and every push to `main` runs all stages. Build fails if any stage fails.
 
-### 14.2 Branching
+1. **Lint and format.** ESLint, Prettier (TypeScript); Ruff (Python); Hadolint (Dockerfiles); Markdownlint (docs). Zero warnings allowed.
+2. **Type check.** TypeScript strict mode for all TS code; mypy strict for Python. No errors allowed.
+3. **Unit tests.** Vitest (TS), pytest (Python). 70 percent coverage target for business logic in `services/*/src/use-cases/`, `services/*/src/domain/`, and `packages/*/src/`. No coverage requirement on glue code.
+4. **Integration tests.** Postgres and MinIO (or Azurite for Azure Blob) in containers via testcontainers; tests run against real dependencies, not mocks.
+5. **Build container image.** Multi-stage Dockerfile, non-root user, Alpine base for Node services; `python:3.12-slim` for AI Service. Hadolint must pass.
+6. **Security scans (each is a build gate):**
+   - **Trivy** on the built image: fails on HIGH or CRITICAL CVEs with available patches. MEDIUM and below logged but not blocking.
+   - **Semgrep** on the source: fails on findings from `p/owasp-top-ten` and `p/security-audit` rulesets at HIGH severity.
+   - **Gitleaks** on git history (full history scan): any secret detection fails the build.
+   - **npm audit** / **pip-audit**: fails on HIGH or CRITICAL with an available patch. Documented exception process for CVEs with no patch available.
+7. **Push image** to GitHub Container Registry on success, tagged with the git commit SHA and (for `main`) `latest`.
+8. **Deploy to dev staging** on merge to `main`: SSH to the M5 over Tailscale, `git pull && docker compose pull && docker compose up -d`. Smoke test runs after; failure rolls back automatically.
+9. **Deploy to production** on tag push (e.g., `v0.1.0`): manual approval required from a Manager-role team member; otherwise identical to staging deploy.
 
-Trunk-based, short-lived feature branches. PRs require 1 review and all checks green.
+### 14.2 Branch Protection
+
+Configured on `main` and enforced by GitHub:
+
+- Required status checks: lint, type-check, unit-tests, integration-tests, trivy, semgrep, gitleaks, build
+- Require pull request before merge
+- Require 1 approval (2 for paths in CODEOWNERS, see Section 8)
+- Dismiss stale approvals when new commits are pushed
+- Require linear history (rebase or squash; no merge commits)
+- Block force push
+- Block deletion
+
+CODEOWNERS enforces two-reviewer requirement on:
+- `services/audit/`
+- `services/core-api/src/middleware/auth.ts`
+- `services/core-api/src/lib/hmac.ts`
+- `services/core-api/src/domain/inspection.ts`
+- `db/migrations/`
+
+### 14.3 Dockerfile Rules (enforced by Hadolint)
+
+Every Dockerfile in the repo must:
+
+- Use a pinned base image version, never `latest`
+- Run as a non-root user: `USER nonroot:nonroot` or a numeric UID/GID
+- Use multi-stage builds: build dependencies isolated from runtime image
+- Not install build tools in the final stage
+- Use `COPY` not `ADD` (unless extracting an archive)
+- Set a `HEALTHCHECK` instruction
+
+Docker Compose adds:
+
+- `read_only: true` on the root filesystem; explicit `tmpfs` mounts for what needs to write
+- `cap_drop: [ALL]` then `cap_add` only what is needed
+- `security_opt: [no-new-privileges:true]`
+- No `privileged: true`
+- Resource limits: `mem_limit` and `cpus` set on each service
+
+### 14.4 Secrets Management
+
+| Environment | Secret store |
+|-------------|--------------|
+| Local dev | `.env` files (gitignored; covered by Gitleaks pre-commit) |
+| Dev staging (M5) | `.env` files on the host, readable only by the deploy user; never committed |
+| Production (Azure) | Azure Key Vault; injected into containers at startup via the Azure SDK or a sidecar |
+| Production (campus VM) | Docker Secrets, file-based; rotated quarterly |
+| CI | GitHub Secrets, scoped per environment (dev-staging, production) |
+
+**Never use `.env` files in production.** Hardcoded values, including for "convenience," are a CVE waiting to happen.
+
+### 14.5 Operations: Dependency and Vulnerability Management
+
+- **Renovate** (or Dependabot) enabled with weekly grouped PRs. Patch and minor updates auto-merged after CI passes; major updates require human review.
+- **CVE SLA:** HIGH or CRITICAL with an available patch must be merged within **7 calendar days** of detection. Tracked in a dedicated GitHub Project board.
+- **Monthly security review** (30 minutes, team meeting): walk through Renovate alerts, Trivy historical reports, audit log integrity verification logs. One team member presents; rotates each month.
+
+### 14.6 Branching
+
+Trunk-based, short-lived feature branches. PRs require 1 review and all checks green (or 2 reviewers for CODEOWNERS-protected paths). Squash and merge to `main`. No long-lived branches.
 
 ---
 

@@ -355,14 +355,28 @@ A green CI on first PR is a massive morale boost.
 - [ ] Open a test PR (against an empty branch) and verify CI runs green
 - [ ] Commit: "ci: add lint, type-check, test, build workflow"
 
-## 2.2 Security Scanning in CI (~1.5 hours)
+## 2.2 Security Scanning in CI with Explicit Severity Gates (~2 hours)
 
-- [ ] Add Trivy scan job to CI for Docker images
-- [ ] Add Semgrep scan job for source code (use the default `auto` config)
-- [ ] Add Gitleaks job for secret scanning
-- [ ] Commit: "ci: add Trivy, Semgrep, Gitleaks security scans"
+The point is not just to run scans; it is to **fail the build** on real findings. Every gate below is configured with an explicit severity threshold so the team cannot accidentally merge HIGH-severity issues.
 
-## 2.3 Pre-Commit Hooks (~1 hour)
+- [ ] Add Trivy job (`aquasecurity/trivy-action`) with `severity: HIGH,CRITICAL` and `exit-code: 1` so the build fails on findings
+- [ ] Add Semgrep job (`returntocorp/semgrep-action`) with `config: p/owasp-top-ten p/security-audit` and fail on HIGH severity
+- [ ] Add Gitleaks job (`gitleaks/gitleaks-action`) running full history scan; any finding fails the build
+- [ ] Add `npm audit --audit-level=high` step that fails the build (with exception process documented in `docs/security-exceptions.md`)
+- [ ] Add **Hadolint** job (`hadolint/hadolint-action`) on every Dockerfile in the repo; fail on any error or warning
+- [ ] Configure GitHub branch protection so all six security checks (Trivy, Semgrep, Gitleaks, npm-audit, Hadolint, plus the lint/type/test/build checks from 2.1) are required before merge
+- [ ] Commit: "ci: add enforced security gates with explicit severity thresholds"
+
+## 2.3 Dependency Management Bot (~30 minutes)
+
+- [ ] Enable Renovate (preferred) or Dependabot on the repo
+- [ ] Configure to group patch and minor updates into weekly PRs
+- [ ] Configure auto-merge after CI passes for patch and minor updates
+- [ ] Major updates require human review (default behavior)
+- [ ] Create a GitHub Project board "Security Triage" with columns: New, In Review, Patching, Verified
+- [ ] Commit: "chore: enable Renovate with auto-merge for patch and minor"
+
+## 2.4 Pre-Commit Hooks (~1 hour)
 
 - [ ] Install Husky: `npm run prepare` after `npm install`
 - [ ] Add lint-staged config to `package.json`:
@@ -371,7 +385,8 @@ A green CI on first PR is a massive morale boost.
 "lint-staged": {
   "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
   "*.{md,json,yaml,yml}": ["prettier --write"],
-  "*.py": ["ruff format", "ruff check --fix"]
+  "*.py": ["ruff format", "ruff check --fix"],
+  "Dockerfile*": ["hadolint"]
 }
 ```
 
@@ -379,9 +394,10 @@ A green CI on first PR is a massive morale boost.
 - [ ] Add Husky `pre-commit` hook running `gitleaks protect --staged`
 - [ ] Test: try committing with a syntax error; confirm it is blocked
 - [ ] Test: try committing with a fake AWS key; confirm Gitleaks blocks it
-- [ ] Commit: "chore: add pre-commit hooks for lint and secret scanning"
+- [ ] Test: try committing a Dockerfile with `USER root`; confirm Hadolint blocks it
+- [ ] Commit: "chore: add pre-commit hooks for lint, secrets, and Dockerfile lint"
 
-## 2.4 Dev Staging on M5 Plus (~2 hours)
+## 2.5 Dev Staging on M5 Plus (~2 hours)
 
 - [ ] On M5: create `~/projects/mat-inspect/` directory
 - [ ] Clone the repo there
@@ -393,7 +409,7 @@ A green CI on first PR is a massive morale boost.
 - [ ] In Tailscale admin, create a tag `tag:mat-inspect-staging` and an ACL allowing teammates to reach the M5 on ports 80/443 only
 - [ ] Confirm M5 is reachable from your laptop over Tailscale
 
-## 2.5 GitHub Actions Deploy to M5 (~1.5 hours)
+## 2.6 GitHub Actions Deploy to M5 (~1.5 hours)
 
 - [ ] Generate a fresh SSH key pair on M5 for deploys only (`ssh-keygen -t ed25519 -f ~/.ssh/github_actions_deploy`)
 - [ ] Add public key to M5's `~/.ssh/authorized_keys`
@@ -517,9 +533,9 @@ Doing these solo wastes time the team should spend together; they are also good 
 | Tier | Tasks | Time |
 |------|-------|------|
 | Tier 1 (must do) | 8 tasks | ~12 hours |
-| Tier 2 (strongly recommended) | 5 tasks | ~8 hours |
+| Tier 2 (strongly recommended) | 6 tasks | ~9.5 hours |
 | Tier 3 (nice to have) | 5 tasks | ~5 hours |
-| **Total** | **18 tasks** | **~25 hours** |
+| **Total** | **19 tasks** | **~26.5 hours** |
 
 Realistic schedule: two long weekends (~10 hours each) plus a few weeknights.
 

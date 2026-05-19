@@ -108,7 +108,7 @@ Goal: confirm regulatory anchors and identify any SAIT-specific requirements.
 - [ ] **Q: Does SAIT use Microsoft 365 / Entra ID for staff authentication? Are Lab Techs SAIT employees (with Entra accounts), contractors (without), or students (with student accounts)?**
 - [ ] **Q: Can we get an Azure VM under SAIT's institutional tenancy? Specs we need: 8 GB RAM, 2 vCPU, 64 GB SSD, Ubuntu 24.04 LTS. Estimated cost CAD $80 to $120 per month.**
 - [ ] **Q: If Azure is not available, is a campus VM with the same specs an option? Lead time?**
-- [ ] **Q: Network: is there reliable WiFi in the MAT lab where Lab Techs will use the system? Coverage in all bays?**
+- [ ] **Q: Network: is there reliable WiFi in the MAT lab where Lab Techs will use the system? Coverage in all bays?** **This is a hard requirement.** The PWA assumes connectivity is generally available. If significant dead zones exist, the offline scope must be upgraded, which is roughly 3 to 5 days of additional work. Confirm: signal strength in each of the 10 equipment locations. If unconfirmed, schedule a 30-minute WiFi survey during the equipment walkaround.
 - [ ] **Q: Do Lab Techs have SAIT-issued phones, tablets, or personal devices? Will they be using their personal phones for QR scanning?**
 - [ ] **Q: For dev staging during the first 9 weeks, the team plans to use a team-owned mini-PC accessed via Tailscale. No SAIT data on it. Acceptable?**
 
@@ -125,6 +125,10 @@ Goal: lock the pilot and production rollout dates.
 - [ ] **Q: Supervisor training: 1-hour session planned. Manager: 1-hour. Acceptable?**
 - [ ] **Q: During cutover from paper to digital, we plan to keep paper as a 3-day fallback. Acceptable, or does the sponsor want longer or shorter parallel-run period?**
 - [ ] **Q: Can the sponsor identify 2 to 3 Lab Techs who would be willing to act as "power users" during the pilot, providing rapid feedback?**
+- [ ] **Schedule the equipment walkaround** within 1 week of this meeting. Combine three goals into one 60- to 90-minute visit:
+  1. Collect make / model / serial / location for each of the 10 machines
+  2. WiFi signal survey at each equipment location (use a phone WiFi analyzer app)
+  3. **Whisper acoustic test:** record 10 to 15 second voice clips at typical operator-to-equipment distance, with typical background noise (compressor running, equipment idling). The team transcribes these with `small.en` afterward and computes word error rate. If WER exceeds 20 percent, escalation options are documented in ARCHITECTURE Section 9.
 
 ---
 

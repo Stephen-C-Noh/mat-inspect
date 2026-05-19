@@ -274,7 +274,9 @@ In short:
 
 ---
 
-## Protecting Main
+## Protecting Main: Enforced CI Gates
+
+Security on this project is **enforced in tooling**, not left to discipline. The CI pipeline acts as a gate that blocks bad code from reaching `main`.
 
 These rules are configured on GitHub under **Settings → Branches → Branch protection rules** for `main`:
 
@@ -282,11 +284,79 @@ These rules are configured on GitHub under **Settings → Branches → Branch pr
 - [x] Require at least 1 approval (2 for security-sensitive paths via CODEOWNERS)
 - [x] Dismiss stale pull request approvals when new commits are pushed
 - [x] Require branches to be up to date before merging
-- [x] Require status checks: lint, type-check, test, security-scan, build
 - [x] Restrict who can push to matching branches (no direct push)
-- [x] Require signed commits (optional but encouraged)
+- [x] Block force push
+- [x] Block deletions
+- [x] Require linear history (no merge commits; squash or rebase only)
 
-The CODEOWNERS file enforces two-reviewer rule on security-sensitive paths.
+Required status checks (all must pass before merge):
+
+- `lint` (ESLint, Prettier, Ruff, Hadolint, Markdownlint, zero warnings)
+- `type-check` (TypeScript strict, mypy strict)
+- `unit-tests`
+- `integration-tests`
+- `trivy` (fails on HIGH or CRITICAL with available patch)
+- `semgrep` (fails on HIGH severity from `p/owasp-top-ten` and `p/security-audit`)
+- `gitleaks` (fails on any secret detection in git history)
+- `npm-audit` (fails on HIGH or CRITICAL with available patch)
+- `build` (Docker images build successfully)
+
+CODEOWNERS forces 2 reviewers on:
+- `services/audit/`
+- `services/core-api/src/middleware/auth.ts`
+- `services/core-api/src/lib/hmac.ts`
+- `services/core-api/src/domain/inspection.ts`
+- `db/migrations/`
+
+**There is no `--no-verify` escape hatch on `main`.** If CI is failing on your branch, fix the failure. Do not bypass.
+
+---
+
+## Dockerfile Rules
+
+Every Dockerfile in the repo must pass Hadolint and follow these rules. Hadolint runs in CI; failures block merge.
+
+- Pin base image versions explicitly. Never `node:latest`; always `node:22.11-alpine` or similar.
+- Use multi-stage builds. Build dependencies live in an intermediate stage; the final image contains only runtime.
+- Run as a non-root user: `USER nonroot:nonroot` or a numeric UID/GID (e.g., `USER 1001:1001`).
+- Set a `HEALTHCHECK` instruction.
+- Use `COPY`, not `ADD`, unless extracting a tarball.
+- Do not install build tools (gcc, python-dev, etc.) in the final stage.
+
+Docker Compose adds these constraints in `compose.prod.yml`:
+
+- `read_only: true` on every service; explicit `tmpfs` mounts for what needs to write
+- `cap_drop: [ALL]`; `cap_add` only the capabilities each service actually requires (almost always none for Node services)
+- `security_opt: [no-new-privileges:true]`
+- No `privileged: true` anywhere
+- `mem_limit` and `cpus` set on every service
+- Networks are explicit; do not rely on the default bridge
+
+---
+
+## Secrets Management
+
+| Environment | Where secrets live | How loaded |
+|-------------|--------------------|------------|
+| Local dev | `.env` files in repo root | Read by Docker Compose |
+| Dev staging (team-owned mini-PC) | `.env` files on the host, mode `0400`, owned by deploy user | Read by Docker Compose; never committed |
+| Production (Azure path) | Azure Key Vault | Injected at container startup via Azure SDK or `dapr-secrets` sidecar |
+| Production (campus VM path) | Docker Secrets, file-based | Mounted into containers at `/run/secrets/` |
+| CI (GitHub Actions) | GitHub Secrets, scoped per environment | Available in workflow as `${{ secrets.NAME }}` |
+
+**Never use `.env` files in production.** Audit failures and credential leaks both trace back to "we just used a .env file for convenience." Do not.
+
+---
+
+## CVE Triage SLA
+
+Continuous dependency and vulnerability management:
+
+- **Renovate** (or Dependabot) enabled with weekly grouped PRs. Patch and minor updates auto-merge after CI passes; major updates require human review.
+- **HIGH or CRITICAL CVEs with an available patch must be merged within 7 calendar days** of detection by CI. Tracked in a dedicated GitHub Project board.
+- **MEDIUM CVEs** are reviewed at the monthly security review; no hard deadline but they do not accumulate indefinitely.
+- **No-patch CVEs** are documented with an exception note in `docs/security-exceptions.md`, reviewed quarterly.
+- **Monthly security review** (30-minute team meeting): walk through Renovate alerts, Trivy historical reports, audit log integrity verification logs. One team member presents; rotates each month.
 
 ---
 
@@ -296,6 +366,7 @@ A pre-commit hook runs locally before each commit:
 - Gitleaks: scans staged changes for secrets
 - Prettier: formats staged files
 - Ruff: formats and lints Python files
+- ESLint: lints staged TS files
 
 Install once after cloning:
 
