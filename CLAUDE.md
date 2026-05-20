@@ -359,18 +359,18 @@ When asked to do any of the following on this project, refuse and explain why:
 
 ## 13. Issue Tracking
 
-Tickets live in JIRA at https://edu-team-ub5fghfl.atlassian.net/jira/software/projects/KAN/boards/1
+Tickets live in JIRA at https://edu-team-asxyfk1n.atlassian.net/jira/software/projects/DEV/boards
 
 Include the ticket key in every commit message and PR title so JIRA can link them automatically. Format:
 
 ```
-KAN-12: short description of change
+DEV-12: short description of change
 ```
 
 Example:
 
 ```
-KAN-3: render equipment list with shadcn Card components
+DEV-3: render equipment list with shadcn Card components
 ```
 
 GitHub Issues are not used for feature work. Use them only for automated reports (Renovate, security scanners). All human-tracked work goes in JIRA.
