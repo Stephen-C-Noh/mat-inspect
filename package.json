@@ -14,7 +14,7 @@
     "type-check": "tsc -b",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "build": "tsc -b",
     "prepare": "husky"
   },

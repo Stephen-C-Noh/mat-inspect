@@ -60,6 +60,7 @@ jobs:
       - run: npm ci
 
       - name: Vitest
+        # --passWithNoTests is temporary until real test files exist. Remove this flag in Sprint 1.
         run: npm test
 
   test-python:
@@ -70,7 +71,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
           cache: pip
           cache-dependency-path: services/ai/requirements.txt
 
