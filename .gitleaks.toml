@@ -1,0 +1,5 @@
+[allowlist]
+description = "Allowlisted files"
+paths = [
+  ".env.example",
+]
