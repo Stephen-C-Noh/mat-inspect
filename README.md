@@ -16,7 +16,6 @@ docker compose up
 
 Open http://localhost:3000 for the operator PWA.
 Open http://localhost:3001 for the manager dashboard.
-Open http://localhost:8080/realms/mat-inspect for Keycloak admin.
 
 ## New Teammate? Read These in Order
 

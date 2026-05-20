@@ -133,7 +133,7 @@ Heuristics:
 
 - If you have re-prompted AI more than 3 times on the same issue, stop. Read the documentation directly.
 - If AI keeps suggesting variants of a solution that does not work, the problem is probably outside what AI knows about. Read the source. Or ask a teammate.
-- For Drizzle ORM, Fastify, Keycloak: read the official docs. AI often has stale or fabricated knowledge of these.
+- For Drizzle ORM, Fastify, MSAL / Microsoft identity platform (Entra ID): read the official docs. AI often has stale or fabricated knowledge of these.
 - For Whisper: the faster-whisper README is short. Read it.
 
 When you are stuck for more than 30 minutes, post in the team chat before continuing to argue with the AI.

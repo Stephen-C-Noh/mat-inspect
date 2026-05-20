@@ -197,7 +197,7 @@ If you hear any of these during the meeting, flag them politely and follow up be
 
 - **"We don't actually have a fixed list of equipment yet."** → Project scope is unstable; need a hard list by end of Week 1.
 - **"SAIT IT has not been engaged."** → Start the engagement immediately; this is the critical path for Sprint 4.
-- **"The Lab Techs are not SAIT employees; they are contractors."** → Affects authentication strategy (cannot use Entra ID federation; must use local Keycloak users).
+- **"The Lab Techs are not SAIT employees; they are contractors."** → Affects authentication strategy (contractors do not have SAIT Entra ID accounts; would require a separate identity solution). Confirmed resolved: lab techs are SAIT staff and have SAIT accounts. Entra ID is the auth provider.
 - **"We were hoping you could also integrate with our existing system X."** → Scope creep; defer to v2 unless trivial.
 - **"Inspections are currently done by whoever is around, not necessarily by certified operators."** → Real compliance gap; not your team's fault, but be clear that the system will enforce certification.
 - **"We don't really track defects today; problems just get fixed when someone notices."** → No baseline for the defect workflow; you will design the canonical process.

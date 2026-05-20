@@ -35,7 +35,6 @@ If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. I
       `cp .env.example .env && docker compose up`
 - [ ] Open http://localhost:3000 and confirm "Hello, MAT-Inspect" (operator PWA stub)
 - [ ] Open http://localhost:3001 and confirm "Hello, MAT-Inspect" (dashboard stub)
-- [ ] Open http://localhost:8080/realms/mat-inspect and confirm Keycloak is up
 - [ ] Check all service health endpoints return 200: - http://localhost/health (Caddy / API gateway) - http://localhost:9000/minio/health/live (MinIO)
 - [ ] Read these docs in order: 1. [CONTRIBUTING.md](CONTRIBUTING.md) — Git workflow, branch naming, commit style 2. [CODING_STANDARDS.md](CODING_STANDARDS.md) — Code style and layer structure 3. [AI_USAGE_GUIDE.md](AI_USAGE_GUIDE.md) — AI tools policy 4. [ARCHITECTURE.md](ARCHITECTURE.md) — System design overview
 
@@ -59,7 +58,6 @@ If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. I
 | Problem                 | Action                                                                                             |
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
 | Stack does not start    | Check Docker Desktop is running; check ports 3000, 3001, 5432, 8080, 9000 are free on your machine |
-| Keycloak takes too long | It needs ~60s on first boot; wait and refresh                                                      |
 | Cannot access GitHub    | Stephen (repo owner) can add you                                                                   |
 | Cannot access Bitwarden | Stephen sends the invite                                                                           |
 | Cannot access Tailscale | Stephen sends the invite                                                                           |

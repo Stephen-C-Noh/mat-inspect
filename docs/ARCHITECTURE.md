@@ -107,16 +107,15 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ca
        +----------------+  |  |  |  +-------------------+
        |                   |  |  |                      |
 +------v---------+  +------v--+  +-v-------+   +--------v-------+
-| Keycloak       |  | Core API |  | Audit / |   |  AI Service    |
-| (auth, OIDC,   |  | Service  |  | Report  |   |  (Python,      |
-| MFA, lockout)  |  | (Node.js)|  | Service |   |  FastAPI,      |
-+------+---------+  +----+-----+  | (Node)  |   |  Whisper)      |
-       |                 |        +----+----+   +--------+-------+
-       |                 |             |                 |
-+------v---------+       |             |                 |
-| PostgreSQL     |       |   +---------v------+          |
-| auth schema    |       |   |  Media Service |          |
-+----------------+       |   |  (Node, MinIO  |          |
+| Entra ID       |  | Core API |  | Audit / |   |  AI Service    |
+| (Azure, ext;   |  | Service  |  | Report  |   |  (Python,      |
+| JWT via JWKS)  |  | (Node.js)|  | Service |   |  FastAPI,      |
++----------------+  +----+-----+  | (Node)  |   |  Whisper)      |
+                         |        +----+----+   +--------+-------+
+                         |             |                 |
+                         |   +---------v------+          |
+                         |   |  Media Service |          |
+                         |   |  (Node, MinIO  |          |
                          |   |  client)       |          |
 +----------------+       |   +-------+--------+          |
 | PostgreSQL     +<------+           |                   |
@@ -144,8 +143,8 @@ Four services are built by the team. Three are off-the-shelf images with configu
 | Service                | Language / Framework              | Built by Team | Responsibility                                                                                  |
 | ---------------------- | --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
 | Caddy                  | image only                        | No            | TLS termination, reverse proxy, routing, ACME certs                                             |
-| Keycloak               | image only                        | No            | OAuth2/OIDC, JWT issuance, user store, RBAC, MFA                                                |
-| PostgreSQL             | image only                        | No            | Three logical schemas: auth (Keycloak), core, audit                                             |
+| Azure AD / Entra ID    | external (SAIT tenant)            | No            | OAuth2/OIDC, JWT issuance, MFA, account lockout; managed by SAIT IT                             |
+| PostgreSQL             | image only                        | No            | Two logical schemas: core, audit                                                                 |
 | Core API Service       | Node.js + Fastify + TypeScript    | Yes           | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications |
 | Media Service          | Node.js + Fastify + TypeScript    | Yes           | Photo upload, voice clip upload, MinIO write, presigned URLs                                    |
 | Audit / Report Service | Node.js + Fastify + TypeScript    | Yes           | Hash-chained audit log writer, PDF generation, CSV export                                       |
@@ -162,7 +161,6 @@ Four services are built by the team. Three are off-the-shelf images with configu
 
 | Store                 | Purpose                                            | Notes                                           |
 | --------------------- | -------------------------------------------------- | ----------------------------------------------- |
-| PostgreSQL (auth_db)  | Keycloak data                                      | Managed by Keycloak                             |
 | PostgreSQL (core_db)  | Equipment, checklists, inspections, defects        | Primary business data                           |
 | PostgreSQL (audit_db) | Hash-chained audit log, retention metadata         | INSERT-only role; writes only via Audit Service |
 | MinIO                 | Photo evidence, voice clips, generated PDF exports | S3-compatible, self-hosted                      |
@@ -252,8 +250,8 @@ AuditEvent (audit_db, append-only)
   resource_type, resource_id
   payload_summary (jsonb, redacted)
 
-User (managed by Keycloak; mirrored shadow table in core_db for joins)
-  id (uuid, matches Keycloak sub)
+User (identity managed by Entra ID; shadow table in core_db for joins and certifications)
+  id (uuid, matches Entra ID oid claim)
   display_name
   email
   certifications (jsonb: [{type, expires_at}])
@@ -274,7 +272,7 @@ Database-level invariants:
 ### 7.1 Operator: Pre-Use Inspection (with Voice Notes)
 
 1. Operator scans the QR code on the equipment (PWA camera or native scanner).
-2. PWA prompts login (Keycloak; if SAIT SSO is federated, transparently bounces to Microsoft Entra ID).
+2. PWA prompts login (redirects to Entra ID; user signs in with SAIT credentials).
 3. App loads the active ChecklistTemplate for the equipment type.
 4. Operator works through items. For each failed item, the app shows a notes field with two options: type or **tap to dictate**.
 5. If operator taps dictate: app records up to 30 seconds of audio, shows a waveform, then sends the clip to AI Service via Media Service (audio is stored, transcription returned).
@@ -315,27 +313,22 @@ Database-level invariants:
 
 ### 8.1 Authentication
 
-Keycloak as identity provider. Open source, OIDC compliant, supports federation with Microsoft Entra ID (SAIT's identity tenant), built-in user management, MFA, and lockout.
+Azure AD / Entra ID as the sole identity provider (see ADR-0002). All users are SAIT staff with existing SAIT accounts. No local user store. SAIT IT manages the Entra ID app registration and assigns App Roles to users or groups via the Azure portal.
 
-**SAIT SSO federation:** Pending decision from the campus IT meeting. The system supports both paths without code changes:
-
-- **Path A (MVP default):** Local Keycloak users provisioned by Admin. Works on day one.
-- **Path B (preferred long-term):** Keycloak as OIDC client of Microsoft Entra ID. Users sign in with SAIT credentials.
-
-Switching paths is a Keycloak realm configuration change, no application code change.
+Services validate JWTs by fetching the public key from the Entra ID JWKS endpoint (`https://login.microsoftonline.com/{tenant-id}/discovery/v2.0/keys`). The shared `verifyToken` middleware handles this; no per-endpoint JWT parsing.
 
 Token policy:
 
-- JWT access tokens, 15-minute lifetime.
+- JWT access tokens, 15-minute lifetime (Entra ID default).
 - Refresh tokens, 7-day lifetime, rotated on use.
-- MFA optional for Operator, required for Supervisor / Manager / Admin (Keycloak TOTP).
-- Account lockout after 5 failed attempts.
+- MFA policy enforced at the Entra ID level for elevated roles; not the application's responsibility.
+- Account lockout managed by Entra ID (Smart Lockout).
 
 ### 8.2 Authorization (RBAC)
 
 Two layers:
 
-1. Caddy + Keycloak validate JWT signature and basic role claim.
+1. Caddy passes the JWT; `verifyToken` middleware validates the signature against the Entra ID JWKS endpoint and extracts the role claim.
 2. Each service re-validates and enforces fine-grained permissions per endpoint via Casbin or a simple JSON policy.
 
 Endpoints without a declared permission fail closed.
@@ -416,7 +409,7 @@ The AI Service introduces new threats. Mitigations:
 | A04 Insecure Design                            | This document; threat model session at start of Sprint 2                                   |
 | A05 Security Misconfiguration                  | Hardened Docker images (Alpine), non-root, read-only root filesystem, dropped capabilities |
 | A06 Vulnerable Components                      | Trivy on every build, Renovate, npm audit                                                  |
-| A07 Identification and Authentication Failures | Keycloak, MFA for elevated roles, lockout                                                  |
+| A07 Identification and Authentication Failures | Entra ID (MFA, Smart Lockout, conditional access managed by SAIT IT)                       |
 | A08 Software and Data Integrity Failures       | Hash-chained audit, signed PDF exports                                                     |
 | A09 Security Logging and Monitoring Failures   | Loki, alerts on suspicious patterns                                                        |
 | A10 SSRF                                       | Allow-list URL fetching only                                                               |
@@ -553,7 +546,7 @@ This isolation is enforced by the fact that AI Service is a separate container w
 - Server-side rendering for initial load; client-side for interactive grids.
 - Charts: Recharts.
 - Tables: TanStack Table.
-- Auth: same Keycloak client family, different client ID with elevated scopes.
+- Auth: same Entra ID app registration, different client ID or scope with elevated permissions.
 
 ### 10.3 Accessibility
 
@@ -624,7 +617,7 @@ The capstone scope cannot deliver active-active high availability. But the archi
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Postgres                                                         | Azure Database for PostgreSQL (Flexible Server, Burstable B1ms tier) | Managed backups, point-in-time recovery, automated patching, replicated storage   |
 | Object storage (photos, voice clips, PDF exports)                | Azure Blob Storage with lifecycle policies                           | Geo-redundant storage, automated tiering, no self-hosted MinIO operational burden |
-| Stateless services (Caddy, Keycloak, Core API, Media, Audit, AI) | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM)                    | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts      |
+| Stateless services (Caddy, Core API, Media, Audit, AI)           | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM)                    | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts      |
 | Observability (Prometheus, Grafana, Loki, Promtail)              | Same VM                                                              | Loss of monitoring during the rebuild window is acceptable for capstone scope     |
 
 This eliminates the worst SPOF (the data layer). If the VM dies, a replacement is spun up, pulls the same code from Git, points at the same managed Postgres and Blob Storage, and the system is back without data loss.
@@ -642,7 +635,6 @@ The campus path has more residual SPOF than the Azure path. If campus is the onl
 **Stack composition (containers running on the VM, either path):**
 
 - Caddy (1 container)
-- Keycloak (1 container)
 - Core API (1 container)
 - Media Service (1 container)
 - Audit / Report Service (1 container)
@@ -654,11 +646,10 @@ On the Azure path, Postgres and MinIO are NOT in this list (they are managed ser
 
 **Memory budget on an 8 GB VM (Azure path with managed DB/storage):**
 
-- Keycloak ~700 MB
 - AI Service (Whisper loaded) ~1.5 GB
 - Each Node service ~150 MB (3 services = ~450 MB)
 - Caddy, Prometheus, Grafana, Loki, Promtail, Uptime Kuma combined ~1 GB
-- Total ~3.7 GB, leaving 4.3 GB of headroom (more on the Azure path because Postgres and MinIO are not in-process).
+- Total ~3.0 GB, leaving ~5 GB of headroom (more on the Azure path because Postgres and MinIO are not in-process).
 
 Staging runs the same compose file on a second instance (or a second resource group on Azure).
 
@@ -734,7 +725,7 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 **Isolation from host owner's existing services:**
 
-- The MAT project lives in `~/projects/mat-inspect/` with its own Docker Compose file, its own Caddy container (on host ports 80 and 443), its own Postgres, its own MinIO, its own Keycloak, its own observability stack.
+- The MAT project lives in `~/projects/mat-inspect/` with its own Docker Compose file, its own Caddy container (on host ports 80 and 443), its own Postgres, its own MinIO, its own observability stack.
 - All project services except Caddy stay on the project's internal Docker network and are not exposed to the host.
 - The project does not reuse the host owner's personal homelab services (Gitea, personal Prometheus, etc.). Keeping the project self-contained makes the Sprint 4 migration a single-command lift.
 
@@ -746,7 +737,7 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 **Shared secrets:**
 
-- Bitwarden cloud (free tier, or 1Password Teams via student plan if available) hosts the shared collection for team credentials (Keycloak admin, SMTP, database passwords, deploy keys).
+- Bitwarden cloud (free tier, or 1Password Teams via student plan if available) hosts the shared collection for team credentials (Entra ID app registration IDs, SMTP, database passwords, deploy keys).
 - `.env` files live in each developer's local checkout, never committed. The same Gitleaks pre-commit pattern used elsewhere prevents accidental commits.
 - On the M5 dev staging host, the `.env` file sits in the project directory, readable only by the deploy user.
 
@@ -882,7 +873,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 - Confirm checklist content with sponsor for all four equipment classes. Photograph or transcribe all existing paper checklists.
 - Campus IT meeting: confirm hosting option, SSO path, request FOIP checklist.
 - Repo set up on GitHub. Branch protection, PR template, issue templates.
-- Docker Compose skeleton: Postgres, MinIO, Keycloak, Caddy, stubs for Core API, Media, Audit, AI.
+- Docker Compose skeleton: Postgres, MinIO, Caddy, stubs for Core API, Media, Audit, AI.
 - Each student gets the stack running locally.
 - Dev staging set up on team-owned mini-PC (see Section 12.7); all 5 students added to Tailscale; root cert distributed.
 - Bitwarden shared collection created; service credentials added; all team members onboarded.
@@ -896,7 +887,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 
 **Weeks 3 to 4 (June 1 to June 14)**
 
-- Keycloak realm configured. Roles defined. Test users provisioned.
+- Entra ID app registration configured with SAIT IT. App Roles defined. Test users assigned.
 - Core API: Equipment CRUD endpoints; seed data for the 10 machines.
 - ChecklistTemplate model and admin publish endpoint.
 - Checklist templates entered for all four equipment classes; reviewed by sponsor.
@@ -990,7 +981,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 | Student                      | Owns                                                                                           | Backs Up                                     |
 | ---------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | **Backend Lead**             | Core API, data model, API contracts, state machine                                             | Audit Service                                |
-| **Backend Engineer 2**       | Keycloak integration, Media Service, notifications                                             | Core API                                     |
+| **Backend Engineer 2**       | Entra ID integration, Media Service, notifications                                             | Core API                                     |
 | **Frontend Lead**            | Operator PWA, QR scan, offline, **voice capture UI**                                           | Manager dashboard                            |
 | **Frontend Engineer 2 / UX** | Manager dashboard, accessibility, UI consistency                                               | Operator PWA                                 |
 | **DevOps / QA / AI**         | Docker, CI/CD, observability, Audit Service, **AI Service**, integration tests, security scans | Whichever backend service is behind schedule |
@@ -1030,8 +1021,8 @@ Bundled with the source code at handover.
 | -------------------------------------------------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Sponsor checklist content not finalized in time                                        | High       | Medium | Lock content by end of Week 4; document explicit decision deadlines                                                                                                        |
 | Campus IT delays hosting approval beyond Sprint 4                                      | Medium     | High   | Dev staging on team-owned mini-PC bridges Sprint 0 to 4; if SAIT VM is not ready by Week 9, escalate to sponsor immediately because Sprint 5 pilot cannot start without it |
-| SSO federation decision delayed beyond Sprint 0                                        | Medium     | Low    | Default to local Keycloak users; switch is a config change, no code rework                                                                                                 |
-| Team learning curve on Keycloak / Docker / Whisper                                     | High       | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration                                                                                             |
+| Entra ID app registration not ready before Sprint 1                                    | Medium     | Low    | Use dev JWT stub locally; coordinate with SAIT IT in Sprint 0                                                                                                              |
+| Team learning curve on MSAL / Entra ID / Docker / Whisper                              | High       | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration                                                                                             |
 | Real Lab Tech availability for testing                                                 | Medium     | High   | Schedule test sessions in advance; build a fake-equipment test rig if needed                                                                                               |
 | Scope creep from sponsor                                                               | Medium     | High   | Out-of-scope document, change request process, defer to v2                                                                                                                 |
 | Whisper accuracy too low to be useful in a loud shop                                   | Medium     | Medium | Quiet the operator (move 2 metres from equipment to dictate); fallback to typed notes is always available; document accuracy expectations in AI Model Card                 |
@@ -1040,7 +1031,7 @@ Bundled with the source code at handover.
 | Audit chain bug undermines legal value                                                 | Low        | High   | Code review by 2 students, integration test with 10,000 simulated events that verifies chain                                                                               |
 | Team-owned mini-PC fails or its owner becomes unavailable                              | Low        | Medium | Everything in Git; any teammate can rebuild the staging stack on their laptop with `docker compose up`; Sprint 2 includes a recovery drill that proves this works          |
 | Sprint 4 migration to SAIT infrastructure reveals environment-specific bugs            | Medium     | Medium | Migration is an explicit Sprint 4 deliverable, not Sprint 6; two full weeks of buffer to fix any environment-specific issues before pilot                                  |
-| Real Lab Tech data accidentally written to team-owned mini-PC during or after Sprint 5 | Low        | High   | Tear-down of dev staging's Keycloak realm at end of Sprint 4; Sprint 5 onward, dev staging uses synthetic data only; ADR documents the rule                                |
+| Real Lab Tech data accidentally written to team-owned mini-PC during or after Sprint 5 | Low        | High   | Rotate dev JWT stub secrets at end of Sprint 4; Sprint 5 onward, dev staging uses synthetic data only; ADR documents the rule                                              |
 
 ---
 
@@ -1080,12 +1071,12 @@ So the team is not staring at a blank repo on day one.
 **Week 1 (May 18 to May 24)**
 
 - [ ] Create Git repo (`mat-inspect`) on GitHub; branch protection, PR template, issue templates.
-- [ ] Create `docker-compose.yml` with: Postgres, MinIO, Keycloak, Caddy, and empty service stubs for Core API, Media, Audit, AI.
+- [ ] Create `docker-compose.yml` with: Postgres, MinIO, Caddy, and empty service stubs for Core API, Media, Audit, AI.
 - [ ] Each student gets the stack running locally (`docker compose up`).
 - [ ] Stand up dev staging on the team-owned mini-PC: clone repo to `~/projects/mat-inspect/`, `docker compose up`, verify all stubs respond.
 - [ ] Generate Caddy local CA root cert; distribute to all 5 team members; each installs on their dev devices.
 - [ ] Add all 5 students to the host owner's Tailscale tailnet (project-scoped).
-- [ ] Create Bitwarden shared collection for the team; seed it with placeholder entries for Keycloak admin, SMTP, database, MinIO.
+- [ ] Create Bitwarden shared collection for the team; seed it with placeholder entries for Entra ID app registration IDs, SMTP, database, MinIO.
 - [ ] Lock framework choices: Node.js + Fastify + TypeScript (services), Next.js (PWA + dashboard), Python + FastAPI + faster-whisper (AI), Drizzle ORM, Zod validation, Tailwind + shadcn/ui.
 - [ ] Write first ADRs: framework choices, Whisper variant (`small.en`), hosting target placeholder, dev staging on team-owned hardware with constraints from Section 12.7.
 - [ ] CI pipeline that runs lint and a hello-world test, green on first commit.
@@ -1097,7 +1088,7 @@ So the team is not staring at a blank repo on day one.
 - [ ] Run job shadow sessions with at least 4 Lab Techs across the four equipment classes.
 - [ ] Document current paper checklists (photograph or transcribe all of them).
 - [ ] Draft initial ChecklistTemplate JSON for each equipment class; review with sponsor before Sprint 1.
-- [ ] Provision Keycloak realm; create test users for each role.
+- [ ] Coordinate with SAIT IT to configure Entra ID app registration; create test users and assign App Roles for each role.
 - [ ] Stub Core API `GET /api/v1/equipment` returning the 10 hard-coded machines.
 - [ ] Stub AI Service `POST /api/v1/ai/transcribe` returning a hardcoded transcript for any input (real Whisper integration in Sprint 3).
 - [ ] PWA renders a list of equipment from the stub API. This is the "hello world" milestone.

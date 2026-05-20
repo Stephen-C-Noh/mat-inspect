@@ -13,14 +13,14 @@
 ### 1.1 User Login
 
 **Actors:** Operator, Supervisor, Manager, Admin, Auditor
-**Preconditions:** User has an active Keycloak account; account is not locked
+**Preconditions:** User has an active SAIT Entra ID account; account is not locked
 **Main Flow:**
 
 1. User navigates to PWA or dashboard
-2. App redirects to Keycloak login page
-3. User enters email and password
-4. (If MFA required by role) User enters TOTP code
-5. Keycloak validates credentials and issues access token (15 min) and refresh token (7 days)
+2. App redirects to the Entra ID login page (Microsoft)
+3. User signs in with their SAIT credentials
+4. (If MFA required by role) User completes MFA via Microsoft Authenticator or TOTP
+5. Entra ID validates credentials and issues access token (15 min) and refresh token (7 days)
 6. App stores tokens; user is redirected to landing screen for their role
 
 **Alternate Flows:**
@@ -45,9 +45,9 @@
 1. Admin opens user management screen
 2. Admin enters: display name, email, role(s), certifications (type + expiry date)
 3. Admin submits
-4. System creates Keycloak user with a temporary password
-5. System emails the new user with login link and temporary password
-6. User logs in with temporary password and is forced to change it on first login
+4. System creates a user profile in core_db with the assigned role(s) and certifications
+5. System emails the new user notifying them they have been granted access
+6. User logs in via Entra ID (SAIT credentials); the system matches their account on first login
 
 **Validation:**
 

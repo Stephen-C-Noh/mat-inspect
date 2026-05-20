@@ -76,7 +76,6 @@ docker compose up
 
 Open http://localhost:3000 for the operator PWA.
 Open http://localhost:3001 for the manager dashboard.
-Open http://localhost:8080/realms/mat-inspect for Keycloak admin.
 
 ## New Teammate? Read These in Order
 
@@ -185,7 +184,6 @@ packages/shared-utils/
 db/schema/
 db/migrations/
 infra/caddy/
-infra/keycloak/
 infra/docker/
 .github/workflows/
 ```
@@ -198,9 +196,8 @@ infra/docker/
 The point of this step: a teammate clones, runs `docker compose up`, and sees green health checks for every container.
 
 - [ ] Create `/docker-compose.yml` at repo root with:
-  - Postgres 16 container with an init script creating three databases: `auth_db`, `core_db`, `audit_db`
+  - Postgres 16 container with an init script creating two databases: `core_db`, `audit_db`
   - MinIO container with two pre-created buckets: `mat-inspect-media`, `mat-inspect-reports`
-  - Keycloak 25 container with realm import placeholder
   - Caddy 2 container with reverse proxy config
   - 4 service stubs (core-api, media, audit, ai) each returning `{ "status": "ok" }` on `/health`
   - 2 app stubs (PWA, dashboard) showing "Hello, MAT-Inspect"
@@ -208,7 +205,6 @@ The point of this step: a teammate clones, runs `docker compose up`, and sees gr
 - [ ] Each service has a minimal Dockerfile (multi-stage build, non-root user)
 - [ ] Postgres init script: `infra/docker/postgres-init.sql`
 - [ ] Caddy config: `infra/caddy/Caddyfile` routing each hostname to the right container
-- [ ] Keycloak realm placeholder: `infra/keycloak/realm-mat-inspect.json` (can be minimal)
 
 - [ ] `.env.example` at repo root with all required variables (placeholders, never real secrets):
 
@@ -217,8 +213,9 @@ POSTGRES_USER=mat
 POSTGRES_PASSWORD=changeme
 POSTGRES_DB=postgres
 
-KEYCLOAK_ADMIN=admin
-KEYCLOAK_ADMIN_PASSWORD=changeme
+# Obtain from the Entra ID app registration in the Azure portal (SAIT IT)
+ENTRA_TENANT_ID=REPLACE_ME
+ENTRA_CLIENT_ID=REPLACE_ME
 
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=changeme
@@ -441,7 +438,7 @@ The point is not just to run scans; it is to **fail the build** on real findings
 
 - [ ] Install Drizzle in `services/core-api`
 - [ ] Create `db/schema/equipment.ts` with the Equipment table from CODING_STANDARDS.md
-- [ ] Create `db/schema/users.ts` (shadow table, references Keycloak `sub`)
+- [ ] Create `db/schema/users.ts` (shadow table, references Entra ID `oid` claim)
 - [ ] Configure `drizzle.config.ts`
 - [ ] Generate first migration: `npm run db:generate`
 - [ ] Add `db/seed.ts` with 10 hardcoded equipment records (use the asset tags planned in PRD)
@@ -464,7 +461,7 @@ The point is not just to run scans; it is to **fail the build** on real findings
 ## 3.5 First Issue Backlog for Sprint 0 (~30 minutes)
 
 - [ ] Create one issue per task you want teammates to claim in Week 1:
-  - "Set up Keycloak realm with roles" (Backend Engineer 2)
+  - "Configure Entra ID app registration with roles" (Backend Engineer 2)
   - "Build login flow in PWA" (Frontend Lead)
   - "Build login flow in dashboard" (Frontend Engineer 2)
   - "Set up Loki + Promtail observability containers" (DevOps/QA/AI)
@@ -517,7 +514,7 @@ When everything above is green:
 
 These do not need to exist before invites:
 
-- Detailed Keycloak realm config (do it together in Week 1)
+- Detailed Entra ID app registration and role assignment (coordinate with SAIT IT in Week 1)
 - All ADRs beyond ADR-0001 (write them as decisions are made)
 - Detailed observability dashboards in Grafana
 - E2E test framework setup (Playwright or Cypress)

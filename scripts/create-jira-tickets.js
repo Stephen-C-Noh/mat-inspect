@@ -38,7 +38,7 @@ const tickets = [
     ref: 'T1',
     summary: 'Set up Drizzle ORM and initial schema (equipment + users)',
     description: text(
-      'Install Drizzle in services/core-api. Create db/schema/equipment.ts and db/schema/users.ts (shadow table referencing Keycloak sub). Configure drizzle.config.ts. Run npm run db:generate to produce the first migration. Add db/seed.ts with 10 hardcoded equipment records matching the asset tags in PRD.md.\n\nAcceptance criteria: npm run db:generate produces a valid migration. npm run db:seed inserts 10 equipment rows. Schema matches CLAUDE.md Drizzle examples.',
+      'Install Drizzle in services/core-api. Create db/schema/equipment.ts and db/schema/users.ts (shadow table; id matches the Entra ID oid claim). Configure drizzle.config.ts. Run npm run db:generate to produce the first migration. Add db/seed.ts with 10 hardcoded equipment records matching the asset tags in PRD.md.\n\nAcceptance criteria: npm run db:generate produces a valid migration. npm run db:seed inserts 10 equipment rows. Schema matches CLAUDE.md Drizzle examples.',
     ),
     labels: ['backend'],
     priority: 'High',
@@ -66,9 +66,9 @@ const tickets = [
   },
   {
     ref: 'T4',
-    summary: 'Set up Keycloak realm with operator, supervisor, manager, and admin roles',
+    summary: 'Configure Entra ID app registration with operator, supervisor, manager, and admin roles',
     description: text(
-      'Configure the Keycloak realm in infra/keycloak/realm.json. Define roles: operator, supervisor, manager, admin (see packages/shared-types/src/index.ts for the UserRole type). Create test users for each role. Document login credentials in Bitwarden.\n\nAcceptance criteria: All four roles exist in Keycloak. A test user for each role can log in via the Keycloak UI. Realm config is exported and committed to infra/keycloak/realm.json.',
+      'Work with SAIT IT to configure the Entra ID app registration. Define App Roles: operator, supervisor, manager, admin (see packages/shared-types/src/index.ts for the UserRole type). Assign test users to each role. Record the tenant ID and client ID in Bitwarden and in .env.example as ENTRA_TENANT_ID and ENTRA_CLIENT_ID.\n\nAcceptance criteria: All four App Roles exist in the Entra ID registration. A test user for each role can authenticate and the role claim appears in the JWT. ENTRA_TENANT_ID and ENTRA_CLIENT_ID are documented.',
     ),
     labels: ['backend'],
     priority: 'High',
@@ -78,7 +78,7 @@ const tickets = [
     ref: 'T5',
     summary: 'Build login flow in PWA',
     description: text(
-      'Wire Keycloak auth into apps/pwa using the OIDC client library. Redirect unauthenticated users to Keycloak login. Store the JWT in memory (not localStorage). Expose req.user via the verifyToken middleware pattern in CLAUDE.md.\n\nAcceptance criteria: Unauthenticated users are redirected to Keycloak. After login, the user is redirected back to the PWA. JWT is validated on each request.',
+      'Wire Entra ID auth into apps/pwa using MSAL (@azure/msal-browser). Redirect unauthenticated users to the Entra ID login page. Store the JWT in memory (not localStorage). Expose req.user via the verifyToken middleware pattern in CLAUDE.md.\n\nAcceptance criteria: Unauthenticated users are redirected to Entra ID. After login, the user is redirected back to the PWA. JWT is validated on each request.',
     ),
     labels: ['frontend'],
     priority: 'High',
@@ -88,7 +88,7 @@ const tickets = [
     ref: 'T6',
     summary: 'Build login flow in dashboard',
     description: text(
-      'Wire Keycloak auth into apps/dashboard. Only users with the manager or admin role should be able to access the dashboard. Others get a 403 page.\n\nAcceptance criteria: Manager and admin roles can log in and see the dashboard. Operator role is denied with a clear error message.',
+      'Wire Entra ID auth into apps/dashboard using MSAL (@azure/msal-browser). Only users with the manager or admin App Role should be able to access the dashboard. Others get a 403 page.\n\nAcceptance criteria: Manager and admin roles can log in and see the dashboard. Operator role is denied with a clear error message.',
     ),
     labels: ['frontend'],
     priority: 'High',

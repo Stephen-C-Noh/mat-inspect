@@ -5,7 +5,7 @@
 **Base URL (local dev):** `http://localhost:8080/api/v1`
 **Base URL (dev staging):** `https://mat-inspect.staging/api/v1`
 **Base URL (production):** TBD by SAIT IT (likely `https://mat-inspect.sait.ca/api/v1`)
-**Auth:** `Authorization: Bearer <JWT>` issued by Keycloak
+**Auth:** `Authorization: Bearer <JWT>` issued by Entra ID
 
 **Indicators:** 🔓 public · 🔒 authenticated · 👤 operator · 👷 supervisor · 📊 manager · 🛡️ admin · 🔍 auditor
 
@@ -15,16 +15,16 @@
 
 ## Authentication
 
-Authentication is handled by Keycloak. The application exposes thin wrappers for session-level operations only. User registration, password reset, and MFA setup happen through Keycloak's standard flows.
+Authentication is handled by Entra ID. The application exposes thin wrappers for session-level operations only. User account management, password reset, and MFA setup are handled by SAIT IT via the Azure portal.
 
 | Method | Endpoint                  | Auth | Description                                          |
 | ------ | ------------------------- | ---- | ---------------------------------------------------- |
 | POST   | `/auth/session/refresh`   | 🔒   | Exchange refresh token for new access token          |
-| POST   | `/auth/session/logout`    | 🔒   | Invalidate current session in Keycloak               |
+| POST   | `/auth/session/logout`    | 🔒   | Invalidate current session                           |
 | GET    | `/auth/me`                | 🔒   | Current user profile with role(s) and certifications |
 | GET    | `/auth/me/certifications` | 🔒   | Current user's certifications with expiry status     |
 
-**Login flow:** PWA redirects to Keycloak's `/realms/mat-inspect/protocol/openid-connect/auth`. After login, Keycloak redirects back with authorization code. PWA exchanges code for tokens. Standard OIDC, no custom endpoint.
+**Login flow:** PWA redirects to the Entra ID authorization endpoint. After login, Entra ID redirects back with an authorization code. PWA exchanges the code for tokens via MSAL. Standard OIDC, no custom endpoint.
 
 ---
 
@@ -256,7 +256,7 @@ Audit events are read-only via API. Writes happen automatically as a side effect
 
 | Header                           | Required             | Notes                                                                 |
 | -------------------------------- | -------------------- | --------------------------------------------------------------------- |
-| `Authorization: Bearer <JWT>`    | Yes for 🔒 endpoints | Token from Keycloak                                                   |
+| `Authorization: Bearer <JWT>`    | Yes for 🔒 endpoints | Token from Entra ID                                                   |
 | `Idempotency-Key: <uuid>`        | Yes for POST writes  | Server caches result for 24 hours; resubmits return original response |
 | `Content-Type: application/json` | Yes for JSON bodies  | `multipart/form-data` for /media/upload                               |
 | `Accept-Language: en`            | Optional             | English only at MVP; planned for v2                                   |

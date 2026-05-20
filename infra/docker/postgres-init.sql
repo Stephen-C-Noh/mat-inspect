@@ -1,3 +1,2 @@
 CREATE DATABASE core_db;
 CREATE DATABASE audit_db;
-CREATE DATABASE auth_db;

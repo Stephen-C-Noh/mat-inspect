@@ -3,7 +3,7 @@
 ## MAT-Inspect: Pre-Use Inspection System
 
 **Version:** 1.0 | **Date:** May 18, 2026
-**Stack:** Next.js 15 + TypeScript, Node.js + Fastify, Python + FastAPI, PostgreSQL, Keycloak, MinIO, Docker, faster-whisper, Tailwind CSS
+**Stack:** Next.js 15 + TypeScript, Node.js + Fastify, Python + FastAPI, PostgreSQL, Azure AD / Entra ID, MinIO, Docker, faster-whisper, Tailwind CSS
 **Purpose:** Reference document defining WHAT we are building and WHY for the MAT School capstone project
 
 ---
@@ -99,7 +99,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 ### P0: Launch Blockers (cannot ship without)
 
-- Keycloak authentication with role-based access control
+- Entra ID authentication with role-based access control
 - Equipment registry with QR-code addressable assets (10 machines at MVP)
 - Versioned checklist templates per equipment class (overhead crane, forklift, truck, electric pallet jack)
 - Inspection submission with HMAC operator signature
@@ -272,7 +272,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - TLS 1.3 everywhere; no plain HTTP
 - JWT validation at API gateway and at each service
 - RBAC fail-closed: endpoints without declared roles return 403
-- Passwords: Argon2id via Keycloak default
+- Passwords: managed by Entra ID (not the application)
 - Rate limiting: 100 requests per minute per IP at gateway
 - All write endpoints accept Idempotency-Key header
 - Audit log append-only at the database role level
@@ -375,7 +375,7 @@ See `docs/ARCHITECTURE.md` Section 15 for the full sprint plan. Summary:
 | Phase                                    | Weeks   | Focus                                                                    |
 | ---------------------------------------- | ------- | ------------------------------------------------------------------------ |
 | Sprint 0: Discovery and Setup            | 1 to 2  | Stakeholder interviews, dev staging on team mini-PC, repo, CI            |
-| Sprint 1: Auth, Equipment, Checklists    | 3 to 4  | Keycloak, equipment registry, checklist templates, PWA login and QR scan |
+| Sprint 1: Auth, Equipment, Checklists    | 3 to 4  | Entra ID integration, equipment registry, checklist templates, PWA login and QR scan |
 | Sprint 2: Inspection and Defect Workflow | 5 to 6  | Submission, state machine, defect flow, email notifications              |
 | Sprint 3: Dashboard, Media, AI           | 7 to 8  | Manager dashboard, photo upload, AI voice-to-text                        |
 | Sprint 4: Audit, Reports, SAIT Migration | 9 to 10 | Hash chain, PDF and CSV exports, migrate stack to SAIT VM                |
@@ -391,12 +391,11 @@ See `docs/ARCHITECTURE.md` Section 15 for the full sprint plan. Summary:
 
 | Service or Library     | Purpose                                                    | Hosting Choice                                                  |
 | ---------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
-| Keycloak               | Authentication and identity                                | Self-hosted Docker container                                    |
+| Azure AD / Entra ID    | Authentication and identity                                | SAIT existing tenant; provided by SAIT IT                       |
 | PostgreSQL 16          | Primary relational data                                    | Self-hosted Docker container; managed Postgres if on Azure      |
 | MinIO                  | S3-compatible object storage for photos, voice clips, PDFs | Self-hosted Docker container; or Azure Blob Storage on Azure    |
 | faster-whisper         | On-prem speech-to-text                                     | Self-hosted Docker container, CPU inference                     |
 | SMTP                   | Outbound email                                             | SAIT institutional SMTP relay (preferred) or SendGrid free tier |
-| Microsoft Entra ID     | SSO federation (future)                                    | SAIT existing tenant; Keycloak federates when enabled           |
 | GitHub                 | Source control, CI/CD                                      | GitHub Free for educational use                                 |
 | Docker, Docker Compose | Container runtime                                          | Self-hosted, all environments                                   |
 

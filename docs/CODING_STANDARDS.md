@@ -32,7 +32,7 @@ This document is the human-readable guide to writing code in this repo. The comp
 | File names: TS modules       | kebab-case                              | `inspection-service.ts`              |
 | File names: React components | PascalCase                              | `ChecklistItemView.tsx`              |
 | Folders                      | kebab-case                              | `services/core-api/`                 |
-| Env variables                | SCREAMING_SNAKE                         | `KEYCLOAK_URL`, `WHISPER_MODEL_PATH` |
+| Env variables                | SCREAMING_SNAKE                         | `ENTRA_TENANT_ID`, `WHISPER_MODEL_PATH` |
 | API endpoints                | kebab-case in path; resources plural    | `/api/v1/inspections/:id`            |
 
 ---
@@ -60,7 +60,6 @@ mat-inspect/
 │   └── migrations/            # Generated migration files
 ├── infra/
 │   ├── caddy/                 # Caddyfile
-│   ├── keycloak/              # Realm export
 │   └── docker/                # Compose files
 ├── docs/
 │   ├── ARCHITECTURE.md
@@ -619,7 +618,7 @@ throw new Error('something broke'); // use httpError
 const body = req.body as SubmitInspectionInput; // unsafe cast; use Zod parse
 
 // No localStorage tokens
-localStorage.setItem('token', jwt); // use memory + httpOnly cookies via Keycloak
+localStorage.setItem('token', jwt); // use memory + httpOnly cookies via MSAL
 
 // No business logic in handlers
 async function handler(req, reply) {

@@ -8,7 +8,7 @@ This file briefs AI coding assistants (Claude, ChatGPT, Cursor, Copilot, and oth
 
 MAT-Inspect is a digital pre-use inspection system for high-risk equipment at SAIT Main Campus (4 overhead cranes, 2 trucks, 1 electric pallet jack, 3 forklifts). It replaces paper inspection sheets with a mobile PWA, voice-to-text defect notes, a manager dashboard, and tamper-evident audit logs.
 
-Capstone project, 5 students, 13 weeks (May to August 2026). Deployed to SAIT campus VM or SAIT Azure tenant.
+Capstone project, 5 students, 13 weeks (May to August 2026). Deployed to SAIT Azure tenant (resources provided by SAIT IT).
 
 The architectural source of truth is `docs/ARCHITECTURE.md` (also called the Capstone Plan). Read it before suggesting structural changes.
 
@@ -63,7 +63,7 @@ Pinned versions as of project start. Match these when generating code.
 
 - Docker + Docker Compose
 - Caddy 2.x reverse proxy with built-in local CA in dev, ACME in prod
-- Keycloak 25.x for auth
+- Azure AD / Entra ID for auth (all users are SAIT staff with existing SAIT accounts; no Keycloak)
 - MinIO for S3-compatible object storage
 - Prometheus, Grafana, Loki, Promtail, Uptime Kuma for observability
 - GitHub Actions for CI/CD
@@ -75,6 +75,7 @@ Pinned versions as of project start. Match these when generating code.
 - Redux (we use Zustand)
 - Material UI (we use shadcn/ui)
 - TypeORM, Sequelize, or raw `pg` client (use Drizzle)
+- Keycloak (replaced by Entra ID; see ADR)
 - Yarn or pnpm unless you check `package.json` first; npm is the default
 
 ---
@@ -300,7 +301,7 @@ A: Check `package.json` first. If a dependency is already in the project that do
 A: `packages/shared-types/` for types, `packages/shared-schemas/` for Zod schemas. For runtime helpers, create a new package under `packages/` and add it to the monorepo workspaces. Do not import across service directories directly.
 
 **Q: How do I add a new role or permission?**
-A: Update the role enum in `packages/shared-types/roles.ts`. Update the Keycloak realm config in `infra/keycloak/realm.json`. Update the permission matrix in `services/core-api/src/auth/policy.ts`. Add tests covering the new role. Document in an ADR if the role represents a new actor type (not just a permission tweak).
+A: Update the role enum in `packages/shared-types/roles.ts`. Update the Entra ID app registration (add the role in the Azure portal under App roles). Update the permission matrix in `services/core-api/src/auth/policy.ts`. Add tests covering the new role. Document in an ADR if the role represents a new actor type (not just a permission tweak).
 
 **Q: How do I write a database migration?**
 A: Change the Drizzle schema file. Run `npm run db:generate` to create the migration. Read the generated SQL. If it does what you expected, commit both the schema change and the migration. Never edit the generated SQL directly except to add `IF NOT EXISTS` guards if needed; if you need to edit it, the schema is probably wrong.
