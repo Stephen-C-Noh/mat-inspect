@@ -1,0 +1,8 @@
+# Stub HTTP servers for services not yet implemented.
+# These run inside Docker behind Caddy, which handles TLS termination.
+# Remove this file when real service implementations replace the stubs.
+apps/dashboard/server.js
+apps/pwa/server.js
+services/audit/server.js
+services/core-api/server.js
+services/media/server.js
