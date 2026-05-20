@@ -1,4 +1,5 @@
 # CODING_STANDARDS.md
+
 ## MAT-Inspect: Code Style and Conventions
 
 This document is the human-readable guide to writing code in this repo. The companion file `CLAUDE.md` in the repo root is the same information packaged for AI assistants; keep both in sync.
@@ -19,20 +20,20 @@ This document is the human-readable guide to writing code in this repo. The comp
 
 ## Naming Conventions
 
-| Thing | Convention | Example |
-|-------|-----------|---------|
-| Variables and functions | camelCase | `submitInspection` |
-| React components | PascalCase | `ChecklistItem` |
-| Types and interfaces | PascalCase | `Inspection`, `EquipmentStatus` |
-| Enums and enum values | PascalCase enum, SCREAMING_SNAKE values | `EquipmentStatus.OUT_OF_SERVICE` |
-| Constants | SCREAMING_SNAKE | `MAX_VOICE_CLIP_SECONDS` |
-| Drizzle table objects | camelCase plural | `inspections`, `equipment` |
-| Drizzle column names in DB | snake_case | `submitted_at`, `operator_id` |
-| File names: TS modules | kebab-case | `inspection-service.ts` |
-| File names: React components | PascalCase | `ChecklistItemView.tsx` |
-| Folders | kebab-case | `services/core-api/` |
-| Env variables | SCREAMING_SNAKE | `KEYCLOAK_URL`, `WHISPER_MODEL_PATH` |
-| API endpoints | kebab-case in path; resources plural | `/api/v1/inspections/:id` |
+| Thing                        | Convention                              | Example                              |
+| ---------------------------- | --------------------------------------- | ------------------------------------ |
+| Variables and functions      | camelCase                               | `submitInspection`                   |
+| React components             | PascalCase                              | `ChecklistItem`                      |
+| Types and interfaces         | PascalCase                              | `Inspection`, `EquipmentStatus`      |
+| Enums and enum values        | PascalCase enum, SCREAMING_SNAKE values | `EquipmentStatus.OUT_OF_SERVICE`     |
+| Constants                    | SCREAMING_SNAKE                         | `MAX_VOICE_CLIP_SECONDS`             |
+| Drizzle table objects        | camelCase plural                        | `inspections`, `equipment`           |
+| Drizzle column names in DB   | snake_case                              | `submitted_at`, `operator_id`        |
+| File names: TS modules       | kebab-case                              | `inspection-service.ts`              |
+| File names: React components | PascalCase                              | `ChecklistItemView.tsx`              |
+| Folders                      | kebab-case                              | `services/core-api/`                 |
+| Env variables                | SCREAMING_SNAKE                         | `KEYCLOAK_URL`, `WHISPER_MODEL_PATH` |
+| API endpoints                | kebab-case in path; resources plural    | `/api/v1/inspections/:id`            |
 
 ---
 
@@ -102,7 +103,7 @@ Routes call handlers. Handlers call use-cases. Use-cases call repositories. Repo
 ```ts
 // Good
 function classifyResult(passed: boolean[], severities: Severity[]): InspectionResult {
-  if (passed.every(p => p)) return 'PASS';
+  if (passed.every((p) => p)) return 'PASS';
   const anyBlocking = passed.some((p, i) => !p && severities[i] === 'BLOCKING');
   return anyBlocking ? 'FAIL_BLOCKING' : 'FAIL_WARNING';
 }
@@ -133,11 +134,7 @@ Avoid TypeScript `enum` keyword. It generates extra runtime code and does not ma
 
 ```ts
 // Good
-export type EquipmentStatus =
-  | 'READY'
-  | 'AWAITING_INSPECTION'
-  | 'OUT_OF_SERVICE'
-  | 'RETIRED';
+export type EquipmentStatus = 'READY' | 'AWAITING_INSPECTION' | 'OUT_OF_SERVICE' | 'RETIRED';
 
 export const EquipmentStatus = {
   READY: 'READY',
@@ -177,15 +174,23 @@ import { requireRole } from '../middleware/auth';
 import { submitInspectionSchema, listInspectionsQuerySchema } from '../schemas/inspection';
 
 export const inspectionRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/inspections', {
-    preHandler: [requireRole('operator')],
-    schema: { body: submitInspectionSchema },
-  }, submitInspectionHandler);
+  app.post(
+    '/inspections',
+    {
+      preHandler: [requireRole('operator')],
+      schema: { body: submitInspectionSchema },
+    },
+    submitInspectionHandler,
+  );
 
-  app.get('/inspections', {
-    preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin', 'auditor')],
-    schema: { querystring: listInspectionsQuerySchema },
-  }, listInspectionsHandler);
+  app.get(
+    '/inspections',
+    {
+      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin', 'auditor')],
+      schema: { querystring: listInspectionsQuerySchema },
+    },
+    listInspectionsHandler,
+  );
 };
 ```
 
@@ -266,7 +271,12 @@ export class HttpError extends Error {
   }
 }
 
-export function httpError(status: number, code: string, detail: string, extras?: Record<string, unknown>) {
+export function httpError(
+  status: number,
+  code: string,
+  detail: string,
+  extras?: Record<string, unknown>,
+) {
   const title = code.toLowerCase().replace(/_/g, ' ');
   return new HttpError(status, code, title, detail, extras);
 }
@@ -291,15 +301,19 @@ export const submitInspectionSchema = z.object({
   templateId: z.string().uuid(),
   templateVersion: z.number().int().positive(),
   startedAt: z.string().datetime(),
-  responses: z.array(z.object({
-    itemKey: z.string().min(1),
-    value: z.unknown(),
-    passed: z.boolean(),
-    notes: z.string().max(500).optional(),
-    notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),
-    voiceClipId: z.string().uuid().optional(),
-    photoIds: z.array(z.string().uuid()).optional(),
-  })).min(1),
+  responses: z
+    .array(
+      z.object({
+        itemKey: z.string().min(1),
+        value: z.unknown(),
+        passed: z.boolean(),
+        notes: z.string().max(500).optional(),
+        notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),
+        voiceClipId: z.string().uuid().optional(),
+        photoIds: z.array(z.string().uuid()).optional(),
+      }),
+    )
+    .min(1),
   signatureHmac: z.string().min(1),
 });
 
@@ -315,13 +329,19 @@ import { equipment } from './equipment';
 import { users } from './users';
 
 export const inspectionResultEnum = pgEnum('inspection_result', [
-  'PASS', 'FAIL_WARNING', 'FAIL_BLOCKING',
+  'PASS',
+  'FAIL_WARNING',
+  'FAIL_BLOCKING',
 ]);
 
 export const inspections = pgTable('inspections', {
   id: uuid('id').primaryKey().defaultRandom(),
-  equipmentId: uuid('equipment_id').notNull().references(() => equipment.id),
-  operatorId: uuid('operator_id').notNull().references(() => users.id),
+  equipmentId: uuid('equipment_id')
+    .notNull()
+    .references(() => equipment.id),
+  operatorId: uuid('operator_id')
+    .notNull()
+    .references(() => users.id),
   templateId: uuid('template_id').notNull(),
   templateVersion: integer('template_version').notNull(),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
@@ -582,34 +602,36 @@ Do not disable lint rules with `// eslint-disable` comments without a PR comment
 
 ```ts
 // No any
-function process(data: any) { /* ... */ }
+function process(data: any) {
+  /* ... */
+}
 
 // No console.log in service code
-console.log('user logged in', user);  // use logger
+console.log('user logged in', user); // use logger
 
 // No string SQL
-const q = `SELECT * FROM inspections WHERE id = '${id}'`;  // SQL injection; use Drizzle
+const q = `SELECT * FROM inspections WHERE id = '${id}'`; // SQL injection; use Drizzle
 
 // No raw error throws from handlers
-throw new Error('something broke');  // use httpError
+throw new Error('something broke'); // use httpError
 
 // No skipping Zod validation
-const body = req.body as SubmitInspectionInput;  // unsafe cast; use Zod parse
+const body = req.body as SubmitInspectionInput; // unsafe cast; use Zod parse
 
 // No localStorage tokens
-localStorage.setItem('token', jwt);  // use memory + httpOnly cookies via Keycloak
+localStorage.setItem('token', jwt); // use memory + httpOnly cookies via Keycloak
 
 // No business logic in handlers
 async function handler(req, reply) {
-  const eq = await db.select().from(equipment);  // belongs in repository
+  const eq = await db.select().from(equipment); // belongs in repository
   // ...
 }
 
 // No direct equipment status writes
-await db.update(equipment).set({ status: 'READY' });  // bypass state machine
+await db.update(equipment).set({ status: 'READY' }); // bypass state machine
 
 // No fake AI passing
-if (transcript.includes('looks good')) return { result: 'PASS' };  // AI cannot pass inspections
+if (transcript.includes('looks good')) return { result: 'PASS' }; // AI cannot pass inspections
 ```
 
 ---
@@ -618,7 +640,7 @@ if (transcript.includes('looks good')) return { result: 'PASS' };  // AI cannot 
 
 - Subject-verb-object sentences. No marketing language.
 - No em dashes (—) or en dashes (–). Use commas, colons, semicolons, parentheses.
-- Comments explain *why*, not *what*. The code shows what.
+- Comments explain _why_, not _what_. The code shows what.
 - Doc comments on public exports use TSDoc syntax (`/** ... */`).
 
 ```ts
@@ -627,7 +649,9 @@ if (transcript.includes('looks good')) return { result: 'PASS' };  // AI cannot 
  * Computes the inspection result from individual responses.
  * Returns FAIL_BLOCKING if any required item failed with BLOCKING severity.
  */
-export function computeResult(/* ... */) { /* ... */ }
+export function computeResult(/* ... */) {
+  /* ... */
+}
 
 // Bad
 /**
@@ -638,4 +662,4 @@ export function computeResult(/* ... */) { /* ... */ }
 
 ---
 
-*See `CLAUDE.md` for the same information packaged for AI tools. See `CONTRIBUTING.md` for git workflow. See `ARCHITECTURE.md` for system design.*
+_See `CLAUDE.md` for the same information packaged for AI tools. See `CONTRIBUTING.md` for git workflow. See `ARCHITECTURE.md` for system design._

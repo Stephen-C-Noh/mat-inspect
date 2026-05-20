@@ -1,4 +1,5 @@
 # CONTRIBUTING.md
+
 ## MAT-Inspect: Git Workflow and Contribution Guide
 
 ---
@@ -21,15 +22,15 @@
 type/short-description
 ```
 
-| Type | When to use | Example |
-|------|-------------|---------|
-| `feature/` | New functionality | `feature/voice-transcription-ui` |
-| `fix/` | Bug fix | `fix/equipment-status-race` |
-| `chore/` | Config, deps, tooling | `chore/upgrade-fastify-5` |
-| `docs/` | Documentation only | `docs/update-api-reference` |
-| `test/` | Adding or fixing tests | `test/inspection-state-machine` |
-| `refactor/` | Code cleanup, no behavior change | `refactor/extract-hmac-helper` |
-| `adr/` | New or updated Architecture Decision Record | `adr/0007-rate-limiting` |
+| Type        | When to use                                 | Example                          |
+| ----------- | ------------------------------------------- | -------------------------------- |
+| `feature/`  | New functionality                           | `feature/voice-transcription-ui` |
+| `fix/`      | Bug fix                                     | `fix/equipment-status-race`      |
+| `chore/`    | Config, deps, tooling                       | `chore/upgrade-fastify-5`        |
+| `docs/`     | Documentation only                          | `docs/update-api-reference`      |
+| `test/`     | Adding or fixing tests                      | `test/inspection-state-machine`  |
+| `refactor/` | Code cleanup, no behavior change            | `refactor/extract-hmac-helper`   |
+| `adr/`      | New or updated Architecture Decision Record | `adr/0007-rate-limiting`         |
 
 Use lowercase and hyphens only. Keep it short but descriptive.
 
@@ -43,17 +44,17 @@ Follow **Conventional Commits**:
 type: short description in present tense (max 72 chars)
 ```
 
-| Type | When to use |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `chore` | Tooling, config, dependencies |
-| `docs` | Documentation |
-| `test` | Tests only |
-| `refactor` | Refactor, no behavior change |
-| `style` | Formatting, whitespace, no logic change |
-| `security` | Security fix or hardening |
-| `compliance` | OHS or FOIP compliance change |
+| Type         | When to use                             |
+| ------------ | --------------------------------------- |
+| `feat`       | New feature                             |
+| `fix`        | Bug fix                                 |
+| `chore`      | Tooling, config, dependencies           |
+| `docs`       | Documentation                           |
+| `test`       | Tests only                              |
+| `refactor`   | Refactor, no behavior change            |
+| `style`      | Formatting, whitespace, no logic change |
+| `security`   | Security fix or hardening               |
+| `compliance` | OHS or FOIP compliance change           |
 
 **Examples:**
 
@@ -69,10 +70,11 @@ refactor: extract equipment state machine into domain layer
 ```
 
 **Rules:**
+
 - Present tense: `add` not `added`, `fix` not `fixed`
 - No period at the end
 - Keep under 72 characters in the subject line
-- Body (optional) explains *why* the change is needed
+- Body (optional) explains _why_ the change is needed
 - Commit often: small, focused commits are easier to review and revert
 
 ---
@@ -128,20 +130,25 @@ fix: prevent duplicate inspection on retry
 
 ```markdown
 ## What does this PR do?
+
 Brief description of the change.
 
 ## Why is it needed?
+
 Link to FRS section, GitHub issue, or sprint goal.
 
 ## How to test
+
 Step-by-step verification.
 
 ## Screenshots / video (if UI change)
 
 ## AI assistance used?
+
 Yes / No. If yes, which sections.
 
 ## Compliance impact?
+
 - [ ] Affects audit log structure
 - [ ] Affects equipment state machine
 - [ ] Affects authentication or authorization
@@ -149,6 +156,7 @@ Yes / No. If yes, which sections.
 - [ ] None of the above
 
 ## Checklist
+
 - [ ] Tests pass
 - [ ] Lint and type-check pass
 - [ ] Documentation updated (if user-visible)
@@ -201,37 +209,37 @@ Wrong-layer code is the most common review rejection. Reference:
 
 ### Backend Services
 
-| Layer | Location | Responsibility |
-|-------|----------|----------------|
-| Routes | `services/*/src/routes/` | URL to handler mapping only, no logic |
-| Handlers | `services/*/src/handlers/` | Thin glue: parse input, call use-case, format response |
-| Use-cases | `services/*/src/use-cases/` | Business workflow: orchestrate repositories and domain logic |
-| Domain | `services/*/src/domain/` | Pure logic, no I/O (state machines, computations) |
-| Repositories | `services/*/src/repositories/` | Database access via Drizzle, no business logic |
-| Middleware | `services/*/src/middleware/` | Auth, validation, error handling |
-| Schemas | `services/*/src/schemas/` | Zod schemas (often re-exported from packages/shared-schemas) |
-| Lib | `services/*/src/lib/` | App-specific utilities: logger, errors, HMAC |
-| Config | `services/*/src/config/` | Typed environment loading |
+| Layer        | Location                       | Responsibility                                               |
+| ------------ | ------------------------------ | ------------------------------------------------------------ |
+| Routes       | `services/*/src/routes/`       | URL to handler mapping only, no logic                        |
+| Handlers     | `services/*/src/handlers/`     | Thin glue: parse input, call use-case, format response       |
+| Use-cases    | `services/*/src/use-cases/`    | Business workflow: orchestrate repositories and domain logic |
+| Domain       | `services/*/src/domain/`       | Pure logic, no I/O (state machines, computations)            |
+| Repositories | `services/*/src/repositories/` | Database access via Drizzle, no business logic               |
+| Middleware   | `services/*/src/middleware/`   | Auth, validation, error handling                             |
+| Schemas      | `services/*/src/schemas/`      | Zod schemas (often re-exported from packages/shared-schemas) |
+| Lib          | `services/*/src/lib/`          | App-specific utilities: logger, errors, HMAC                 |
+| Config       | `services/*/src/config/`       | Typed environment loading                                    |
 
 ### Frontend Apps
 
-| Layer | Location | Responsibility |
-|-------|----------|----------------|
-| App router | `apps/*/src/app/` | Next.js routes; pages and layouts |
-| Components | `apps/*/src/components/` | Reusable UI primitives, no API calls |
-| Features | `apps/*/src/features/` | Feature-specific components and hooks bundled together |
-| Hooks | `apps/*/src/hooks/` | Data fetching via TanStack Query; cross-cutting hooks |
-| Store | `apps/*/src/store/` | Zustand slices |
-| Lib | `apps/*/src/lib/` | API client, utility functions |
-| Types | `apps/*/src/types/` | App-specific types; cross-app types live in `packages/shared-types` |
+| Layer      | Location                 | Responsibility                                                      |
+| ---------- | ------------------------ | ------------------------------------------------------------------- |
+| App router | `apps/*/src/app/`        | Next.js routes; pages and layouts                                   |
+| Components | `apps/*/src/components/` | Reusable UI primitives, no API calls                                |
+| Features   | `apps/*/src/features/`   | Feature-specific components and hooks bundled together              |
+| Hooks      | `apps/*/src/hooks/`      | Data fetching via TanStack Query; cross-cutting hooks               |
+| Store      | `apps/*/src/store/`      | Zustand slices                                                      |
+| Lib        | `apps/*/src/lib/`        | API client, utility functions                                       |
+| Types      | `apps/*/src/types/`      | App-specific types; cross-app types live in `packages/shared-types` |
 
 ### Shared Packages
 
-| Package | Purpose |
-|---------|---------|
+| Package                    | Purpose                                    |
+| -------------------------- | ------------------------------------------ |
 | `packages/shared-schemas/` | Zod schemas used by both client and server |
-| `packages/shared-types/` | Pure TypeScript types |
-| `packages/shared-utils/` | Pure utility functions with no I/O |
+| `packages/shared-types/`   | Pure TypeScript types                      |
+| `packages/shared-utils/`   | Pure utility functions with no I/O         |
 
 If you find yourself wanting to import code from one service into another, the answer is almost always to put it in a shared package instead. Services do not depend on each other directly; they communicate over HTTP or events.
 
@@ -266,6 +274,7 @@ If you find yourself wanting to import code from one service into another, the a
 See `docs/AI_USAGE_GUIDE.md` for the full policy and `CLAUDE.md` for the briefing file to paste into AI sessions.
 
 In short:
+
 - AI assistance is encouraged for boilerplate, scaffolding, tests, debugging help, doc drafts
 - AI assistance is restricted for: security-sensitive code, OHS regulatory text, audit service code, architectural decisions
 - Always read and understand AI-generated code before committing
@@ -302,6 +311,7 @@ Required status checks (all must pass before merge):
 - `build` (Docker images build successfully)
 
 CODEOWNERS forces 2 reviewers on:
+
 - `services/audit/`
 - `services/core-api/src/middleware/auth.ts`
 - `services/core-api/src/lib/hmac.ts`
@@ -336,13 +346,13 @@ Docker Compose adds these constraints in `compose.prod.yml`:
 
 ## Secrets Management
 
-| Environment | Where secrets live | How loaded |
-|-------------|--------------------|------------|
-| Local dev | `.env` files in repo root | Read by Docker Compose |
-| Dev staging (team-owned mini-PC) | `.env` files on the host, mode `0400`, owned by deploy user | Read by Docker Compose; never committed |
-| Production (Azure path) | Azure Key Vault | Injected at container startup via Azure SDK or `dapr-secrets` sidecar |
-| Production (campus VM path) | Docker Secrets, file-based | Mounted into containers at `/run/secrets/` |
-| CI (GitHub Actions) | GitHub Secrets, scoped per environment | Available in workflow as `${{ secrets.NAME }}` |
+| Environment                      | Where secrets live                                          | How loaded                                                            |
+| -------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| Local dev                        | `.env` files in repo root                                   | Read by Docker Compose                                                |
+| Dev staging (team-owned mini-PC) | `.env` files on the host, mode `0400`, owned by deploy user | Read by Docker Compose; never committed                               |
+| Production (Azure path)          | Azure Key Vault                                             | Injected at container startup via Azure SDK or `dapr-secrets` sidecar |
+| Production (campus VM path)      | Docker Secrets, file-based                                  | Mounted into containers at `/run/secrets/`                            |
+| CI (GitHub Actions)              | GitHub Secrets, scoped per environment                      | Available in workflow as `${{ secrets.NAME }}`                        |
 
 **Never use `.env` files in production.** Audit failures and credential leaks both trace back to "we just used a .env file for convenience." Do not.
 
@@ -363,6 +373,7 @@ Continuous dependency and vulnerability management:
 ## Pre-Commit Hooks
 
 A pre-commit hook runs locally before each commit:
+
 - Gitleaks: scans staged changes for secrets
 - Prettier: formats staged files
 - Ruff: formats and lints Python files
@@ -408,15 +419,15 @@ docker compose up
 
 ## What to Do When Things Go Wrong
 
-| Problem | Action |
-|---------|--------|
-| Accidentally committed a secret | Stop. Tell the team in chat immediately. Rotate the secret. Force-push a fixed history. Do not assume "it's just my branch, it's fine." |
-| Force-pushed over a teammate's commits | Stop. Ask the teammate for their local copy of the lost commits. Restore them via git reflog if you can. |
-| CI is red on main | Revert the offending commit on a hotfix branch and merge; do not "fix forward" while main is broken |
-| You don't know what to work on | Ask in standup. Pair on someone else's task. Do not start a new feature without a sprint goal |
-| You don't understand a code review comment | Ask. Pair-program with the reviewer for 15 minutes. Do not silently ignore it |
-| Dev staging is broken | Check the GitHub Actions deploy log. If the deploy failed, fix the issue. If the deploy succeeded but the app is broken, roll back via SSH to the staging host |
+| Problem                                    | Action                                                                                                                                                         |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accidentally committed a secret            | Stop. Tell the team in chat immediately. Rotate the secret. Force-push a fixed history. Do not assume "it's just my branch, it's fine."                        |
+| Force-pushed over a teammate's commits     | Stop. Ask the teammate for their local copy of the lost commits. Restore them via git reflog if you can.                                                       |
+| CI is red on main                          | Revert the offending commit on a hotfix branch and merge; do not "fix forward" while main is broken                                                            |
+| You don't know what to work on             | Ask in standup. Pair on someone else's task. Do not start a new feature without a sprint goal                                                                  |
+| You don't understand a code review comment | Ask. Pair-program with the reviewer for 15 minutes. Do not silently ignore it                                                                                  |
+| Dev staging is broken                      | Check the GitHub Actions deploy log. If the deploy failed, fix the issue. If the deploy succeeded but the app is broken, roll back via SSH to the staging host |
 
 ---
 
-*See `docs/CODING_STANDARDS.md` for code style. See `docs/AI_USAGE_GUIDE.md` for AI policy. See `docs/ARCHITECTURE.md` for system design.*
+_See `docs/CODING_STANDARDS.md` for code style. See `docs/AI_USAGE_GUIDE.md` for AI policy. See `docs/ARCHITECTURE.md` for system design._

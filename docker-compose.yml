@@ -1,5 +1,4 @@
 services:
-
   postgres:
     image: postgres:16-alpine
     environment:
@@ -10,7 +9,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,10 +25,10 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live || exit 1"]
+      test: ['CMD-SHELL', 'curl -fs http://localhost:9000/minio/health/live || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -67,12 +66,12 @@ services:
     volumes:
       - ./infra/keycloak/realm-mat-inspect.json:/opt/keycloak/data/import/realm-mat-inspect.json:ro
     ports:
-      - "8080:8080"
+      - '8080:8080'
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 || exit 1"]
+      test: ['CMD-SHELL', 'exec 3<>/dev/tcp/localhost/9000 || exit 1']
       interval: 15s
       timeout: 10s
       start_period: 90s
@@ -83,8 +82,8 @@ services:
   caddy:
     image: caddy:2.8-alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -95,7 +94,7 @@ services:
       - audit
       - ai
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -107,14 +106,14 @@ services:
       context: ./services/core-api
       target: runtime
     environment:
-      PORT: "3000"
+      PORT: '3000'
       SERVICE_NAME: core-api
       DATABASE_URL: ${CORE_API_DB_URL}
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -126,13 +125,13 @@ services:
       context: ./services/media
       target: runtime
     environment:
-      PORT: "3000"
+      PORT: '3000'
       SERVICE_NAME: media
     depends_on:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -144,14 +143,14 @@ services:
       context: ./services/audit
       target: runtime
     environment:
-      PORT: "3000"
+      PORT: '3000'
       SERVICE_NAME: audit
       DATABASE_URL: ${AUDIT_API_DB_URL}
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -163,9 +162,13 @@ services:
       context: ./services/ai
       target: runtime
     environment:
-      PORT: "8000"
+      PORT: '8000'
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/health'')"',
+        ]
       interval: 10s
       timeout: 5s
       start_period: 15s
@@ -178,12 +181,12 @@ services:
       context: ./apps/pwa
       target: runtime
     environment:
-      PORT: "3000"
+      PORT: '3000'
       APP_NAME: pwa
     ports:
-      - "3000:3000"
+      - '3000:3000'
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -195,12 +198,12 @@ services:
       context: ./apps/dashboard
       target: runtime
     environment:
-      PORT: "3000"
+      PORT: '3000'
       APP_NAME: dashboard
     ports:
-      - "3001:3000"
+      - '3001:3000'
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
       interval: 10s
       timeout: 5s
       retries: 3

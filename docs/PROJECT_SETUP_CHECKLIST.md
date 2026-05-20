@@ -56,7 +56,7 @@ The docs we have produced go in the repo so teammates can read before contributi
 
 The README is what a new teammate sees first. Keep it focused.
 
-```markdown
+````markdown
 # MAT-Inspect
 
 Pre-use inspection system for SAIT's MAT (Manufacturing, Automation, Transportation) School.
@@ -72,6 +72,7 @@ cd mat-inspect
 cp .env.example .env
 docker compose up
 ```
+````
 
 Open http://localhost:3000 for the operator PWA.
 Open http://localhost:3001 for the manager dashboard.
@@ -98,7 +99,8 @@ SAIT School of Manufacturing, Automation, and Transportation.
 ## License
 
 [MIT or Apache-2.0]
-```
+
+````
 
 - [ ] Replace `<org>` with actual GitHub org or username
 - [ ] Adjust ports if any conflict on your machine
@@ -142,7 +144,7 @@ The directory structure from CODING_STANDARDS.md, but empty.
     "lint-staged": "^15.0.0"
   }
 }
-```
+````
 
 - [ ] Create root `tsconfig.base.json` with strict settings:
 
@@ -262,20 +264,24 @@ Date: 2026-05-18
 Status: Accepted
 
 ## Context
+
 Capstone team of 5, 13 weeks, building a microservices system with shared types
 between PWA, dashboard, and backend services.
 
 ## Decision
+
 Use a single Git repository (monorepo) with npm workspaces. At runtime, build and
 deploy as separate Docker containers (microservices).
 
 ## Consequences
+
 Positive: atomic cross-service changes; shared schemas with no publishing overhead;
 single CI config; one handover artifact for SAIT IT.
 Negative: clone size grows; needs care to keep service boundaries clean (services
 import only from packages/, never from other services).
 
 ## Alternatives Considered
+
 Polyrepo per service: rejected because cross-service changes are common in this
 project and the team is small enough that coordination overhead exceeds benefits.
 See https://github.com/<repo>/issues/<discussion-link> for full reasoning.
@@ -304,11 +310,7 @@ ping the chat; do not silently struggle.
 - [ ] Run the stack: cp .env.example .env && docker compose up
 - [ ] Open http://localhost:3000 and confirm "Hello, MAT-Inspect"
 - [ ] Open all /health endpoints; confirm 200s
-- [ ] Read the four onboarding docs in order:
-      1. CONTRIBUTING.md  (git workflow)
-      2. CODING_STANDARDS.md  (code style)
-      3. AI_USAGE_GUIDE.md  (AI tools policy)
-      4. ARCHITECTURE.md  (system design overview)
+- [ ] Read the four onboarding docs in order: 1. CONTRIBUTING.md (git workflow) 2. CODING_STANDARDS.md (code style) 3. AI_USAGE_GUIDE.md (AI tools policy) 4. ARCHITECTURE.md (system design overview)
 
 ## Day 2 (Aim for 2 hours)
 
@@ -530,12 +532,12 @@ Doing these solo wastes time the team should spend together; they are also good 
 
 # Estimated Total Time Budget
 
-| Tier | Tasks | Time |
-|------|-------|------|
-| Tier 1 (must do) | 8 tasks | ~12 hours |
-| Tier 2 (strongly recommended) | 6 tasks | ~9.5 hours |
-| Tier 3 (nice to have) | 5 tasks | ~5 hours |
-| **Total** | **19 tasks** | **~26.5 hours** |
+| Tier                          | Tasks        | Time            |
+| ----------------------------- | ------------ | --------------- |
+| Tier 1 (must do)              | 8 tasks      | ~12 hours       |
+| Tier 2 (strongly recommended) | 6 tasks      | ~9.5 hours      |
+| Tier 3 (nice to have)         | 5 tasks      | ~5 hours        |
+| **Total**                     | **19 tasks** | **~26.5 hours** |
 
 Realistic schedule: two long weekends (~10 hours each) plus a few weeknights.
 

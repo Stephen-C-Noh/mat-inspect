@@ -10,10 +10,7 @@ module.exports = {
     sourceType: 'module',
   },
   plugins: ['@typescript-eslint'],
-  extends: [
-    'eslint:recommended',
-    'plugin:@typescript-eslint/recommended-type-checked',
-  ],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended-type-checked'],
   rules: {
     // No any without explicit justification
     '@typescript-eslint/no-explicit-any': 'error',
@@ -51,10 +48,5 @@ module.exports = {
       },
     },
   ],
-  ignorePatterns: [
-    'node_modules/',
-    'dist/',
-    '.next/',
-    'db/migrations/',
-  ],
+  ignorePatterns: ['node_modules/', 'dist/', '.next/', 'db/migrations/'],
 };

@@ -165,7 +165,9 @@ const linkIssues = async (blockerKey, blockedKey) => {
 
   if (!res.ok && res.status !== 201) {
     const data = await res.json();
-    console.warn(`  Warning: could not link ${blockerKey} -> ${blockedKey}: ${JSON.stringify(data)}`);
+    console.warn(
+      `  Warning: could not link ${blockerKey} -> ${blockedKey}: ${JSON.stringify(data)}`,
+    );
   }
 };
 

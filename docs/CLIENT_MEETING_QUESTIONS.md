@@ -7,6 +7,7 @@
 **Bring:** Laptop with the PRD, notepad, this document, list of equipment from the brief
 
 **Send ahead of meeting (24 to 48 hours before):**
+
 - One-page project summary (vision, scope, timeline)
 - This list of questions, so the sponsor can prepare answers in advance
 - Request a sample of completed paper inspection sheets (one per equipment class)

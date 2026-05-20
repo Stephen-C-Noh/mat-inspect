@@ -3,6 +3,7 @@
 This guide governs how team members use AI assistants (Claude, ChatGPT, Cursor, GitHub Copilot, and similar) on the MAT-Inspect capstone project.
 
 Two reasons this matters:
+
 1. **Compliance and privacy.** The system handles Alberta OHS records and SAIT institutional data subject to FOIP. Pasting the wrong thing into an external AI service is a real incident.
 2. **Capstone defense.** Every team member must be able to explain any code or document they submit. If AI wrote it and you cannot explain it, you do not ship it.
 
@@ -13,6 +14,7 @@ This guide is not anti-AI. AI is a productivity multiplier on this project. The 
 ## 1. Allowed AI Tools
 
 Approved for use:
+
 - Anthropic Claude (web, app, Claude Code)
 - OpenAI ChatGPT
 - GitHub Copilot (in-editor suggestions)
@@ -20,6 +22,7 @@ Approved for use:
 - Codeium / Continue.dev
 
 Not approved (require team discussion first):
+
 - Random AI services from unknown vendors
 - AI tools that train on your conversations by default (read the terms before using)
 - Self-hosted models that have not been vetted
@@ -31,6 +34,7 @@ Not approved (require team discussion first):
 ## 2. What AI Is Good For on This Project
 
 Use AI freely for:
+
 - Code scaffolding: a new Fastify route, a Drizzle schema, a React component, a Dockerfile, a GitHub Actions workflow
 - Boilerplate: error handling patterns, validation schemas, test setup
 - Test generation: write the first cut of unit tests, then verify they actually test behavior
@@ -48,6 +52,7 @@ Use AI freely for:
 ## 3. What AI Is NOT Good For
 
 Use extreme care or avoid:
+
 - **Architectural decisions.** AI gives plausible but generic advice. Architecture decisions on this project go in ADRs, written by humans, after team discussion.
 - **Alberta OHS citations.** AI hallucinates regulatory clauses. Every OHS reference in this project (in code comments, in docs, in the SECURITY.md) must be verified against the actual source on `search-ohs-laws.alberta.ca` before it ships.
 - **Security-sensitive code.** Auth flows, HMAC implementation, hash chain logic, JWT validation. AI may suggest patterns that look correct but have subtle holes. Two human reviewers minimum on these.
@@ -62,6 +67,7 @@ Use extreme care or avoid:
 These are not guidelines. These are rules.
 
 **Never paste into any AI tool:**
+
 - Real SAIT credentials, API keys, JWT secrets, database passwords
 - `.env` file contents (even "redacted" ones)
 - Real Lab Tech names, emails, employee IDs
@@ -85,6 +91,7 @@ The MAT-Inspect system processes SAIT institutional data covered by Alberta's Fr
 External AI services (Claude, ChatGPT, Copilot cloud) are third parties that may store, log, and process whatever you send them. From a FOIP perspective, sending SAIT data to an external AI is a disclosure to a third party.
 
 Rules:
+
 - Synthetic data only when asking AI for help with database or logic problems
 - Anonymize before pasting (replace real names with `User1`, real asset tags with `EQ-001`)
 - The voice transcription AI Service in this project runs on-prem; external AI services do not see voice clips
@@ -95,6 +102,7 @@ Rules:
 ## 6. Code Review When AI Was Used
 
 If a PR contains substantial AI-generated code:
+
 1. **Author** declares it in the PR description: "Sections X and Y were drafted with AI assistance."
 2. **Reviewer** reads with extra skepticism for:
    - API or library calls that do not exist (hallucinated method names)
@@ -122,6 +130,7 @@ If a PR contains substantial AI-generated code:
 Common failure mode: spend 45 minutes re-prompting AI until it gives an answer that looks right, when 10 minutes of reading the actual docs would have solved the problem definitively.
 
 Heuristics:
+
 - If you have re-prompted AI more than 3 times on the same issue, stop. Read the documentation directly.
 - If AI keeps suggesting variants of a solution that does not work, the problem is probably outside what AI knows about. Read the source. Or ask a teammate.
 - For Drizzle ORM, Fastify, Keycloak: read the official docs. AI often has stale or fabricated knowledge of these.
@@ -134,6 +143,7 @@ When you are stuck for more than 30 minutes, post in the team chat before contin
 ## 9. Academic Integrity
 
 SAIT capstone programs may have specific rules on AI use. Each team member is responsible for:
+
 - Reading SAIT's academic integrity policy on AI as of Spring 2026
 - Asking the capstone instructor directly about AI use expectations for this course
 - Disclosing AI use in the final capstone deliverables if required
@@ -146,11 +156,13 @@ If the instructor sets stricter rules than this guide, the instructor's rules wi
 ## 10. What to Do When AI Is Wrong About This Project
 
 AI tools have a training cutoff. They will sometimes be confidently wrong about:
+
 - Library versions (Next.js, Fastify, Drizzle release frequently)
 - Alberta OHS specifics
 - This project's specific architecture decisions
 
 When you catch AI being wrong:
+
 - Do not just re-prompt. Correct the AI in context (or paste the relevant section of `CLAUDE.md` into the chat) so the rest of the session is grounded.
 - If the error is systemic (AI keeps using an outdated pattern), update `CLAUDE.md` in the repo so the next teammate gets the corrected context.
 
@@ -159,6 +171,7 @@ When you catch AI being wrong:
 ## 11. Project AI Briefing File
 
 The repo root contains `CLAUDE.md`. This file is the project briefing for AI tools. Paste it (or its relevant section) into:
+
 - Claude chat sessions when starting work on a new feature
 - Cursor (it auto-loads as project context if placed in the repo root)
 - ChatGPT custom instructions for project-specific sessions
@@ -171,6 +184,7 @@ Update `CLAUDE.md` when you learn that AI consistently gets something wrong abou
 ## 12. Quick Self-Check Before Pasting Into AI
 
 Before you hit send on a paste into Claude or ChatGPT, ask:
+
 - Does this contain a real credential, key, or secret?
 - Does this contain personal information of any SAIT employee or student?
 - Does this contain SAIT internal data the sponsor shared with us?

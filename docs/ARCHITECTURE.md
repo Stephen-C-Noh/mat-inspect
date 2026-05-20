@@ -6,6 +6,7 @@
 **Hosting:** SAIT campus VM or SAIT cloud tenant (Microsoft Azure preferred), to be confirmed with campus IT
 **Compliance Target:** Alberta OHS Code Part 19 (Powered Mobile Equipment), Part 6 (Cranes, Hoists, Lifting Devices), CSA B167, CSA B335
 **Revision history:**
+
 - v1: Two-semester plan, broad architecture
 - v2: Tightened to one semester, AI removed
 - v3: AI required by sponsor; voice-to-text feature added back to MVP
@@ -28,18 +29,18 @@ The system is built as a set of Docker-based microservices and deployed to SAIT-
 
 Every problem stated in the project brief maps to a specific system feature.
 
-| Stated Problem | System Feature That Solves It |
-|---|---|
-| Inspection practices are inconsistent | Centralized checklist templates per equipment class, managed by Admin role |
-| Paper-based and often incomplete | Required-field validation; submission blocked if any required item is missing |
-| Missing records | All submissions written to PostgreSQL with append-only audit log |
-| Limited accountability | Every entry tied to authenticated user ID, timestamp, and device |
-| Cannot demonstrate compliance | Hash-chained audit log, signed PDF export, retention policy enforced by service |
-| Managers cannot verify completion | Real-time dashboard with per-shift, per-equipment status |
-| Lack of standardization | Equipment-class checklists with versioning; checklist changes are tracked |
-| Safety risk from unsafe equipment | Failed inspection auto-sets equipment status to OUT_OF_SERVICE; return-to-service requires supervisor approval |
-| Audit retrieval is difficult | Search by equipment, date range, operator, defect type; export to PDF or CSV |
-| Friction in capturing defect details (gloves, dirty hands) | Voice-to-text dictation for defect notes (AI Service, Whisper) |
+| Stated Problem                                             | System Feature That Solves It                                                                                  |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Inspection practices are inconsistent                      | Centralized checklist templates per equipment class, managed by Admin role                                     |
+| Paper-based and often incomplete                           | Required-field validation; submission blocked if any required item is missing                                  |
+| Missing records                                            | All submissions written to PostgreSQL with append-only audit log                                               |
+| Limited accountability                                     | Every entry tied to authenticated user ID, timestamp, and device                                               |
+| Cannot demonstrate compliance                              | Hash-chained audit log, signed PDF export, retention policy enforced by service                                |
+| Managers cannot verify completion                          | Real-time dashboard with per-shift, per-equipment status                                                       |
+| Lack of standardization                                    | Equipment-class checklists with versioning; checklist changes are tracked                                      |
+| Safety risk from unsafe equipment                          | Failed inspection auto-sets equipment status to OUT_OF_SERVICE; return-to-service requires supervisor approval |
+| Audit retrieval is difficult                               | Search by equipment, date range, operator, defect type; export to PDF or CSV                                   |
+| Friction in capturing defect details (gloves, dirty hands) | Voice-to-text dictation for defect notes (AI Service, Whisper)                                                 |
 
 ---
 
@@ -61,19 +62,19 @@ The system design enforces these Alberta OHS requirements directly in code, not 
 
 **Record retention:** Alberta OHS does not specify a hard minimum for inspection records, but the cross-jurisdiction best-practice default is 5 years. The system stores records for 7 years by default (configurable).
 
-**Critical compliance note on AI:** Alberta OHS s.257 requires the *operator* (a competent human) to complete the visual inspection. The AI Service in this system is assistive only: it transcribes voice notes and (optionally) suggests defect categories. It never auto-passes or auto-fails an inspection. Final judgement is always the operator's, recorded under the operator's signed identity.
+**Critical compliance note on AI:** Alberta OHS s.257 requires the _operator_ (a competent human) to complete the visual inspection. The AI Service in this system is assistive only: it transcribes voice notes and (optionally) suggests defect categories. It never auto-passes or auto-fails an inspection. Final judgement is always the operator's, recorded under the operator's signed identity.
 
 ---
 
 ## 4. Stakeholders and Roles
 
-| Role | Count | Permissions |
-|---|---|---|
-| Operator (Lab Tech) | 6 to 7 | Scan equipment, submit inspections, upload defect photos, dictate defect notes, view own history |
-| Supervisor | 2 to 3 | All Operator rights, plus: approve return-to-service, view team dashboard, acknowledge defects |
-| Manager | 1 to 2 | Full read access to all data, dashboard, reports, user management |
-| Admin | 1 (IT) | System config, checklist template editor, user roles, integrations |
-| Auditor | 0 to 2 (read-only) | Read-only access to records and exports, time-boxed access |
+| Role                | Count              | Permissions                                                                                      |
+| ------------------- | ------------------ | ------------------------------------------------------------------------------------------------ |
+| Operator (Lab Tech) | 6 to 7             | Scan equipment, submit inspections, upload defect photos, dictate defect notes, view own history |
+| Supervisor          | 2 to 3             | All Operator rights, plus: approve return-to-service, view team dashboard, acknowledge defects   |
+| Manager             | 1 to 2             | Full read access to all data, dashboard, reports, user management                                |
+| Admin               | 1 (IT)             | System config, checklist template editor, user roles, integrations                               |
+| Auditor             | 0 to 2 (read-only) | Read-only access to records and exports, time-boxed access                                       |
 
 Roles are not hierarchical in code; they are explicit permission sets. A user can hold multiple roles.
 
@@ -140,17 +141,18 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ca
 
 Four services are built by the team. Three are off-the-shelf images with configuration only.
 
-| Service | Language / Framework | Built by Team | Responsibility |
-|---|---|---|---|
-| Caddy | image only | No | TLS termination, reverse proxy, routing, ACME certs |
-| Keycloak | image only | No | OAuth2/OIDC, JWT issuance, user store, RBAC, MFA |
-| PostgreSQL | image only | No | Three logical schemas: auth (Keycloak), core, audit |
-| Core API Service | Node.js + Fastify + TypeScript | Yes | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications |
-| Media Service | Node.js + Fastify + TypeScript | Yes | Photo upload, voice clip upload, MinIO write, presigned URLs |
-| Audit / Report Service | Node.js + Fastify + TypeScript | Yes | Hash-chained audit log writer, PDF generation, CSV export |
-| AI Service | Python + FastAPI + faster-whisper | Yes | Voice-to-text transcription; (stretch) photo defect suggestion |
+| Service                | Language / Framework              | Built by Team | Responsibility                                                                                  |
+| ---------------------- | --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
+| Caddy                  | image only                        | No            | TLS termination, reverse proxy, routing, ACME certs                                             |
+| Keycloak               | image only                        | No            | OAuth2/OIDC, JWT issuance, user store, RBAC, MFA                                                |
+| PostgreSQL             | image only                        | No            | Three logical schemas: auth (Keycloak), core, audit                                             |
+| Core API Service       | Node.js + Fastify + TypeScript    | Yes           | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications |
+| Media Service          | Node.js + Fastify + TypeScript    | Yes           | Photo upload, voice clip upload, MinIO write, presigned URLs                                    |
+| Audit / Report Service | Node.js + Fastify + TypeScript    | Yes           | Hash-chained audit log writer, PDF generation, CSV export                                       |
+| AI Service             | Python + FastAPI + faster-whisper | Yes           | Voice-to-text transcription; (stretch) photo defect suggestion                                  |
 
 **Why these boundaries:**
+
 - Core API holds the business workflow and notifications. Notifications are embedded for the 13-week timeline; the code is structured so it can be extracted to its own service later.
 - Media is separate because it handles binary uploads, has different scaling needs, and a different attack surface (file parsing).
 - Audit is separate because its database has different durability and retention guarantees; isolation preserves legal evidentiary value.
@@ -158,12 +160,12 @@ Four services are built by the team. Three are off-the-shelf images with configu
 
 ### 5.3 Data Stores
 
-| Store | Purpose | Notes |
-|---|---|---|
-| PostgreSQL (auth_db) | Keycloak data | Managed by Keycloak |
-| PostgreSQL (core_db) | Equipment, checklists, inspections, defects | Primary business data |
-| PostgreSQL (audit_db) | Hash-chained audit log, retention metadata | INSERT-only role; writes only via Audit Service |
-| MinIO | Photo evidence, voice clips, generated PDF exports | S3-compatible, self-hosted |
+| Store                 | Purpose                                            | Notes                                           |
+| --------------------- | -------------------------------------------------- | ----------------------------------------------- |
+| PostgreSQL (auth_db)  | Keycloak data                                      | Managed by Keycloak                             |
+| PostgreSQL (core_db)  | Equipment, checklists, inspections, defects        | Primary business data                           |
+| PostgreSQL (audit_db) | Hash-chained audit log, retention metadata         | INSERT-only role; writes only via Audit Service |
+| MinIO                 | Photo evidence, voice clips, generated PDF exports | S3-compatible, self-hosted                      |
 
 Each schema is owned by a distinct database role with least-privilege grants.
 
@@ -259,6 +261,7 @@ User (managed by Keycloak; mirrored shadow table in core_db for joins)
 ```
 
 Database-level invariants:
+
 - An Inspection with `result = PASS` cannot exist if any of its responses has `passed = false` and `fail_severity = BLOCKING`.
 - An Equipment status of READY requires a recent passing Inspection within the shift window.
 - AuditEvent rows are insert-only; trigger blocks UPDATE and DELETE.
@@ -315,12 +318,14 @@ Database-level invariants:
 Keycloak as identity provider. Open source, OIDC compliant, supports federation with Microsoft Entra ID (SAIT's identity tenant), built-in user management, MFA, and lockout.
 
 **SAIT SSO federation:** Pending decision from the campus IT meeting. The system supports both paths without code changes:
+
 - **Path A (MVP default):** Local Keycloak users provisioned by Admin. Works on day one.
 - **Path B (preferred long-term):** Keycloak as OIDC client of Microsoft Entra ID. Users sign in with SAIT credentials.
 
 Switching paths is a Keycloak realm configuration change, no application code change.
 
 Token policy:
+
 - JWT access tokens, 15-minute lifetime.
 - Refresh tokens, 7-day lifetime, rotated on use.
 - MFA optional for Operator, required for Supervisor / Manager / Admin (Keycloak TOTP).
@@ -329,6 +334,7 @@ Token policy:
 ### 8.2 Authorization (RBAC)
 
 Two layers:
+
 1. Caddy + Keycloak validate JWT signature and basic role claim.
 2. Each service re-validates and enforces fine-grained permissions per endpoint via Casbin or a simple JSON policy.
 
@@ -348,6 +354,7 @@ Endpoints without a declared permission fail closed.
 The audit log is the legal record. Naive hash-chain implementations have five common failure modes that each break the chain's evidentiary value. The implementation below defends against each.
 
 **Failure modes guarded against:**
+
 - Non-deterministic JSON serialization (key-order changes → different hash for same data)
 - Mutable fields contaminating the hash input (`updated_at` triggers re-hash)
 - Concurrent inserts forking the chain (two writers compute hash against same `prev_hash`)
@@ -379,7 +386,7 @@ The audit log is the legal record. Naive hash-chain implementations have five co
    COMMIT;
    ```
 
-   The advisory lock serializes the *chain extension*, not the whole table; the lock is released at COMMIT. Concurrent writers queue behind each other rather than racing.
+   The advisory lock serializes the _chain extension_, not the whole table; the lock is released at COMMIT. Concurrent writers queue behind each other rather than racing.
 
 6. **Defense-in-depth CHECK constraint.** A Postgres function `verify_audit_hash(event_row, prev_hash)` recomputes the hash from canonical JSON and the supplied `prev_hash`; a CHECK constraint on the table calls this function. Even if application code has a bug, the database rejects malformed entries.
 
@@ -392,6 +399,7 @@ This is the level of specificity required for the audit log to actually have evi
 ### 8.5 AI-Specific Security Considerations
 
 The AI Service introduces new threats. Mitigations:
+
 - **Audio clips contain voice biometrics.** Treat as PII. Stored encrypted at rest in MinIO. Access logged. Retention: 90 days (transcripts kept for 7 years; audio is shorter-lived).
 - **Prompt injection via voice:** Operators could speak instructions that try to manipulate downstream consumers of the transcript. Mitigation: the transcript is stored as plain text and never fed to an LLM in this version. If a future feature does feed transcripts to an LLM, treat them as untrusted input.
 - **Model accuracy is not perfect.** Operator must confirm the transcript before submission. Schema requires `notes_source` field to track whether the operator edited the AI output.
@@ -400,24 +408,25 @@ The AI Service introduces new threats. Mitigations:
 
 ### 8.6 OWASP Top 10 Posture
 
-| OWASP Item | Mitigation |
-|---|---|
-| A01 Broken Access Control | Declarative policy, fail-closed, per-endpoint checks |
-| A02 Cryptographic Failures | TLS 1.3, encrypted backups, no plaintext secrets |
-| A03 Injection | Drizzle ORM (parameterized), Zod input validation |
-| A04 Insecure Design | This document; threat model session at start of Sprint 2 |
-| A05 Security Misconfiguration | Hardened Docker images (Alpine), non-root, read-only root filesystem, dropped capabilities |
-| A06 Vulnerable Components | Trivy on every build, Renovate, npm audit |
-| A07 Identification and Authentication Failures | Keycloak, MFA for elevated roles, lockout |
-| A08 Software and Data Integrity Failures | Hash-chained audit, signed PDF exports |
-| A09 Security Logging and Monitoring Failures | Loki, alerts on suspicious patterns |
-| A10 SSRF | Allow-list URL fetching only |
+| OWASP Item                                     | Mitigation                                                                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| A01 Broken Access Control                      | Declarative policy, fail-closed, per-endpoint checks                                       |
+| A02 Cryptographic Failures                     | TLS 1.3, encrypted backups, no plaintext secrets                                           |
+| A03 Injection                                  | Drizzle ORM (parameterized), Zod input validation                                          |
+| A04 Insecure Design                            | This document; threat model session at start of Sprint 2                                   |
+| A05 Security Misconfiguration                  | Hardened Docker images (Alpine), non-root, read-only root filesystem, dropped capabilities |
+| A06 Vulnerable Components                      | Trivy on every build, Renovate, npm audit                                                  |
+| A07 Identification and Authentication Failures | Keycloak, MFA for elevated roles, lockout                                                  |
+| A08 Software and Data Integrity Failures       | Hash-chained audit, signed PDF exports                                                     |
+| A09 Security Logging and Monitoring Failures   | Loki, alerts on suspicious patterns                                                        |
+| A10 SSRF                                       | Allow-list URL fetching only                                                               |
 
 ### 8.7 Privacy (FOIP)
 
 The system is hosted by SAIT; it falls under Alberta's Freedom of Information and Protection of Privacy Act (FOIP) and SAIT's institutional privacy policy.
 
 PII inventory:
+
 - Operator name, email
 - Certification dates
 - Voice clips (biometric)
@@ -425,6 +434,7 @@ PII inventory:
 - Optional geolocation (off by default)
 
 Controls:
+
 - Geolocation opt-in only.
 - Data subject access: export-all-data-by-user-id endpoint.
 - Retention: 7 years for inspection records; 90 days for raw voice audio (transcripts kept the full 7 years); per-user soft-delete preserves the audit trail.
@@ -432,16 +442,16 @@ Controls:
 
 ### 8.8 Threat Model Highlights
 
-| Threat | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Operator forges a signature to bypass inspection | Low | High | Server-side HMAC validation; session keys short-lived |
-| Manager edits an inspection after the fact | Low | High | Inspections immutable; corrections are new linked records |
-| QR code is replaced with a malicious one | Medium | Medium | QR contains only non-secret asset_tag; server validates against registry; suspicious scan patterns alert Admin |
-| Stolen JWT used from another device | Low | Medium | Short token lifetime, device fingerprint logged |
-| Database backup leaked | Low | High | Backups encrypted at rest, transferred over SSH only |
-| Voice clip leak | Low | High | Encrypted at rest, 90-day retention, access logged |
-| Supply chain (npm or pip package) compromise | Medium | High | Lockfile pinning, Trivy, audits |
-| AI transcript hallucinates a "pass" that masks a real failure | Low | High | Operator confirms transcript; transcripts are notes only, never drive pass/fail decisions; pass/fail driven by structured checklist items |
+| Threat                                                        | Likelihood | Impact | Mitigation                                                                                                                                |
+| ------------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Operator forges a signature to bypass inspection              | Low        | High   | Server-side HMAC validation; session keys short-lived                                                                                     |
+| Manager edits an inspection after the fact                    | Low        | High   | Inspections immutable; corrections are new linked records                                                                                 |
+| QR code is replaced with a malicious one                      | Medium     | Medium | QR contains only non-secret asset_tag; server validates against registry; suspicious scan patterns alert Admin                            |
+| Stolen JWT used from another device                           | Low        | Medium | Short token lifetime, device fingerprint logged                                                                                           |
+| Database backup leaked                                        | Low        | High   | Backups encrypted at rest, transferred over SSH only                                                                                      |
+| Voice clip leak                                               | Low        | High   | Encrypted at rest, 90-day retention, access logged                                                                                        |
+| Supply chain (npm or pip package) compromise                  | Medium     | High   | Lockfile pinning, Trivy, audits                                                                                                           |
+| AI transcript hallucinates a "pass" that masks a real failure | Low        | High   | Operator confirms transcript; transcripts are notes only, never drive pass/fail decisions; pass/fail driven by structured checklist items |
 
 ---
 
@@ -452,6 +462,7 @@ Controls:
 **Use case:** Lab Techs wearing gloves or with dirty hands struggle to type defect descriptions on a phone. Voice input is fast, hands-free, and natural.
 
 **Implementation:**
+
 - Model: **faster-whisper** with the `small` model (~500 MB, English-optimized variant `small.en`).
 - Runtime: Python 3.12 + FastAPI in a Docker container. CPU-only inference (no GPU required for short clips of under 30 seconds).
 - Endpoint: `POST /api/v1/ai/transcribe` accepts an audio blob (webm or wav, max 30 seconds, max 2 MB), returns `{transcript, confidence, language, processing_ms}`.
@@ -459,12 +470,14 @@ Controls:
 - Audio handling: clip is uploaded to MinIO by Media Service first, then AI Service is given a presigned URL. AI Service streams the audio in, transcribes, returns. The clip is referenced by `voice_clip_id` in the Response record.
 
 **Why this model:**
+
 - Pre-trained, no training data required from the team.
 - Open source (MIT), runs on-prem, satisfies privacy concerns.
 - `small.en` accuracy on clean English audio in a quiet lab: word error rate of 5 to 10 percent. Operator review catches the rest.
 - CPU inference of a 15-second clip on a 4-core VM completes in 3 to 5 seconds. Acceptable for UX.
 
 **Operator UX guardrails:**
+
 - Tap-to-record, tap-to-stop. Visual waveform during recording.
 - Auto-stop at 30 seconds.
 - After transcription, the text is editable. Operator must confirm before submission.
@@ -487,6 +500,7 @@ Controls:
 **Use case:** When operator uploads a photo of a defect, AI suggests a category (tire wear, hydraulic leak, structural damage, oil contamination). Operator confirms or overrides.
 
 **Implementation:**
+
 - Model: a pre-trained vision model (CLIP zero-shot classifier, or a small ViT fine-tuned on an open industrial-defect dataset like NEU surface defects). CLIP zero-shot is the faster path because no fine-tuning is needed.
 - Endpoint: `POST /api/v1/ai/classify-defect-photo` returns `{suggested_category, confidence, alternatives: [...]}`.
 - Suggestions are advisory only. The structured `item_key` is set by the checklist item, not by the AI.
@@ -502,7 +516,8 @@ This feature is explicitly out of MVP scope and only attempted if the team finis
 
 ### 9.4 AI Failure Mode (Architecturally Mandatory)
 
-The AI Service is *never* on the critical path of an inspection submission. If it is offline:
+The AI Service is _never_ on the critical path of an inspection submission. If it is offline:
+
 - PWA detects the failure (timeout or HTTP error) and shows a "voice unavailable, type your notes" message.
 - Submission proceeds normally with typed notes.
 - Equipment status is unaffected.
@@ -575,12 +590,12 @@ All endpoints have OpenAPI specs generated from Zod schemas (`zod-to-openapi`).
 
 ### 12.1 Environments
 
-| Environment | Purpose | Hosting |
-|---|---|---|
-| Local dev | Each student's laptop | Docker Compose, single host |
-| Dev staging | Shared environment for daily integration testing; fake data only | Team-owned mini-PC on Tailscale (Sprint 0 to Sprint 4); see Section 12.7 |
-| Pilot / Production staging | Sprint 5 pilot with real Lab Tech data; production deployment | SAIT campus VM or SAIT Azure tenant (provisioned in Sprint 4) |
-| Production | Live use at SAIT | SAIT campus VM or SAIT Azure tenant |
+| Environment                | Purpose                                                          | Hosting                                                                  |
+| -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Local dev                  | Each student's laptop                                            | Docker Compose, single host                                              |
+| Dev staging                | Shared environment for daily integration testing; fake data only | Team-owned mini-PC on Tailscale (Sprint 0 to Sprint 4); see Section 12.7 |
+| Pilot / Production staging | Sprint 5 pilot with real Lab Tech data; production deployment    | SAIT campus VM or SAIT Azure tenant (provisioned in Sprint 4)            |
+| Production                 | Live use at SAIT                                                 | SAIT campus VM or SAIT Azure tenant                                      |
 
 ### 12.2 Hosting Options
 
@@ -605,22 +620,22 @@ The capstone scope cannot deliver active-active high availability. But the archi
 
 **Recommended production posture (Azure path):**
 
-| Component | Hosting | Reason |
-|-----------|---------|--------|
-| Postgres | Azure Database for PostgreSQL (Flexible Server, Burstable B1ms tier) | Managed backups, point-in-time recovery, automated patching, replicated storage |
-| Object storage (photos, voice clips, PDF exports) | Azure Blob Storage with lifecycle policies | Geo-redundant storage, automated tiering, no self-hosted MinIO operational burden |
-| Stateless services (Caddy, Keycloak, Core API, Media, Audit, AI) | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM) | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts |
-| Observability (Prometheus, Grafana, Loki, Promtail) | Same VM | Loss of monitoring during the rebuild window is acceptable for capstone scope |
+| Component                                                        | Hosting                                                              | Reason                                                                            |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Postgres                                                         | Azure Database for PostgreSQL (Flexible Server, Burstable B1ms tier) | Managed backups, point-in-time recovery, automated patching, replicated storage   |
+| Object storage (photos, voice clips, PDF exports)                | Azure Blob Storage with lifecycle policies                           | Geo-redundant storage, automated tiering, no self-hosted MinIO operational burden |
+| Stateless services (Caddy, Keycloak, Core API, Media, Audit, AI) | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM)                    | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts      |
+| Observability (Prometheus, Grafana, Loki, Promtail)              | Same VM                                                              | Loss of monitoring during the rebuild window is acceptable for capstone scope     |
 
 This eliminates the worst SPOF (the data layer). If the VM dies, a replacement is spun up, pulls the same code from Git, points at the same managed Postgres and Blob Storage, and the system is back without data loss.
 
 **Recommended production posture (campus VM path, if Azure is not available):**
 
-| Component | Hosting | Reason |
-|-----------|---------|--------|
-| Postgres | Docker container on the campus VM, **but with PITR backup configured** to a SAIT-managed off-host target (e.g., NFS share, S3, Azure Blob, whatever SAIT IT provides) | Continuous WAL archiving so RPO is minutes, not 24 hours |
-| Object storage | Self-hosted MinIO with daily `mc mirror` to a SAIT-managed backup target | |
-| Everything else | Same VM | |
+| Component       | Hosting                                                                                                                                                               | Reason                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Postgres        | Docker container on the campus VM, **but with PITR backup configured** to a SAIT-managed off-host target (e.g., NFS share, S3, Azure Blob, whatever SAIT IT provides) | Continuous WAL archiving so RPO is minutes, not 24 hours |
+| Object storage  | Self-hosted MinIO with daily `mc mirror` to a SAIT-managed backup target                                                                                              |                                                          |
+| Everything else | Same VM                                                                                                                                                               |                                                          |
 
 The campus path has more residual SPOF than the Azure path. If campus is the only option, document this explicitly to the sponsor and SAIT IT.
 
@@ -638,6 +653,7 @@ The campus path has more residual SPOF than the Azure path. If campus is the onl
 On the Azure path, Postgres and MinIO are NOT in this list (they are managed services). On the campus path, add 1 Postgres container + 1 MinIO container (total 12 containers).
 
 **Memory budget on an 8 GB VM (Azure path with managed DB/storage):**
+
 - Keycloak ~700 MB
 - AI Service (Whisper loaded) ~1.5 GB
 - Each Node service ~150 MB (3 services = ~450 MB)
@@ -649,17 +665,20 @@ Staging runs the same compose file on a second instance (or a second resource gr
 ### 12.4 Reverse Proxy and TLS
 
 Caddy:
+
 - **Public hostname** (e.g., `mat-inspect.sait.ca`): Let's Encrypt via ACME. DNS managed by SAIT IT.
 - **Campus-internal hostname**: internal CA root cert provided by SAIT IT, or Caddy's built-in local CA with root cert distributed via SAIT device management.
 
 ### 12.5 Backup Strategy
 
 **Azure path:**
+
 - Postgres: managed automated backups with point-in-time recovery, 7-day retention default, configurable up to 35 days
 - Blob Storage: GRS (geo-redundant) replication by default
 - Configuration: All in Git. No unique server state outside the managed services.
 
 **Campus VM path:**
+
 - Postgres: `pg_dump` nightly + WAL archiving every 5 minutes to off-host storage. RPO ~5 minutes.
 - MinIO: `mc mirror` nightly to off-host target.
 - Configuration: All in Git.
@@ -669,14 +688,17 @@ Caddy:
 ### 12.6 Disaster Recovery
 
 **RPO (Recovery Point Objective):**
+
 - Azure path: under 5 minutes (PITR on managed Postgres)
 - Campus path: under 5 minutes if WAL archiving is set up; otherwise 24 hours
 
 **RTO (Recovery Time Objective):**
+
 - Azure path: 1 hour to rebuild the stateless VM; data is already preserved
 - Campus path: 4 hours on a replacement VM with the documented runbook
 
 **DR runbook contents:**
+
 - Step-by-step rebuild procedure
 - Where backups live and how to restore them
 - DNS update steps (if hostname needs to point to a new IP)
@@ -692,47 +714,56 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 **Host:** GMKtec M5 Plus (Ryzen 7 5825U, 32 GB RAM, Ubuntu 24.04), owned by a team member, reachable via Tailscale.
 
 **What this environment is used for:**
+
 - Daily integration testing of merged code
 - Sponsor demos at end of each sprint (Sprint 0 through Sprint 4)
 - The team's "Stephen-is-not-available" recovery drill (Sprint 2)
 - Whisper model performance baseline measurements
 
 **What this environment is NOT used for:**
+
 - Real Lab Tech inspections (Sprint 5 pilot must run on SAIT infrastructure)
 - Any data that falls under SAIT's institutional records or FOIP scope
 - Persistent storage of credentials beyond the project's own service accounts
 
 **Access pattern:**
+
 - All 5 team members are added to the host owner's Tailscale tailnet, scoped to the project.
 - SSH access via Tailscale only; no public ports.
 - CI/CD: GitHub Actions deploys to the host over SSH on every merge to `main` (continuous deployment to dev staging).
 
 **Isolation from host owner's existing services:**
+
 - The MAT project lives in `~/projects/mat-inspect/` with its own Docker Compose file, its own Caddy container (on host ports 80 and 443), its own Postgres, its own MinIO, its own Keycloak, its own observability stack.
 - All project services except Caddy stay on the project's internal Docker network and are not exposed to the host.
 - The project does not reuse the host owner's personal homelab services (Gitea, personal Prometheus, etc.). Keeping the project self-contained makes the Sprint 4 migration a single-command lift.
 
 **Caddy and HTTPS on dev staging:**
+
 - The project's Caddy container uses its built-in local CA. On first start, `docker compose exec caddy caddy trust` generates the root cert.
 - The root cert is distributed to all 5 team members; they install it on their dev devices.
 - Hostnames: `mat-inspect.staging` and similar, mapped to the Tailscale IP via each user's `/etc/hosts` or via Tailscale MagicDNS.
 
 **Shared secrets:**
+
 - Bitwarden cloud (free tier, or 1Password Teams via student plan if available) hosts the shared collection for team credentials (Keycloak admin, SMTP, database passwords, deploy keys).
 - `.env` files live in each developer's local checkout, never committed. The same Gitleaks pre-commit pattern used elsewhere prevents accidental commits.
 - On the M5 dev staging host, the `.env` file sits in the project directory, readable only by the deploy user.
 
 **Backups during dev staging phase:**
+
 - The host owner's existing rsync nightly backup is extended to include the project directory.
 - Database dumps run nightly inside the project's compose stack and write to the same backup target.
 - Backups are recovery for dev work only; they are not the system of record (the system of record is Git for code and the Sprint 5+ Azure/campus VM for data).
 
 **Sprint 4 migration (forced rehearsal):**
+
 - The migration to SAIT infrastructure is an explicit Sprint 4 deliverable, not a stretch task.
 - Migration steps: `pg_dump` of all three schemas, `mc mirror` of MinIO, `git pull` on the target VM, `docker compose up -d`, restore dumps, smoke test.
 - After Sprint 4, dev staging on the M5 continues for parallel team work but loses its sponsor-demo role. All sponsor demos from Sprint 5 onward use the SAIT-hosted instance.
 
 **End-of-project decommission:**
+
 - After capstone presentation (Aug 15, 2026), the M5 staging instance is shut down and its project directory archived.
 - No project data is retained on team-owned hardware post-handover.
 
@@ -740,13 +771,13 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 ## 13. Observability
 
-| Concern | Tool | Notes |
-|---|---|---|
-| Metrics | Prometheus | Service health, request rates, error rates, AI transcription latency |
-| Dashboards | Grafana | Per-service dashboards, compliance KPIs |
-| Logs | Loki + Promtail | Structured JSON logs, 30-day retention |
-| Uptime | Uptime Kuma | External-style ping checks |
-| Alerts | Alertmanager + email | Service down, audit chain break, disk full, AI Service errors above threshold |
+| Concern    | Tool                 | Notes                                                                         |
+| ---------- | -------------------- | ----------------------------------------------------------------------------- |
+| Metrics    | Prometheus           | Service health, request rates, error rates, AI transcription latency          |
+| Dashboards | Grafana              | Per-service dashboards, compliance KPIs                                       |
+| Logs       | Loki + Promtail      | Structured JSON logs, 30-day retention                                        |
+| Uptime     | Uptime Kuma          | External-style ping checks                                                    |
+| Alerts     | Alertmanager + email | Service down, audit chain break, disk full, AI Service errors above threshold |
 
 Logs are structured JSON. No PII (user IDs only, never names; equipment IDs only).
 
@@ -789,6 +820,7 @@ Configured on `main` and enforced by GitHub:
 - Block deletion
 
 CODEOWNERS enforces two-reviewer requirement on:
+
 - `services/audit/`
 - `services/core-api/src/middleware/auth.ts`
 - `services/core-api/src/lib/hmac.ts`
@@ -816,13 +848,13 @@ Docker Compose adds:
 
 ### 14.4 Secrets Management
 
-| Environment | Secret store |
-|-------------|--------------|
-| Local dev | `.env` files (gitignored; covered by Gitleaks pre-commit) |
-| Dev staging (M5) | `.env` files on the host, readable only by the deploy user; never committed |
-| Production (Azure) | Azure Key Vault; injected into containers at startup via the Azure SDK or a sidecar |
-| Production (campus VM) | Docker Secrets, file-based; rotated quarterly |
-| CI | GitHub Secrets, scoped per environment (dev-staging, production) |
+| Environment            | Secret store                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| Local dev              | `.env` files (gitignored; covered by Gitleaks pre-commit)                           |
+| Dev staging (M5)       | `.env` files on the host, readable only by the deploy user; never committed         |
+| Production (Azure)     | Azure Key Vault; injected into containers at startup via the Azure SDK or a sidecar |
+| Production (campus VM) | Docker Secrets, file-based; rotated quarterly                                       |
+| CI                     | GitHub Secrets, scoped per environment (dev-staging, production)                    |
 
 **Never use `.env` files in production.** Hardcoded values, including for "convenience," are a CVE waiting to happen.
 
@@ -843,7 +875,9 @@ Trunk-based, short-lived feature branches. PRs require 1 review and all checks g
 Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each end.
 
 ### Sprint 0: Discovery and Setup
+
 **Weeks 1 to 2 (May 18 to May 31)**
+
 - Stakeholder interviews; job shadow at least 2 inspections per equipment type.
 - Confirm checklist content with sponsor for all four equipment classes. Photograph or transcribe all existing paper checklists.
 - Campus IT meeting: confirm hosting option, SSO path, request FOIP checklist.
@@ -859,7 +893,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Sprint 0 demo target:** stack runs locally and on dev staging; checklists confirmed; hosting decision documented; AI Service stub returns a hardcoded transcript; team can reach dev staging via Tailscale with no browser warnings.
 
 ### Sprint 1: Auth, Equipment Registry, Checklist Engine
+
 **Weeks 3 to 4 (June 1 to June 14)**
+
 - Keycloak realm configured. Roles defined. Test users provisioned.
 - Core API: Equipment CRUD endpoints; seed data for the 10 machines.
 - ChecklistTemplate model and admin publish endpoint.
@@ -870,7 +906,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Sprint 1 demo:** Operator logs in, scans a QR, sees the correct checklist for that equipment.
 
 ### Sprint 2: Inspection Submission and Defect Workflow
+
 **Weeks 5 to 6 (June 15 to June 28)**
+
 - Inspection submission endpoint with HMAC validation.
 - Equipment status state machine.
 - Defect entity and workflow. Failed inspection auto-creates Defect and locks equipment.
@@ -881,7 +919,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Sprint 2 demo:** End-to-end pass and fail flows. Supervisor receives email on failure.
 
 ### Sprint 3: Manager Dashboard, Photo Evidence, **AI Voice-to-Text**
+
 **Weeks 7 to 8 (June 29 to July 12)**
+
 - Manager dashboard: live compliance grid, defect inbox, filters, drilldown.
 - Media Service: photo upload and presigned URL download.
 - PWA photo capture on failed items.
@@ -892,7 +932,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Sprint 3 demo:** Manager sees today's compliance. Operator dictates a defect note that appears as text. Voice clip is replayable in dashboard.
 
 ### Sprint 4: Audit, Reporting, Hardening, **SAIT Infrastructure Migration**
+
 **Weeks 9 to 10 (July 13 to July 26)**
+
 - Audit Service with hash-chained log writing; chain verification on startup.
 - PDF report generation (PDFKit). Per-inspection PDF and range exports. Signed PDFs.
 - CSV export.
@@ -908,7 +950,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Sprint 4 demo:** Auditor exports a signed PDF from the SAIT-hosted instance. Backups run. Security scan clean. Migration runbook documented and rehearsed.
 
 ### Sprint 5: Pilot
+
 **Week 11 (July 27 to August 2)**
+
 - Deploy to staging on the production-equivalent host.
 - Pilot with one shift of Lab Techs on real equipment. Target: 20+ real inspections.
 - Daily standup with sponsor.
@@ -917,7 +961,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Sprint 5 demo:** Lab Techs use the system live for one week.
 
 ### Sprint 6: Production Rollout
+
 **Week 12 (August 3 to August 9)**
+
 - Production deployment to the confirmed SAIT host.
 - DNS and TLS configured.
 - QR stickers printed and applied to all 10 machines.
@@ -927,7 +973,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Sprint 6 target:** all 10 machines tagged and live.
 
 ### Sprint 7: Stabilization and Handover
+
 **Week 13 (August 10 to August 15)**
+
 - Real-world bug fixes from the first production week.
 - Final documentation: README, SETUP, DEPLOYMENT, SECURITY, OPERATIONS_RUNBOOK, OPERATOR_GUIDE (1 page), SUPERVISOR_GUIDE (2 pages), ADMIN_GUIDE (5 pages).
 - Source code, deploy scripts, secrets handover process, runbook delivered to SAIT IT.
@@ -939,17 +987,18 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 
 ## 16. Team Allocation (5 Students)
 
-| Student | Owns | Backs Up |
-|---|---|---|
-| **Backend Lead** | Core API, data model, API contracts, state machine | Audit Service |
-| **Backend Engineer 2** | Keycloak integration, Media Service, notifications | Core API |
-| **Frontend Lead** | Operator PWA, QR scan, offline, **voice capture UI** | Manager dashboard |
-| **Frontend Engineer 2 / UX** | Manager dashboard, accessibility, UI consistency | Operator PWA |
-| **DevOps / QA / AI** | Docker, CI/CD, observability, Audit Service, **AI Service**, integration tests, security scans | Whichever backend service is behind schedule |
+| Student                      | Owns                                                                                           | Backs Up                                     |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Backend Lead**             | Core API, data model, API contracts, state machine                                             | Audit Service                                |
+| **Backend Engineer 2**       | Keycloak integration, Media Service, notifications                                             | Core API                                     |
+| **Frontend Lead**            | Operator PWA, QR scan, offline, **voice capture UI**                                           | Manager dashboard                            |
+| **Frontend Engineer 2 / UX** | Manager dashboard, accessibility, UI consistency                                               | Operator PWA                                 |
+| **DevOps / QA / AI**         | Docker, CI/CD, observability, Audit Service, **AI Service**, integration tests, security scans | Whichever backend service is behind schedule |
 
 The AI Service is owned by the DevOps / QA / AI student because it is a Python service with limited business logic. Voice capture UI is owned by the Frontend Lead because it integrates tightly with the PWA recording flow.
 
 Cadence:
+
 - Daily 15-minute standup.
 - Weekly 1-hour planning.
 - Sponsor demo at end of each sprint.
@@ -977,21 +1026,21 @@ Bundled with the source code at handover.
 
 ## 18. Risks and Mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Sponsor checklist content not finalized in time | High | Medium | Lock content by end of Week 4; document explicit decision deadlines |
-| Campus IT delays hosting approval beyond Sprint 4 | Medium | High | Dev staging on team-owned mini-PC bridges Sprint 0 to 4; if SAIT VM is not ready by Week 9, escalate to sponsor immediately because Sprint 5 pilot cannot start without it |
-| SSO federation decision delayed beyond Sprint 0 | Medium | Low | Default to local Keycloak users; switch is a config change, no code rework |
-| Team learning curve on Keycloak / Docker / Whisper | High | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration |
-| Real Lab Tech availability for testing | Medium | High | Schedule test sessions in advance; build a fake-equipment test rig if needed |
-| Scope creep from sponsor | Medium | High | Out-of-scope document, change request process, defer to v2 |
-| Whisper accuracy too low to be useful in a loud shop | Medium | Medium | Quiet the operator (move 2 metres from equipment to dictate); fallback to typed notes is always available; document accuracy expectations in AI Model Card |
-| AI Service slows the inspection flow | Low | Medium | Transcription is non-blocking; PWA shows immediate placeholder, transcript fills in when ready; operator can still type while waiting |
-| One student leaves the project | Low | High | Cross-training, every feature has a backup owner |
-| Audit chain bug undermines legal value | Low | High | Code review by 2 students, integration test with 10,000 simulated events that verifies chain |
-| Team-owned mini-PC fails or its owner becomes unavailable | Low | Medium | Everything in Git; any teammate can rebuild the staging stack on their laptop with `docker compose up`; Sprint 2 includes a recovery drill that proves this works |
-| Sprint 4 migration to SAIT infrastructure reveals environment-specific bugs | Medium | Medium | Migration is an explicit Sprint 4 deliverable, not Sprint 6; two full weeks of buffer to fix any environment-specific issues before pilot |
-| Real Lab Tech data accidentally written to team-owned mini-PC during or after Sprint 5 | Low | High | Tear-down of dev staging's Keycloak realm at end of Sprint 4; Sprint 5 onward, dev staging uses synthetic data only; ADR documents the rule |
+| Risk                                                                                   | Likelihood | Impact | Mitigation                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sponsor checklist content not finalized in time                                        | High       | Medium | Lock content by end of Week 4; document explicit decision deadlines                                                                                                        |
+| Campus IT delays hosting approval beyond Sprint 4                                      | Medium     | High   | Dev staging on team-owned mini-PC bridges Sprint 0 to 4; if SAIT VM is not ready by Week 9, escalate to sponsor immediately because Sprint 5 pilot cannot start without it |
+| SSO federation decision delayed beyond Sprint 0                                        | Medium     | Low    | Default to local Keycloak users; switch is a config change, no code rework                                                                                                 |
+| Team learning curve on Keycloak / Docker / Whisper                                     | High       | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration                                                                                             |
+| Real Lab Tech availability for testing                                                 | Medium     | High   | Schedule test sessions in advance; build a fake-equipment test rig if needed                                                                                               |
+| Scope creep from sponsor                                                               | Medium     | High   | Out-of-scope document, change request process, defer to v2                                                                                                                 |
+| Whisper accuracy too low to be useful in a loud shop                                   | Medium     | Medium | Quiet the operator (move 2 metres from equipment to dictate); fallback to typed notes is always available; document accuracy expectations in AI Model Card                 |
+| AI Service slows the inspection flow                                                   | Low        | Medium | Transcription is non-blocking; PWA shows immediate placeholder, transcript fills in when ready; operator can still type while waiting                                      |
+| One student leaves the project                                                         | Low        | High   | Cross-training, every feature has a backup owner                                                                                                                           |
+| Audit chain bug undermines legal value                                                 | Low        | High   | Code review by 2 students, integration test with 10,000 simulated events that verifies chain                                                                               |
+| Team-owned mini-PC fails or its owner becomes unavailable                              | Low        | Medium | Everything in Git; any teammate can rebuild the staging stack on their laptop with `docker compose up`; Sprint 2 includes a recovery drill that proves this works          |
+| Sprint 4 migration to SAIT infrastructure reveals environment-specific bugs            | Medium     | Medium | Migration is an explicit Sprint 4 deliverable, not Sprint 6; two full weeks of buffer to fix any environment-specific issues before pilot                                  |
+| Real Lab Tech data accidentally written to team-owned mini-PC during or after Sprint 5 | Low        | High   | Tear-down of dev staging's Keycloak realm at end of Sprint 4; Sprint 5 onward, dev staging uses synthetic data only; ADR documents the rule                                |
 
 ---
 
@@ -1029,6 +1078,7 @@ Bundled with the source code at handover.
 So the team is not staring at a blank repo on day one.
 
 **Week 1 (May 18 to May 24)**
+
 - [ ] Create Git repo (`mat-inspect`) on GitHub; branch protection, PR template, issue templates.
 - [ ] Create `docker-compose.yml` with: Postgres, MinIO, Keycloak, Caddy, and empty service stubs for Core API, Media, Audit, AI.
 - [ ] Each student gets the stack running locally (`docker compose up`).
@@ -1043,6 +1093,7 @@ So the team is not staring at a blank repo on day one.
 - [ ] Schedule Lab Tech shadowing sessions for Week 2.
 
 **Week 2 (May 25 to May 31)**
+
 - [ ] Run job shadow sessions with at least 4 Lab Techs across the four equipment classes.
 - [ ] Document current paper checklists (photograph or transcribe all of them).
 - [ ] Draft initial ChecklistTemplate JSON for each equipment class; review with sponsor before Sprint 1.
@@ -1061,6 +1112,7 @@ After Sprint 0: running stack locally and on shared dev staging, continuous depl
 ## 22. Definition of Done (for any feature)
 
 A feature is done when:
+
 1. Code merged to `main` via PR with at least one review.
 2. Unit and integration tests cover the new behavior; CI green.
 3. Trivy and Semgrep show no high or critical issues introduced.
