@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/Edmonton",
+  "schedule": ["before 6am on Monday"],
+  "packageRules": [
+    {
+      "description": "Group all minor and patch updates into one PR",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch"
+    },
+    {
+      "description": "Major updates get individual PRs for review",
+      "matchUpdateTypes": ["major"],
+      "separateMajorMinor": true
+    },
+    {
+      "description": "Security updates are applied immediately, ignore schedule",
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
+      "labels": ["security"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  },
+  "pip_requirements": {
+    "fileMatch": ["(^|/)requirements\\.txt$"]
+  },
+  "dockerfile": {
+    "enabled": true
+  },
+  "labels": ["chore"],
+  "assignees": [],
+  "reviewers": []
+}
