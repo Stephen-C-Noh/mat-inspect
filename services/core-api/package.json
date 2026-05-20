@@ -1,5 +1,5 @@
 {
-  "name": "stub",
+  "name": "@mat-inspect/core-api",
   "version": "0.0.0",
   "private": true,
   "scripts": {

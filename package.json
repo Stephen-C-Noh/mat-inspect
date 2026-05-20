@@ -15,17 +15,27 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "build": "tsc -b",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
-    "*.{md,json,yaml,yml}": ["prettier --write"],
-    "*.py": ["ruff format", "ruff check --fix"],
-    "Dockerfile*": ["hadolint"]
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{md,json,yaml,yml}": [
+      "prettier --write"
+    ],
+    "*.py": [
+      "ruff format",
+      "ruff check --fix"
+    ],
+    "Dockerfile*": [
+      "hadolint"
+    ]
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0",

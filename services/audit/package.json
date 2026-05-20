@@ -1,5 +1,5 @@
 {
-  "name": "stub",
+  "name": "@mat-inspect/audit",
   "version": "0.0.0",
   "private": true,
   "scripts": {
