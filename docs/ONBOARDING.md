@@ -3,6 +3,24 @@
 Welcome aboard. This is your day-1 to day-3 checklist. If anything is broken,
 ping the chat; do not silently struggle.
 
+## Before You Start (Windows only)
+
+All shell commands in this guide assume a Unix shell. Windows users must use WSL2.
+
+1. Open PowerShell as Administrator and run:
+   ```
+   wsl --install
+   ```
+2. Restart your machine. Ubuntu will be installed by default.
+3. Open the Ubuntu app and complete the initial user setup.
+4. Install Docker Desktop for Windows and enable WSL2 integration:
+   Settings > Resources > WSL Integration > enable your Ubuntu distro.
+5. From this point on, run all commands inside the Ubuntu (WSL2) terminal, not PowerShell or Command Prompt.
+
+If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. If any distro shows version 1, run `wsl --set-version Ubuntu 2`.
+
+---
+
 ## Day 1 (Aim for 2 hours)
 
 - [ ] Confirm you have GitHub access to the repo
