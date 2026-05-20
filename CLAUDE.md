@@ -31,6 +31,7 @@ These are not negotiable. Code that violates them will be rejected in review.
 Pinned versions as of project start. Match these when generating code.
 
 **Backend (services):**
+
 - Node.js 22 LTS
 - TypeScript 5.x, strict mode on
 - Fastify 5.x (chosen over Express for performance and type safety)
@@ -40,12 +41,14 @@ Pinned versions as of project start. Match these when generating code.
 - Pino for structured logging (JSON output)
 
 **Backend (AI Service only):**
+
 - Python 3.12
 - FastAPI
 - faster-whisper (small.en model)
 - Pydantic v2
 
 **Frontend:**
+
 - Next.js 15 with App Router
 - React 19
 - TypeScript strict
@@ -57,6 +60,7 @@ Pinned versions as of project start. Match these when generating code.
 - html5-qrcode for QR scanning
 
 **Infra:**
+
 - Docker + Docker Compose
 - Caddy 2.x reverse proxy with built-in local CA in dev, ACME in prod
 - Keycloak 25.x for auth
@@ -65,6 +69,7 @@ Pinned versions as of project start. Match these when generating code.
 - GitHub Actions for CI/CD
 
 **Do not suggest:**
+
 - Express (we use Fastify)
 - Prisma (we use Drizzle)
 - Redux (we use Zustand)
@@ -181,26 +186,35 @@ import { logger } from '../../lib/logger';
 const submitBody = z.object({
   equipmentId: z.string().uuid(),
   templateId: z.string().uuid(),
-  responses: z.array(z.object({
-    itemKey: z.string(),
-    value: z.unknown(),
-    passed: z.boolean(),
-    notes: z.string().optional(),
-    notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),
-  })),
+  responses: z.array(
+    z.object({
+      itemKey: z.string(),
+      value: z.unknown(),
+      passed: z.boolean(),
+      notes: z.string().optional(),
+      notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),
+    }),
+  ),
   signatureHmac: z.string(),
 });
 
 export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
-  app.post('/inspections', {
-    preHandler: [requireRole('operator')],
-    schema: { body: submitBody },
-  }, async (req, reply) => {
-    const body = submitBody.parse(req.body);
-    // ... business logic
-    logger.info({ operatorId: req.user.id, equipmentId: body.equipmentId }, 'inspection submitted');
-    return reply.code(201).send({ id: '...' });
-  });
+  app.post(
+    '/inspections',
+    {
+      preHandler: [requireRole('operator')],
+      schema: { body: submitBody },
+    },
+    async (req, reply) => {
+      const body = submitBody.parse(req.body);
+      // ... business logic
+      logger.info(
+        { operatorId: req.user.id, equipmentId: body.equipmentId },
+        'inspection submitted',
+      );
+      return reply.code(201).send({ id: '...' });
+    },
+  );
 };
 ```
 
@@ -213,13 +227,19 @@ import { equipment } from './equipment';
 import { users } from './users';
 
 export const inspectionResultEnum = pgEnum('inspection_result', [
-  'PASS', 'FAIL_WARNING', 'FAIL_BLOCKING'
+  'PASS',
+  'FAIL_WARNING',
+  'FAIL_BLOCKING',
 ]);
 
 export const inspections = pgTable('inspections', {
   id: uuid('id').primaryKey().defaultRandom(),
-  equipmentId: uuid('equipment_id').notNull().references(() => equipment.id),
-  operatorId: uuid('operator_id').notNull().references(() => users.id),
+  equipmentId: uuid('equipment_id')
+    .notNull()
+    .references(() => equipment.id),
+  operatorId: uuid('operator_id')
+    .notNull()
+    .references(() => users.id),
   templateId: uuid('template_id').notNull(),
   templateVersion: integer('template_version').notNull(),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
@@ -299,12 +319,14 @@ This project's documentation style is "ESL Researcher": short, factual, direct.
 - No marketing language. "Robust", "comprehensive", "leverages", "seamless", "cutting-edge": do not use these.
 - Active voice in collaborative docs; passive voice acceptable in solo-authored sections.
 - Do not start sentences with "I" in technical docs. The project speaks, not the author.
-- Comments explain *why*, not *what*. The code shows what.
+- Comments explain _why_, not _what_. The code shows what.
 
 Bad:
+
 > "This comprehensive solution leverages cutting-edge AI to seamlessly transcribe operator voice notes."
 
 Good:
+
 > "Transcribes operator voice notes using faster-whisper. Runs on-prem so audio does not leave SAIT infrastructure."
 
 ---
@@ -312,6 +334,7 @@ Good:
 ## 10. When You Are Uncertain
 
 If asked something where you do not have current, accurate knowledge:
+
 - Say so. Do not invent a method name, library API, or regulatory clause.
 - Suggest the human verify against the official source. For Alberta OHS, that source is `search-ohs-laws.alberta.ca`.
 - For library APIs, suggest checking the official docs at the version pinned in `package.json`.
@@ -331,6 +354,26 @@ When asked to do any of the following on this project, refuse and explain why:
 - Generate placeholder credentials, secrets, or API keys that look real (use obviously-fake values like `REPLACE_ME` or `xxxxxxxx`)
 - Write code that sends voice clips, photos, or personally identifying inspection data to external AI services
 - Make architectural changes that are not reflected in an ADR
+
+---
+
+## 13. Issue Tracking
+
+Tickets live in JIRA at https://edu-team-ub5fghfl.atlassian.net/jira/software/projects/KAN/boards/1
+
+Include the ticket key in every commit message and PR title so JIRA can link them automatically. Format:
+
+```
+KAN-12: short description of change
+```
+
+Example:
+
+```
+KAN-3: render equipment list with shadcn Card components
+```
+
+GitHub Issues are not used for feature work. Use them only for automated reports (Renovate, security scanners). All human-tracked work goes in JIRA.
 
 ---
 
