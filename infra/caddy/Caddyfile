@@ -1,4 +1,6 @@
 mat-inspect.staging {
+    tls internal
+
     respond /health 200
 
     @ai path /api/v1/ai/*
