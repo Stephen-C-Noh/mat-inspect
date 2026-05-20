@@ -1,0 +1,10 @@
+# Default: anyone on the team can review
+* @Stephen-C-Noh
+
+# Security-sensitive paths: require 2 reviewers
+# Replace @teammate-backend-lead once you know who it is
+/services/audit/                                    @Stephen-C-Noh @teammate-backend-lead
+/services/core-api/src/middleware/auth.ts           @Stephen-C-Noh @teammate-backend-lead
+/services/core-api/src/lib/hmac.ts                  @Stephen-C-Noh @teammate-backend-lead
+/services/core-api/src/domain/inspection.ts         @Stephen-C-Noh @teammate-backend-lead
+/db/migrations/                                     @Stephen-C-Noh @teammate-backend-lead
