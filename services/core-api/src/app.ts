@@ -2,7 +2,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import { HttpError } from './lib/http-error.js';
 import { logger } from './lib/logger.js';
 
-export const buildApp = async () => {
+export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
 
   app.setErrorHandler((err: FastifyError, req, reply) => {
