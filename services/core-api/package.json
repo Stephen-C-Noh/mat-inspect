@@ -3,6 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node server.js"
+    "dev": "tsx src/server.ts",
+    "start": "tsx src/server.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mat-inspect/shared-types": "^0.0.0",
+    "fastify": "^5.8.5",
+    "jose": "^6.2.3",
+    "pino": "^10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3"
   }
 }
