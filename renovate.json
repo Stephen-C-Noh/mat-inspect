@@ -3,6 +3,7 @@
   "extends": ["config:recommended"],
   "timezone": "America/Edmonton",
   "schedule": ["before 6am on Monday"],
+  "osvVulnerabilityAlerts": true,
   "packageRules": [
     {
       "description": "Group all minor and patch updates into one PR",
@@ -17,20 +18,13 @@
     },
     {
       "description": "Security updates are applied immediately, ignore schedule",
-      "matchCategories": ["security"],
+      "isVulnerabilityAlert": true,
       "schedule": ["at any time"],
       "labels": ["security"]
     }
   ],
   "vulnerabilityAlerts": {
-    "enabled": true,
     "labels": ["security"]
-  },
-  "pip_requirements": {
-    "fileMatch": ["(^|/)requirements\\.txt$"]
-  },
-  "dockerfile": {
-    "enabled": true
   },
   "labels": ["chore"],
   "assignees": [],
