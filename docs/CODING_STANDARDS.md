@@ -20,20 +20,20 @@ This document is the human-readable guide to writing code in this repo. The comp
 
 ## Naming Conventions
 
-| Thing                        | Convention                              | Example                              |
-| ---------------------------- | --------------------------------------- | ------------------------------------ |
-| Variables and functions      | camelCase                               | `submitInspection`                   |
-| React components             | PascalCase                              | `ChecklistItem`                      |
-| Types and interfaces         | PascalCase                              | `Inspection`, `EquipmentStatus`      |
-| Enums and enum values        | PascalCase enum, SCREAMING_SNAKE values | `EquipmentStatus.OUT_OF_SERVICE`     |
-| Constants                    | SCREAMING_SNAKE                         | `MAX_VOICE_CLIP_SECONDS`             |
-| Drizzle table objects        | camelCase plural                        | `inspections`, `equipment`           |
-| Drizzle column names in DB   | snake_case                              | `submitted_at`, `operator_id`        |
-| File names: TS modules       | kebab-case                              | `inspection-service.ts`              |
-| File names: React components | PascalCase                              | `ChecklistItemView.tsx`              |
-| Folders                      | kebab-case                              | `services/core-api/`                 |
+| Thing                        | Convention                              | Example                                 |
+| ---------------------------- | --------------------------------------- | --------------------------------------- |
+| Variables and functions      | camelCase                               | `submitInspection`                      |
+| React components             | PascalCase                              | `ChecklistItem`                         |
+| Types and interfaces         | PascalCase                              | `Inspection`, `EquipmentStatus`         |
+| Enums and enum values        | PascalCase enum, SCREAMING_SNAKE values | `EquipmentStatus.OUT_OF_SERVICE`        |
+| Constants                    | SCREAMING_SNAKE                         | `MAX_VOICE_CLIP_SECONDS`                |
+| Drizzle table objects        | camelCase plural                        | `inspections`, `equipment`              |
+| Drizzle column names in DB   | snake_case                              | `submitted_at`, `operator_id`           |
+| File names: TS modules       | kebab-case                              | `inspection-service.ts`                 |
+| File names: React components | PascalCase                              | `ChecklistItemView.tsx`                 |
+| Folders                      | kebab-case                              | `services/core-api/`                    |
 | Env variables                | SCREAMING_SNAKE                         | `ENTRA_TENANT_ID`, `WHISPER_MODEL_PATH` |
-| API endpoints                | kebab-case in path; resources plural    | `/api/v1/inspections/:id`            |
+| API endpoints                | kebab-case in path; resources plural    | `/api/v1/inspections/:id`               |
 
 ---
 

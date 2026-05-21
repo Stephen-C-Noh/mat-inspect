@@ -372,16 +372,16 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 See `docs/ARCHITECTURE.md` Section 15 for the full sprint plan. Summary:
 
-| Phase                                    | Weeks   | Focus                                                                    |
-| ---------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| Sprint 0: Discovery and Setup            | 1 to 2  | Stakeholder interviews, dev staging on team mini-PC, repo, CI            |
+| Phase                                    | Weeks   | Focus                                                                                |
+| ---------------------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| Sprint 0: Discovery and Setup            | 1 to 2  | Stakeholder interviews, dev staging on team mini-PC, repo, CI                        |
 | Sprint 1: Auth, Equipment, Checklists    | 3 to 4  | Entra ID integration, equipment registry, checklist templates, PWA login and QR scan |
-| Sprint 2: Inspection and Defect Workflow | 5 to 6  | Submission, state machine, defect flow, email notifications              |
-| Sprint 3: Dashboard, Media, AI           | 7 to 8  | Manager dashboard, photo upload, AI voice-to-text                        |
-| Sprint 4: Audit, Reports, SAIT Migration | 9 to 10 | Hash chain, PDF and CSV exports, migrate stack to SAIT VM                |
-| Sprint 5: Pilot                          | 11      | Real Lab Tech use of staging system on SAIT infrastructure               |
-| Sprint 6: Production Rollout             | 12      | Production deployment, training, cutover from paper                      |
-| Sprint 7: Stabilization and Handover     | 13      | Bug fixes, documentation, capstone presentation                          |
+| Sprint 2: Inspection and Defect Workflow | 5 to 6  | Submission, state machine, defect flow, email notifications                          |
+| Sprint 3: Dashboard, Media, AI           | 7 to 8  | Manager dashboard, photo upload, AI voice-to-text                                    |
+| Sprint 4: Audit, Reports, SAIT Migration | 9 to 10 | Hash chain, PDF and CSV exports, migrate stack to SAIT VM                            |
+| Sprint 5: Pilot                          | 11      | Real Lab Tech use of staging system on SAIT infrastructure                           |
+| Sprint 6: Production Rollout             | 12      | Production deployment, training, cutover from paper                                  |
+| Sprint 7: Stabilization and Handover     | 13      | Bug fixes, documentation, capstone presentation                                      |
 
 **Final deliverable date: August 15, 2026.**
 

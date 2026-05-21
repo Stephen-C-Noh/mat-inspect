@@ -144,7 +144,7 @@ Four services are built by the team. Three are off-the-shelf images with configu
 | ---------------------- | --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
 | Caddy                  | image only                        | No            | TLS termination, reverse proxy, routing, ACME certs                                             |
 | Azure AD / Entra ID    | external (SAIT tenant)            | No            | OAuth2/OIDC, JWT issuance, MFA, account lockout; managed by SAIT IT                             |
-| PostgreSQL             | image only                        | No            | Two logical schemas: core, audit                                                                 |
+| PostgreSQL             | image only                        | No            | Two logical schemas: core, audit                                                                |
 | Core API Service       | Node.js + Fastify + TypeScript    | Yes           | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications |
 | Media Service          | Node.js + Fastify + TypeScript    | Yes           | Photo upload, voice clip upload, MinIO write, presigned URLs                                    |
 | Audit / Report Service | Node.js + Fastify + TypeScript    | Yes           | Hash-chained audit log writer, PDF generation, CSV export                                       |
@@ -613,12 +613,12 @@ The capstone scope cannot deliver active-active high availability. But the archi
 
 **Recommended production posture (Azure path):**
 
-| Component                                                        | Hosting                                                              | Reason                                                                            |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Postgres                                                         | Azure Database for PostgreSQL (Flexible Server, Burstable B1ms tier) | Managed backups, point-in-time recovery, automated patching, replicated storage   |
-| Object storage (photos, voice clips, PDF exports)                | Azure Blob Storage with lifecycle policies                           | Geo-redundant storage, automated tiering, no self-hosted MinIO operational burden |
-| Stateless services (Caddy, Core API, Media, Audit, AI)           | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM)                    | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts      |
-| Observability (Prometheus, Grafana, Loki, Promtail)              | Same VM                                                              | Loss of monitoring during the rebuild window is acceptable for capstone scope     |
+| Component                                              | Hosting                                                              | Reason                                                                            |
+| ------------------------------------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Postgres                                               | Azure Database for PostgreSQL (Flexible Server, Burstable B1ms tier) | Managed backups, point-in-time recovery, automated patching, replicated storage   |
+| Object storage (photos, voice clips, PDF exports)      | Azure Blob Storage with lifecycle policies                           | Geo-redundant storage, automated tiering, no self-hosted MinIO operational burden |
+| Stateless services (Caddy, Core API, Media, Audit, AI) | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM)                    | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts      |
+| Observability (Prometheus, Grafana, Loki, Promtail)    | Same VM                                                              | Loss of monitoring during the rebuild window is acceptable for capstone scope     |
 
 This eliminates the worst SPOF (the data layer). If the VM dies, a replacement is spun up, pulls the same code from Git, points at the same managed Postgres and Blob Storage, and the system is back without data loss.
 

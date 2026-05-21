@@ -66,7 +66,8 @@ const tickets = [
   },
   {
     ref: 'T4',
-    summary: 'Configure Entra ID app registration with operator, supervisor, manager, and admin roles',
+    summary:
+      'Configure Entra ID app registration with operator, supervisor, manager, and admin roles',
     description: text(
       'Work with SAIT IT to configure the Entra ID app registration. Define App Roles: operator, supervisor, manager, admin (see packages/shared-types/src/index.ts for the UserRole type). Assign test users to each role. Record the tenant ID and client ID in Bitwarden and in .env.example as ENTRA_TENANT_ID and ENTRA_CLIENT_ID.\n\nAcceptance criteria: All four App Roles exist in the Entra ID registration. A test user for each role can authenticate and the role claim appears in the JWT. ENTRA_TENANT_ID and ENTRA_CLIENT_ID are documented.',
     ),
