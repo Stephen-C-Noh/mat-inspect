@@ -40,7 +40,7 @@ If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. I
 
 ## Day 2 (Aim for 2 hours)
 
-- [ ] Set up Bitwarden access (Stephen will send invite link)
+- [ ] Get the `.env` file from Stephen directly (in person or secure message); place it at the repo root
 - [ ] Set up Tailscale access for dev staging (Stephen will send invite)
 - [ ] Skim [PRD.md](PRD.md) and [FRS.md](FRS.md)
 - [ ] Open your first issue in the Sprint 0 milestone; comment to claim it
@@ -59,7 +59,7 @@ If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. I
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
 | Stack does not start    | Check Docker Desktop is running; check ports 3000, 3001, 5432, 8080, 9000 are free on your machine |
 | Cannot access GitHub    | Stephen (repo owner) can add you                                                                   |
-| Cannot access Bitwarden | Stephen sends the invite                                                                           |
+| Missing .env file       | Ask Stephen for it directly                                                                        |
 | Cannot access Tailscale | Stephen sends the invite                                                                           |
 | A doc is unclear        | Ask in chat. If it took you more than 30 min to understand, the doc is wrong — update it           |
 | CI is red on your PR    | Read the failed check log; fix it; do not bypass with `--no-verify`                                |
