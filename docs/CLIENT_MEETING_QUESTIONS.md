@@ -112,6 +112,8 @@ Goal: confirm regulatory anchors and identify any SAIT-specific requirements.
 - [ ] **Q: Network: is there reliable WiFi in the MAT lab where Lab Techs will use the system? Coverage in all bays?** **This is a hard requirement.** The PWA assumes connectivity is generally available. If significant dead zones exist, the offline scope must be upgraded, which is roughly 3 to 5 days of additional work. Confirm: signal strength in each of the 10 equipment locations. If unconfirmed, schedule a 30-minute WiFi survey during the equipment walkaround.
 - [ ] **Q: Do Lab Techs have SAIT-issued phones, tablets, or personal devices? Will they be using their personal phones for QR scanning?**
 - [ ] **Q: For dev staging during the first 9 weeks, the team plans to use a team-owned mini-PC accessed via Tailscale. No SAIT data on it. Acceptable?**
+- [ ] **Q: For Azure resource provisioning: will SAIT IT create and own the Azure resources (VM, PostgreSQL, Blob Storage, Key Vault, ACR) and grant the team access to deploy into them, or will SAIT IT hand the team a resource group to provision themselves and transfer ownership at handover?** This decision affects who holds the Azure credentials during development and must be confirmed before Sprint 4.
+- [ ] **Q: At production handover (August 15, 2026), will SAIT IT take over the Azure subscription and rotate all credentials, or does the team transfer specific resource ownership?** The handover runbook will be written based on the answer.
 
 ---
 
