@@ -68,7 +68,7 @@ services:
       - audit
       - ai
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:2019/']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2019/config/']
       interval: 10s
       timeout: 5s
       retries: 3
