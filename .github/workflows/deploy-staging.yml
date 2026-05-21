@@ -31,5 +31,5 @@ jobs:
             cd ~/projects/mat-inspect
             git pull
             docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose up -d --remove-orphans --wait --wait-timeout 120
             ./scripts/docker-health-check.sh
