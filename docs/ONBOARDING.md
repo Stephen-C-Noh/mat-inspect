@@ -43,7 +43,7 @@ If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. I
 - [ ] Get the `.env` file from Stephen directly (in person or secure message); place it at the repo root
 - [ ] Set up Tailscale access for dev staging (Stephen will send invite)
 - [ ] Skim [PRD.md](PRD.md) and [FRS.md](FRS.md)
-- [ ] Open your first issue in the Sprint 0 milestone; comment to claim it
+- [ ] Open your first ticket on the [Jira board](https://edu-team-asxyfk1n.atlassian.net/jira/software/projects/DEV/boards/1); comment to claim it
 - [ ] Create your first branch and open a PR (even trivial, e.g., add your name
       to a contributors section). This exercises the full workflow end to end.
 
