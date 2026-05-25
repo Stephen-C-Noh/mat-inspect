@@ -1,19 +1,23 @@
-# Azure Deployment Cost Estimate
+# Azure Deployment Cost Estimate (Version 2)
 
 **Project:** MAT-Inspect (SAIT MAT Pre-Use Inspection System)
 **Prepared:** May 2026
-**Audience:** Capstone instructor, SAIT IT
-**Scope:** Production deployment on SAIT Azure tenant (Option A from ARCHITECTURE.md s.12.2)
+**Audience:** SAIT IT (post-handover reference); capstone instructor
+**Scope:** Cost reference for production deployment on Azure if SAIT IT chooses that path. The team does not provision Azure resources during the capstone; all services run on a team-owned mini-PC via Docker Compose. See ARCHITECTURE.md s.12.2 for the deployment strategy.
 
 ---
 
 ## Architecture Summary
 
-The recommended production posture moves the persistent layer to Azure managed services and runs all stateless services on a single VM. This eliminates the database as a single point of failure while keeping the deployment simple enough for a 5-student capstone team to operate and hand over.
+This estimate covers the Azure-managed-services deployment option. SAIT IT may also choose to run the full stack in Docker on a single VM (including self-hosted Postgres and MinIO), which reduces cost but increases operational burden. Both options use the same application code and Docker Compose configuration.
+
+The recommended Azure posture moves the persistent layer to managed services and runs all stateless services on a single VM. This eliminates the database as a single point of failure.
 
 - **Postgres and object storage** run as Azure managed services (automatic backups, PITR, geo-redundancy).
 - **All application containers** run on one Azure VM via Docker Compose.
 - **Entra ID** is the sole identity provider, using SAIT's existing institutional tenant at no extra cost.
+
+**Note on MinIO vs. Azure Blob Storage:** The application's Media Service uses an S3-compatible client (AWS SDK v3) targeting MinIO. If SAIT IT chooses Azure Blob Storage instead, the storage client in the Media Service must be updated to use the Azure SDK (one service file). If SAIT IT keeps MinIO running in Docker on the VM, no code changes are needed and cost is lower.
 
 ---
 
@@ -26,7 +30,7 @@ The recommended production posture moves the persistent layer to Azure managed s
 | Azure Blob Storage                            | LRS, hot tier                                      | ~$4-8              | Replaces self-hosted MinIO. Stores inspection photos, voice clips (90-day retention), and generated PDF reports. Estimated initial volume: 50-100 GB.                                                                                                 |
 | Azure Key Vault                               | Standard tier                                      | ~$3-5              | Stores service secrets (DB passwords, HMAC keys, SMTP credentials). Secrets are injected into containers at startup; nothing is hardcoded or in `.env` in production.                                                                                 |
 | Azure Container Registry (ACR)                | Basic tier                                         | ~$7-10             | Stores the 5 built container images (~5-10 GB total). During development the team uses GitHub Container Registry (GHCR), but production images should be pushed to an ACR under the SAIT tenant so SAIT IT retains full control over the image store. |
-| Azure Entra ID                                | SAIT institutional tenant                          | $0                 | Covered by SAIT's existing Microsoft 365 license. The team registers an app within the existing tenant; SAIT IT assigns App Roles to users or groups via the Azure portal.                                                                            |
+| Azure Entra ID                                | SAIT institutional tenant                          | $0                 | Covered by SAIT's existing Microsoft 365 license. SAIT IT registers the app in their tenant and assigns App Roles to users or groups via the Azure portal. See SAIT_IT_QUESTIONS.md for setup steps.                                                  |
 
 **Estimated total (production): ~$142-175 CAD/month**
 

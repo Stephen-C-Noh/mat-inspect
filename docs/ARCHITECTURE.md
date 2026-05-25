@@ -3,7 +3,7 @@
 **Sponsor:** SAIT School of Manufacturing, Automation, and Transportation (Main Campus)
 **Team Size:** 5 students
 **Timeline:** May 18, 2026 to August 15, 2026 (13 weeks, single semester)
-**Hosting:** SAIT campus VM or SAIT cloud tenant (Microsoft Azure preferred), to be confirmed with campus IT
+**Hosting:** Team-owned mini-PC for the capstone period (Sprints 0 to 6); SAIT-controlled infrastructure provisioned post-handover if the School of MAT adopts the application
 **Compliance Target:** Alberta OHS Code Part 19 (Powered Mobile Equipment), Part 6 (Cranes, Hoists, Lifting Devices), CSA B167, CSA B335
 **Revision history:**
 
@@ -11,7 +11,8 @@
 - v2: Tightened to one semester, AI removed
 - v3: AI required by sponsor; voice-to-text feature added back to MVP
 - v4: Added development staging infrastructure on team-owned hardware (Section 12.7); forced migration to school infrastructure made an explicit Sprint 4 deliverable
-- v5 (this document): Reviewer feedback applied. Audit chain implementation specifics (Section 8.4), Whisper accuracy escalation path (Section 9.1), offline-first downgraded to short-drop tolerance (Section 10.1), SPOF acknowledgement with managed-services recommendation (Section 12.3), CI gates enforced with explicit severity thresholds (Section 14)
+- v5: Reviewer feedback applied. Audit chain implementation specifics (Section 8.4), Whisper accuracy escalation path (Section 9.1), offline-first downgraded to short-drop tolerance (Section 10.1), SPOF acknowledgement with managed-services recommendation (Section 12.3), CI gates enforced with explicit severity thresholds (Section 14)
+- v6 (this document): Deployment strategy updated. SAIT IT confirmed no infrastructure access during the capstone. All services run in Docker on team-owned hardware for the full project duration. Entra ID app registration moved to a team-owned personal Azure tenant for development; SAIT IT registers their own app at handover. Sprint 4 migration milestone reframed as DR rehearsal and handover package assembly. Azure cost estimate repositioned as a post-handover reference document.
 
 ---
 
@@ -21,7 +22,7 @@ The MAT Pre-Use Inspection System (working name: **MAT-Inspect**) replaces paper
 
 Lab Techs scan a QR code on the equipment, complete an equipment-specific digital checklist on a mobile device, dictate defect notes by voice (transcribed by an on-prem AI service), and submit. The system stores a tamper-evident record, blocks unsafe equipment from being marked operational, and notifies supervisors. Managers see live compliance status on a dashboard. Auditors export signed PDF reports for any equipment and date range.
 
-The system is built as a set of Docker-based microservices and deployed to SAIT-controlled infrastructure. All software is open source. The team writes four services (three Node.js, one Python for AI) plus two frontend apps. Production target date: August 15, 2026.
+The system is built as a set of Docker-based microservices running on a team-owned mini-PC via Docker Compose for the capstone period. All software is open source. The team writes four services (three Node.js, one Python for AI) plus two frontend apps. At handover, SAIT IT deploys the same Docker Compose stack to SAIT-controlled infrastructure. Capstone handover date: August 15, 2026.
 
 ---
 
@@ -140,15 +141,15 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ca
 
 Four services are built by the team. Three are off-the-shelf images with configuration only.
 
-| Service                | Language / Framework              | Built by Team | Responsibility                                                                                  |
-| ---------------------- | --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
-| Caddy                  | image only                        | No            | TLS termination, reverse proxy, routing, ACME certs                                             |
-| Azure AD / Entra ID    | external (SAIT tenant)            | No            | OAuth2/OIDC, JWT issuance, MFA, account lockout; managed by SAIT IT                             |
-| PostgreSQL             | image only                        | No            | Two logical schemas: core, audit                                                                |
-| Core API Service       | Node.js + Fastify + TypeScript    | Yes           | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications |
-| Media Service          | Node.js + Fastify + TypeScript    | Yes           | Photo upload, voice clip upload, MinIO write, presigned URLs                                    |
-| Audit / Report Service | Node.js + Fastify + TypeScript    | Yes           | Hash-chained audit log writer, PDF generation, CSV export                                       |
-| AI Service             | Python + FastAPI + faster-whisper | Yes           | Voice-to-text transcription; (stretch) photo defect suggestion                                  |
+| Service                | Language / Framework              | Built by Team | Responsibility                                                                                                                   |
+| ---------------------- | --------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Caddy                  | image only                        | No            | TLS termination, reverse proxy, routing, ACME certs                                                                              |
+| Azure Entra ID         | external (team-owned tenant)      | No            | OAuth2/OIDC, JWT issuance, MFA, account lockout; team-owned personal tenant for dev; SAIT IT registers their own app at handover |
+| PostgreSQL             | image only                        | No            | Two logical schemas: core, audit                                                                                                 |
+| Core API Service       | Node.js + Fastify + TypeScript    | Yes           | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications                                  |
+| Media Service          | Node.js + Fastify + TypeScript    | Yes           | Photo upload, voice clip upload, MinIO write, presigned URLs                                                                     |
+| Audit / Report Service | Node.js + Fastify + TypeScript    | Yes           | Hash-chained audit log writer, PDF generation, CSV export                                                                        |
+| AI Service             | Python + FastAPI + faster-whisper | Yes           | Voice-to-text transcription; (stretch) photo defect suggestion                                                                   |
 
 **Why these boundaries:**
 
@@ -313,7 +314,7 @@ Database-level invariants:
 
 ### 8.1 Authentication
 
-Azure AD / Entra ID as the sole identity provider (see ADR-0002). All users are SAIT staff with existing SAIT accounts. No local user store. SAIT IT manages the Entra ID app registration and assigns App Roles to users or groups via the Azure portal.
+Azure Entra ID is the sole identity provider (see ADR-0002). During the capstone, the team uses a personal Azure tenant (Microsoft Entra ID Free tier) with test users assigned to the five App Roles. No local user store. At handover, SAIT IT registers the application in the SAIT Entra ID tenant and assigns roles to real SAIT staff accounts. No code changes are required for this migration; only the `AZURE_TENANT_ID` and `AZURE_CLIENT_ID` environment variables change.
 
 Services validate JWTs by fetching the public key from the Entra ID JWKS endpoint (`https://login.microsoftonline.com/{tenant-id}/discovery/v2.0/keys`). The shared `verifyToken` middleware handles this; no per-endpoint JWT parsing.
 
@@ -583,110 +584,90 @@ All endpoints have OpenAPI specs generated from Zod schemas (`zod-to-openapi`).
 
 ### 12.1 Environments
 
-| Environment                | Purpose                                                          | Hosting                                                                  |
-| -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Local dev                  | Each student's laptop                                            | Docker Compose, single host                                              |
-| Dev staging                | Shared environment for daily integration testing; fake data only | Team-owned mini-PC on Tailscale (Sprint 0 to Sprint 4); see Section 12.7 |
-| Pilot / Production staging | Sprint 5 pilot with real Lab Tech data; production deployment    | SAIT campus VM or SAIT Azure tenant (provisioned in Sprint 4)            |
-| Production                 | Live use at SAIT                                                 | SAIT campus VM or SAIT Azure tenant                                      |
+| Environment   | Purpose                                                               | Hosting                                                            |
+| ------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Local dev     | Each student's laptop                                                 | Docker Compose, single host                                        |
+| Dev staging   | Shared environment for daily integration testing; synthetic data only | Team-owned mini-PC on Tailscale (Sprints 0 to 6); see Section 12.7 |
+| Capstone demo | Sprint 5 and Sprint 6 sponsor demos; synthetic data only              | Team-owned mini-PC; same host as dev staging                       |
+| Production    | Live use at SAIT (post-handover, if School of MAT adopts the app)     | SAIT-controlled infrastructure, provisioned by SAIT IT on request  |
 
-### 12.2 Hosting Options
+### 12.2 Hosting Strategy
 
-The system is deployed to SAIT-controlled infrastructure. The team will confirm the target with campus IT during Sprint 0. In order of preference:
+All services run in Docker containers via Docker Compose for the full capstone period. This is the only deployment path.
 
-**Option A: Microsoft Azure (SAIT institutional tenant).**
-A VM (Standard B2ms: 2 vCPU, 8 GB RAM, 64 GB SSD) under SAIT's existing Microsoft 365 / Azure tenancy. Pros: SAIT already runs on Microsoft; SSO with Entra ID is straightforward; managed snapshots, backups, and monitoring; Key Vault for secrets; Blob Storage for backup target. Cons: recurring cost (modest, around CAD $80 to $120 per month for B2ms); requires institutional approval.
+**Why all-in-Docker:**
 
-**Option B: SAIT campus VM.**
-A VM inside the campus network provisioned by SAIT IT. Pros: data stays on-prem; simplest FOIP story; no recurring cloud cost. Cons: SAIT IT must maintain; team needs VPN access during development.
+- Any Linux host can run the full stack with `docker compose up`. No environment-specific code changes are needed between the mini-PC, a personal Azure VM, or a SAIT campus VM.
+- MinIO is fully S3-compatible. The Media Service uses the AWS SDK v3 S3 client, which connects to MinIO identically to any S3-compatible service. No code changes are needed if storage is moved to a different provider.
+- PostgreSQL 16 in Docker uses the same wire protocol and Drizzle ORM connection string as any other Postgres host. No code changes are needed if the database is moved to a managed service.
+- Migration between any two hosts is: `pg_dump` + `mc mirror` + `git pull` + `docker compose up`.
 
-**Option C: AWS Educate.**
-A VM in AWS under an educational account if available. Functionally similar to Azure. SSO is more work (Entra-to-AWS federation). Choose only if Options A and B are unavailable.
+**Capstone period (Sprints 0 to 6):** All environments run on the team-owned mini-PC or individual developer laptops. See Section 12.7 for the staging host configuration.
 
-**The AI Service tightens the spec slightly.** Whisper `small.en` needs 1.5 GB RAM in process and benefits from at least 2 vCPU. A 4 GB VM is tight; 8 GB is comfortable. Recommend asking for 8 GB.
+**Post-handover:** SAIT IT provisions their own host when the School of MAT requests deployment. The handover package includes a runbook covering deployment to any Linux VM (Azure, campus, or other). If SAIT IT later chooses to move Postgres or object storage to managed services, that is their decision and requires updating the relevant environment variables (and the storage SDK if replacing MinIO with Azure Blob Storage, which is not S3-compatible). See AZURE_COST_ESTIMATE.md for cost reference.
 
-### 12.3 Production Topology and Single-Point-of-Failure Posture
+### 12.3 Deployment Topology
 
-**Honest assessment:** a single-VM deployment is a single point of failure. If the VM dies mid-shift, no inspections can be submitted. For a system that enforces equipment safety in an industrial training environment, that matters.
+**Honest assessment:** a single-host deployment is a single point of failure. If the host fails mid-shift, no inspections can be submitted. For a system that enforces equipment safety in an industrial training environment, that matters.
 
-The capstone scope cannot deliver active-active high availability. But the architecture supports a meaningful posture improvement at low cost: **move the persistent layer to managed services on Azure, keep the stateless services on one VM.**
+The capstone scope cannot deliver active-active high availability. The architecture mitigates the worst failure modes within the single-host constraint by keeping all persistent data backed up off-host continuously.
 
-**Recommended production posture (Azure path):**
+**Full stack (all containers on one host):**
 
-| Component                                              | Hosting                                                              | Reason                                                                            |
-| ------------------------------------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Postgres                                               | Azure Database for PostgreSQL (Flexible Server, Burstable B1ms tier) | Managed backups, point-in-time recovery, automated patching, replicated storage   |
-| Object storage (photos, voice clips, PDF exports)      | Azure Blob Storage with lifecycle policies                           | Geo-redundant storage, automated tiering, no self-hosted MinIO operational burden |
-| Stateless services (Caddy, Core API, Media, Audit, AI) | Single Azure VM (Standard B2ms: 2 vCPU, 8 GB RAM)                    | Capstone-scope deployment; can be rebuilt in under 1 hour from Git + scripts      |
-| Observability (Prometheus, Grafana, Loki, Promtail)    | Same VM                                                              | Loss of monitoring during the rebuild window is acceptable for capstone scope     |
+| Container              | Role                                                                    |
+| ---------------------- | ----------------------------------------------------------------------- |
+| Caddy                  | TLS termination, reverse proxy, ACME cert renewal                       |
+| Core API               | Equipment registry, checklists, inspection submissions, defect workflow |
+| Media Service          | Photo and voice clip uploads, MinIO client, presigned URLs              |
+| Audit / Report Service | Hash-chained audit log, PDF generation, CSV export                      |
+| AI Service             | Whisper `small.en` voice-to-text transcription                          |
+| Operator PWA           | Mobile-first Next.js app for Lab Techs                                  |
+| Manager Dashboard      | Next.js app for supervisors and managers                                |
+| PostgreSQL 16          | Core and audit schemas                                                  |
+| MinIO                  | S3-compatible object storage: photos, voice clips, PDF exports          |
+| Prometheus + Grafana   | Metrics and dashboards                                                  |
+| Loki + Promtail        | Structured log aggregation                                              |
+| Uptime Kuma            | Uptime monitoring and alerting                                          |
 
-This eliminates the worst SPOF (the data layer). If the VM dies, a replacement is spun up, pulls the same code from Git, points at the same managed Postgres and Blob Storage, and the system is back without data loss.
+**Memory budget on an 8 GB VM:**
 
-**Recommended production posture (campus VM path, if Azure is not available):**
+| Component                                                    | Est. RAM    |
+| ------------------------------------------------------------ | ----------- |
+| AI Service (Whisper `small.en` loaded)                       | ~1.5 GB     |
+| PostgreSQL                                                   | ~200 MB     |
+| MinIO                                                        | ~128 MB     |
+| Core API + Media + Audit (3 Node services)                   | ~450 MB     |
+| PWA + Dashboard (2 Next.js containers)                       | ~300 MB     |
+| Caddy + Prometheus + Grafana + Loki + Promtail + Uptime Kuma | ~1.0 GB     |
+| **Total estimate**                                           | **~3.6 GB** |
+| Headroom on 8 GB VM                                          | ~4.4 GB     |
 
-| Component       | Hosting                                                                                                                                                               | Reason                                                   |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Postgres        | Docker container on the campus VM, **but with PITR backup configured** to a SAIT-managed off-host target (e.g., NFS share, S3, Azure Blob, whatever SAIT IT provides) | Continuous WAL archiving so RPO is minutes, not 24 hours |
-| Object storage  | Self-hosted MinIO with daily `mc mirror` to a SAIT-managed backup target                                                                                              |                                                          |
-| Everything else | Same VM                                                                                                                                                               |                                                          |
+The team-owned mini-PC has 32 GB RAM; headroom is not a concern during development.
 
-The campus path has more residual SPOF than the Azure path. If campus is the only option, document this explicitly to the sponsor and SAIT IT.
-
-**Stack composition (containers running on the VM, either path):**
-
-- Caddy (1 container)
-- Core API (1 container)
-- Media Service (1 container)
-- Audit / Report Service (1 container)
-- AI Service (1 container)
-- Prometheus, Grafana, Loki, Promtail (4 containers)
-- Uptime Kuma (1 container)
-
-On the Azure path, Postgres and MinIO are NOT in this list (they are managed services). On the campus path, add 1 Postgres container + 1 MinIO container (total 12 containers).
-
-**Memory budget on an 8 GB VM (Azure path with managed DB/storage):**
-
-- AI Service (Whisper loaded) ~1.5 GB
-- Each Node service ~150 MB (3 services = ~450 MB)
-- Caddy, Prometheus, Grafana, Loki, Promtail, Uptime Kuma combined ~1 GB
-- Total ~3.0 GB, leaving ~5 GB of headroom (more on the Azure path because Postgres and MinIO are not in-process).
-
-Staging runs the same compose file on a second instance (or a second resource group on Azure).
+If the host fails: restore from backup, `git pull`, `docker compose up`. RTO is approximately 1 to 2 hours with the documented runbook. See Section 12.6.
 
 ### 12.4 Reverse Proxy and TLS
 
 Caddy:
 
-- **Public hostname** (e.g., `mat-inspect.sait.ca`): Let's Encrypt via ACME. DNS managed by SAIT IT.
-- **Campus-internal hostname**: internal CA root cert provided by SAIT IT, or Caddy's built-in local CA with root cert distributed via SAIT device management.
+- **Dev staging hostname**: Caddy's built-in local CA. Root cert distributed to all 5 team members on first setup. Hostname resolved via Tailscale MagicDNS or `/etc/hosts` entries on each developer's machine.
+- **Production hostname (post-handover)**: Let's Encrypt via ACME on a public hostname (e.g., `mat-inspect.sait.ca`). DNS managed by SAIT IT. No manual certificate management required once a public hostname is assigned.
 
 ### 12.5 Backup Strategy
-
-**Azure path:**
-
-- Postgres: managed automated backups with point-in-time recovery, 7-day retention default, configurable up to 35 days
-- Blob Storage: GRS (geo-redundant) replication by default
-- Configuration: All in Git. No unique server state outside the managed services.
-
-**Campus VM path:**
 
 - Postgres: `pg_dump` nightly + WAL archiving every 5 minutes to off-host storage. RPO ~5 minutes.
 - MinIO: `mc mirror` nightly to off-host target.
 - Configuration: All in Git.
 
-**Restore drill cadence:** documented and **tested twice**, once in Sprint 4 and again in the week before production cutover in Sprint 6. A restore that worked in July does not prove a restore works in August; configurations drift.
+Off-host backup target during the capstone: the host owner's existing rsync target (NAS or similar). Post-handover: SAIT IT designates an appropriate target (NFS share, Azure Blob, or other storage).
+
+**Restore drill cadence:** documented and tested twice: once in Sprint 4 and once the week before the capstone demo. A restore that worked in July does not prove a restore works in August; configurations drift.
 
 ### 12.6 Disaster Recovery
 
-**RPO (Recovery Point Objective):**
+**RPO (Recovery Point Objective):** Under 5 minutes with WAL archiving configured; 24 hours with nightly `pg_dump` only.
 
-- Azure path: under 5 minutes (PITR on managed Postgres)
-- Campus path: under 5 minutes if WAL archiving is set up; otherwise 24 hours
-
-**RTO (Recovery Time Objective):**
-
-- Azure path: 1 hour to rebuild the stateless VM; data is already preserved
-- Campus path: 4 hours on a replacement VM with the documented runbook
+**RTO (Recovery Time Objective):** 1 to 2 hours to rebuild the host from the documented runbook; data is preserved in the off-host backup.
 
 **DR runbook contents:**
 
@@ -694,9 +675,9 @@ Caddy:
 - Where backups live and how to restore them
 - DNS update steps (if hostname needs to point to a new IP)
 - Smoke-test checklist (verify each service is functional)
-- Contact list (SAIT IT, sponsor, Anthropic Azure support if applicable)
+- Contact list (SAIT IT, sponsor)
 
-The runbook is rehearsed in Sprint 4 and Sprint 6 (week before cutover), and delivered at handover.
+The runbook is rehearsed in Sprint 4 and the week before the capstone demo, and delivered in the handover package.
 
 ### 12.7 Development Staging Infrastructure
 
@@ -737,9 +718,9 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 **Shared secrets:**
 
-- Bitwarden cloud (free tier, or 1Password Teams via student plan if available) hosts the shared collection for team credentials (Entra ID app registration IDs, SMTP, database passwords, deploy keys).
-- `.env` files live in each developer's local checkout, never committed. The same Gitleaks pre-commit pattern used elsewhere prevents accidental commits.
+- `.env` files distributed directly between team members (in person or via secure message). Never committed. Gitleaks pre-commit hook prevents accidental commits.
 - On the M5 dev staging host, the `.env` file sits in the project directory, readable only by the deploy user.
+- Entra ID credentials (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`) come from the team-owned personal Azure tenant app registration.
 
 **Backups during dev staging phase:**
 
@@ -839,13 +820,12 @@ Docker Compose adds:
 
 ### 14.4 Secrets Management
 
-| Environment            | Secret store                                                                        |
-| ---------------------- | ----------------------------------------------------------------------------------- |
-| Local dev              | `.env` files (gitignored; covered by Gitleaks pre-commit)                           |
-| Dev staging (M5)       | `.env` files on the host, readable only by the deploy user; never committed         |
-| Production (Azure)     | Azure Key Vault; injected into containers at startup via the Azure SDK or a sidecar |
-| Production (campus VM) | Docker Secrets, file-based; rotated quarterly                                       |
-| CI                     | GitHub Secrets, scoped per environment (dev-staging, production)                    |
+| Environment                | Secret store                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Local dev                  | `.env` files (gitignored; covered by Gitleaks pre-commit)                                             |
+| Dev staging (M5)           | `.env` files on the host, readable only by the deploy user; never committed                           |
+| Production (post-handover) | Docker Secrets, file-based, rotated quarterly; or Azure Key Vault if SAIT IT chooses Azure deployment |
+| CI                         | GitHub Secrets, scoped per environment (dev-staging, production)                                      |
 
 **Never use `.env` files in production.** Hardcoded values, including for "convenience," are a CVE waiting to happen.
 
@@ -871,23 +851,23 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 
 - Stakeholder interviews; job shadow at least 2 inspections per equipment type.
 - Confirm checklist content with sponsor for all four equipment classes. Photograph or transcribe all existing paper checklists.
-- Campus IT meeting: confirm hosting option, SSO path, request FOIP checklist.
 - Repo set up on GitHub. Branch protection, PR template, issue templates.
 - Docker Compose skeleton: Postgres, MinIO, Caddy, stubs for Core API, Media, Audit, AI.
 - Each student gets the stack running locally.
 - Dev staging set up on team-owned mini-PC (see Section 12.7); all 5 students added to Tailscale; root cert distributed.
-- Bitwarden shared collection created; service credentials added; all team members onboarded.
+- Register application in team-owned personal Azure tenant (Entra ID Free tier). Define App Roles: Operator, Supervisor, Manager, Admin, Auditor. Create test users and assign roles. Document tenant ID and client ID in `.env.example`.
+- `.env` file distributed to all team members directly.
 - GitHub Actions configured to deploy to dev staging on merge to `main`.
-- Initial ADRs: Fastify over Express, Drizzle over Prisma, Whisper variant choice (`small.en`), database strategy, hosting target, dev staging on team-owned hardware with explicit constraints.
+- Initial ADRs: Fastify over Express, Drizzle over Prisma, Whisper variant choice (`small.en`), database strategy, all-in-Docker deployment strategy (Section 12.2), dev staging on team-owned hardware with explicit constraints.
 - CI pipeline green on first commit.
 
-**Sprint 0 demo target:** stack runs locally and on dev staging; checklists confirmed; hosting decision documented; AI Service stub returns a hardcoded transcript; team can reach dev staging via Tailscale with no browser warnings.
+**Sprint 0 demo target:** stack runs locally and on dev staging; checklists confirmed; Entra ID app registration live in team-owned tenant with test users; AI Service stub returns a hardcoded transcript; team can reach dev staging via Tailscale with no browser warnings.
 
 ### Sprint 1: Auth, Equipment Registry, Checklist Engine
 
 **Weeks 3 to 4 (June 1 to June 14)**
 
-- Entra ID app registration configured with SAIT IT. App Roles defined. Test users assigned.
+- Entra ID app registration in team-owned tenant verified end-to-end: login flow working, App Roles issued correctly in JWT, test users cover all five roles.
 - Core API: Equipment CRUD endpoints; seed data for the 10 machines.
 - ChecklistTemplate model and admin publish endpoint.
 - Checklist templates entered for all four equipment classes; reviewed by sponsor.
@@ -922,7 +902,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 
 **Sprint 3 demo:** Manager sees today's compliance. Operator dictates a defect note that appears as text. Voice clip is replayable in dashboard.
 
-### Sprint 4: Audit, Reporting, Hardening, **SAIT Infrastructure Migration**
+### Sprint 4: Audit, Reporting, Hardening, DR Rehearsal
 
 **Weeks 9 to 10 (July 13 to July 26)**
 
@@ -932,45 +912,46 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 - Retention policy: 7 years for records, 90 days for raw voice audio (lifecycle job).
 - Security review: Trivy, Semgrep, Gitleaks across whole repo. Fix high and critical findings.
 - Internal pen test: students swap roles and attack each other's services.
-- Backup automation: nightly pg_dump + MinIO mirror.
-- DR runbook drafted; restore drill on staging.
-- **Provision SAIT-hosted VM (Azure or campus) per the Sprint 0 decision.**
-- **Migrate the stack from team-owned dev staging to SAIT infrastructure.** Steps: `pg_dump` all three schemas, `mc mirror` MinIO, `git pull` on target VM, `docker compose up -d`, restore dumps, end-to-end smoke test.
-- **Verify the SAIT instance handles a full inspection flow end to end before Sprint 5 begins.** This is the gate to the pilot.
+- Backup automation: nightly pg_dump + MinIO mirror configured and verified on dev staging host.
+- **DR rehearsal:** full backup-and-restore drill on dev staging (simulate host failure; restore from backup to a clean Docker environment; run smoke test). Document time taken and issues found.
+- **Handover package assembled:** DEPLOYMENT.md, SECURITY.md, OPERATIONS_RUNBOOK.md, IT runbook for Entra ID registration in the SAIT tenant, infrastructure setup instructions for SAIT IT.
+- End-to-end inspection flow verified on dev staging with all audit, backup, and observability components running.
 
-**Sprint 4 demo:** Auditor exports a signed PDF from the SAIT-hosted instance. Backups run. Security scan clean. Migration runbook documented and rehearsed.
+**Sprint 4 demo:** Auditor exports a signed PDF on dev staging. Restore drill passes. Security scan clean. Handover package drafted and reviewed with sponsor.
 
-### Sprint 5: Pilot
+### Sprint 5: Simulated Pilot
 
 **Week 11 (July 27 to August 2)**
 
-- Deploy to staging on the production-equivalent host.
-- Pilot with one shift of Lab Techs on real equipment. Target: 20+ real inspections.
+- Full end-to-end test on dev staging with synthetic data covering all 10 pieces of equipment and all four equipment classes.
+- Simulated pilot: team members run all operator, supervisor, and manager flows. Sponsor attends to observe and provide feedback. Synthetic data only; no real Lab Tech PII on team-owned hardware.
 - Daily standup with sponsor.
 - Same-day bug turnaround for critical issues.
 
-**Sprint 5 demo:** Lab Techs use the system live for one week.
+**Note:** A real pilot with SAIT Lab Techs on live equipment requires SAIT-controlled infrastructure (FOIP). This happens post-handover if the School of MAT adopts the application.
 
-### Sprint 6: Production Rollout
+**Sprint 5 demo:** Sponsor observes all workflows running end to end. All equipment types covered. All roles exercised.
+
+### Sprint 6: Handover Preparation
 
 **Week 12 (August 3 to August 9)**
 
-- Production deployment to the confirmed SAIT host.
-- DNS and TLS configured.
-- QR stickers printed and applied to all 10 machines.
-- All Lab Techs trained (30-min session). Supervisors trained (1 hour). Managers trained (1 hour).
-- Cutover from paper to digital. Paper kept as fallback for the first three days only.
+- Bug fixes from Sprint 5 sponsor feedback.
+- Finalize all handover documentation: README, SETUP, DEPLOYMENT, SECURITY, OPERATIONS_RUNBOOK, OPERATOR_GUIDE (1 page), SUPERVISOR_GUIDE (2 pages), ADMIN_GUIDE (5 pages), IT runbook for Entra ID registration and infrastructure setup.
+- QR sticker artwork finalized and delivered to sponsor (physical stickers applied post-handover when SAIT IT provisions the production host).
+- Training guides reviewed with sponsor; training session can be scheduled for post-handover.
+- Second restore drill; confirm handover package produces a working stack from scratch.
 
-**Sprint 6 target:** all 10 machines tagged and live.
+**Sprint 6 target:** handover package complete; sponsor has everything needed to request SAIT IT provisioning.
 
-### Sprint 7: Stabilization and Handover
+### Sprint 7: Handover and Presentation
 
 **Week 13 (August 10 to August 15)**
 
-- Real-world bug fixes from the first production week.
-- Final documentation: README, SETUP, DEPLOYMENT, SECURITY, OPERATIONS_RUNBOOK, OPERATOR_GUIDE (1 page), SUPERVISOR_GUIDE (2 pages), ADMIN_GUIDE (5 pages).
-- Source code, deploy scripts, secrets handover process, runbook delivered to SAIT IT.
+- Final bug fixes and polish from Sprint 6 review.
+- Source code, Docker Compose files, deploy scripts, `.env.example`, and all handover documentation archived and delivered to sponsor.
 - Capstone presentation prepared and delivered.
+- Dev staging on the mini-PC decommissioned after presentation; project directory archived per Section 12.7.
 
 **Final deliverable date: August 15, 2026.**
 
@@ -1017,21 +998,19 @@ Bundled with the source code at handover.
 
 ## 18. Risks and Mitigations
 
-| Risk                                                                                   | Likelihood | Impact | Mitigation                                                                                                                                                                 |
-| -------------------------------------------------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sponsor checklist content not finalized in time                                        | High       | Medium | Lock content by end of Week 4; document explicit decision deadlines                                                                                                        |
-| Campus IT delays hosting approval beyond Sprint 4                                      | Medium     | High   | Dev staging on team-owned mini-PC bridges Sprint 0 to 4; if SAIT VM is not ready by Week 9, escalate to sponsor immediately because Sprint 5 pilot cannot start without it |
-| Entra ID app registration not ready before Sprint 1                                    | Medium     | Low    | Use dev JWT stub locally; coordinate with SAIT IT in Sprint 0                                                                                                              |
-| Team learning curve on MSAL / Entra ID / Docker / Whisper                              | High       | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration                                                                                             |
-| Real Lab Tech availability for testing                                                 | Medium     | High   | Schedule test sessions in advance; build a fake-equipment test rig if needed                                                                                               |
-| Scope creep from sponsor                                                               | Medium     | High   | Out-of-scope document, change request process, defer to v2                                                                                                                 |
-| Whisper accuracy too low to be useful in a loud shop                                   | Medium     | Medium | Quiet the operator (move 2 metres from equipment to dictate); fallback to typed notes is always available; document accuracy expectations in AI Model Card                 |
-| AI Service slows the inspection flow                                                   | Low        | Medium | Transcription is non-blocking; PWA shows immediate placeholder, transcript fills in when ready; operator can still type while waiting                                      |
-| One student leaves the project                                                         | Low        | High   | Cross-training, every feature has a backup owner                                                                                                                           |
-| Audit chain bug undermines legal value                                                 | Low        | High   | Code review by 2 students, integration test with 10,000 simulated events that verifies chain                                                                               |
-| Team-owned mini-PC fails or its owner becomes unavailable                              | Low        | Medium | Everything in Git; any teammate can rebuild the staging stack on their laptop with `docker compose up`; Sprint 2 includes a recovery drill that proves this works          |
-| Sprint 4 migration to SAIT infrastructure reveals environment-specific bugs            | Medium     | Medium | Migration is an explicit Sprint 4 deliverable, not Sprint 6; two full weeks of buffer to fix any environment-specific issues before pilot                                  |
-| Real Lab Tech data accidentally written to team-owned mini-PC during or after Sprint 5 | Low        | High   | Rotate dev JWT stub secrets at end of Sprint 4; Sprint 5 onward, dev staging uses synthetic data only; ADR documents the rule                                              |
+| Risk                                                      | Likelihood | Impact | Mitigation                                                                                                                                                        |
+| --------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sponsor checklist content not finalized in time           | High       | Medium | Lock content by end of Week 4; document explicit decision deadlines                                                                                               |
+| Entra ID personal tenant expires or is misconfigured      | Low        | Low    | Team controls the tenant; renew the M365 dev program subscription or use a personal Azure free account. App registration setup is approximately 30 minutes.       |
+| Team learning curve on MSAL / Entra ID / Docker / Whisper | High       | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration                                                                                    |
+| Real Lab Tech availability for testing                    | Medium     | High   | Schedule test sessions in advance; build a fake-equipment test rig if needed                                                                                      |
+| Scope creep from sponsor                                  | Medium     | High   | Out-of-scope document, change request process, defer to v2                                                                                                        |
+| Whisper accuracy too low to be useful in a loud shop      | Medium     | Medium | Quiet the operator (move 2 metres from equipment to dictate); fallback to typed notes is always available; document accuracy expectations in AI Model Card        |
+| AI Service slows the inspection flow                      | Low        | Medium | Transcription is non-blocking; PWA shows immediate placeholder, transcript fills in when ready; operator can still type while waiting                             |
+| One student leaves the project                            | Low        | High   | Cross-training, every feature has a backup owner                                                                                                                  |
+| Audit chain bug undermines legal value                    | Low        | High   | Code review by 2 students, integration test with 10,000 simulated events that verifies chain                                                                      |
+| Team-owned mini-PC fails or its owner becomes unavailable | Low        | Medium | Everything in Git; any teammate can rebuild the staging stack on their laptop with `docker compose up`; Sprint 2 includes a recovery drill that proves this works |
+| Real Lab Tech data written to team-owned mini-PC          | Low        | High   | No real pilot on team-owned hardware. Sprint 5 uses synthetic data only. A real pilot requires SAIT IT to provision SAIT-controlled infrastructure post-handover. |
 
 ---
 
@@ -1076,7 +1055,7 @@ So the team is not staring at a blank repo on day one.
 - [ ] Stand up dev staging on the team-owned mini-PC: clone repo to `~/projects/mat-inspect/`, `docker compose up`, verify all stubs respond.
 - [ ] Generate Caddy local CA root cert; distribute to all 5 team members; each installs on their dev devices.
 - [ ] Add all 5 students to the host owner's Tailscale tailnet (project-scoped).
-- [ ] Create Bitwarden shared collection for the team; seed it with placeholder entries for Entra ID app registration IDs, SMTP, database, MinIO.
+- [ ] Register application in team-owned personal Azure tenant (Entra ID Free tier). Define App Roles: Operator, Supervisor, Manager, Admin, Auditor. Create test users. Add `AZURE_TENANT_ID` and `AZURE_CLIENT_ID` to `.env.example`.
 - [ ] Lock framework choices: Node.js + Fastify + TypeScript (services), Next.js (PWA + dashboard), Python + FastAPI + faster-whisper (AI), Drizzle ORM, Zod validation, Tailwind + shadcn/ui.
 - [ ] Write first ADRs: framework choices, Whisper variant (`small.en`), hosting target placeholder, dev staging on team-owned hardware with constraints from Section 12.7.
 - [ ] CI pipeline that runs lint and a hello-world test, green on first commit.
@@ -1088,13 +1067,11 @@ So the team is not staring at a blank repo on day one.
 - [ ] Run job shadow sessions with at least 4 Lab Techs across the four equipment classes.
 - [ ] Document current paper checklists (photograph or transcribe all of them).
 - [ ] Draft initial ChecklistTemplate JSON for each equipment class; review with sponsor before Sprint 1.
-- [ ] Coordinate with SAIT IT to configure Entra ID app registration; create test users and assign App Roles for each role.
 - [ ] Stub Core API `GET /api/v1/equipment` returning the 10 hard-coded machines.
 - [ ] Stub AI Service `POST /api/v1/ai/transcribe` returning a hardcoded transcript for any input (real Whisper integration in Sprint 3).
 - [ ] PWA renders a list of equipment from the stub API. This is the "hello world" milestone.
 - [ ] First end-to-end deploy: PR merged to `main` triggers GitHub Actions, deploys to dev staging on the mini-PC, all 5 team members can see the change at the staging URL over Tailscale.
-- [ ] Campus IT meeting; document hosting decision and SSO path in an ADR.
-- [ ] Request FOIP review checklist from SAIT privacy office.
+- [ ] Write ADR documenting all-in-Docker deployment strategy and Entra ID team-owned tenant approach.
 
 After Sprint 0: running stack locally and on shared dev staging, continuous deployment working, real domain knowledge gathered, end-to-end skeleton with AI stub, hosting and identity decisions made.
 

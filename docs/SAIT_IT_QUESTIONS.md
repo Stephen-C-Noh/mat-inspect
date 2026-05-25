@@ -1,42 +1,57 @@
-# Questions for SAIT IT
+# Handover Requirements for SAIT IT
 
 **Project:** MAT-Inspect (MAT School Pre-Use Inspection System)
 **Team:** Team Meridian (Capstone, Summer 2026)
-**Deadline for answers:** End of Sprint 0 (May 31, 2026). Sprint 4 migration cannot proceed without these decisions confirmed.
+**Context:** SAIT IT does not provision infrastructure during the capstone. This document is a handover package for SAIT IT to use when the School of MAT requests deployment. All items below are required before the system can go live with real SAIT staff data.
 
 ---
 
 ## 1. Hosting
 
-- Will SAIT IT provision the Azure resources (VM, PostgreSQL Flexible Server, Blob Storage, Key Vault, Azure Container Registry) and grant the team deploy access, or will SAIT IT hand the team a resource group to provision themselves and transfer ownership at handover?
-- If Azure is not available, is a campus VM an option? What is the lead time?
-- Specs required: 8 GB RAM, 2 vCPU, 64 GB SSD, Ubuntu 24.04 LTS. Estimated cost: CAD $135-165/month (see `docs/AZURE_COST_ESTIMATE.md` for full breakdown).
-- What is the typical timeline to provision a new VM or cloud resource?
+- Provision a Linux VM with at least 8 GB RAM, 2 vCPU, 64 GB SSD. Ubuntu 24.04 LTS recommended.
+- The team recommends Azure (Standard B2ms in Canada East or Canada Central) for alignment with SAIT's existing Microsoft infrastructure. A campus VM is equally viable; the Docker Compose stack runs identically on either.
+- Grant one team member or designated SAIT admin SSH access for the initial deployment. After handover, SSH access transfers to SAIT IT.
+- See AZURE_COST_ESTIMATE.md for Azure cost reference (~CAD $142-175/month for the full Azure-managed stack; less if running self-hosted Postgres and MinIO on the VM).
 
 ## 2. Authentication (Entra ID)
 
-- Can the team register an application in the SAIT Entra ID tenant?
-- The app registration needs: redirect URIs for the PWA and dashboard, and 5 App Roles defined (Operator, Supervisor, Manager, Admin, Auditor).
-- Who at SAIT IT will own the app registration and assign roles to users or groups?
-- Are Lab Techs SAIT employees with existing Entra ID accounts? (Confirmed in client meeting but needs IT-side verification.)
+- Register the application in the SAIT Entra ID tenant (Azure portal > Entra ID > App registrations > New registration).
+- Define 5 App Roles: `Operator`, `Supervisor`, `Manager`, `Admin`, `Auditor`.
+- Set redirect URIs for the PWA and manager dashboard (provided in DEPLOYMENT.md).
+- Assign SAIT staff accounts to the appropriate App Roles via the Azure portal.
+- Note the `Tenant ID` and `Client ID`; these replace the team's dev tenant values in the production `.env` file. No code changes required.
+- Lab Techs must have existing SAIT Entra ID accounts (confirmed: all are SAIT employees).
 
 ## 3. DNS and TLS
 
-- Can SAIT IT provision a subdomain for the system (e.g., `mat-inspect.sait.ca`)?
-- The team uses Caddy as the reverse proxy; it handles TLS via Let's Encrypt automatically once a public hostname is assigned. No manual certificate management required from SAIT IT.
+- Provision a subdomain for the system (e.g., `mat-inspect.sait.ca`) and point its A record at the VM's public IP.
+- Caddy handles TLS automatically via Let's Encrypt once a public hostname resolves. No manual certificate management required from SAIT IT.
 
-## 4. Handover (August 15, 2026)
+## 4. Security and Compliance
 
-- At handover, will SAIT IT take ownership of the Azure subscription and rotate all credentials, or does the team transfer specific resource ownership?
-- Who at SAIT IT will be the ongoing maintainer after handover? That person should attend at least the Sprint 6 demo and review the operations runbook before August 15.
+- A FOIP review of the system is recommended before go-live with real staff data. The system handles: operator names and emails, certification expiry dates, voice clips (biometric under FOIP), and inspection photos that may incidentally capture people. Contact SAIT's privacy office for a review checklist.
+- SAIT IT should review the SECURITY.md in the handover package before deployment.
+- An internal security review process for new web applications, if one exists at SAIT, should be applied before go-live.
 
-## 5. Security and Compliance
+## 5. Ongoing Maintenance
 
-- Is there an internal SAIT process for security review of new web applications before go-live?
-- Does SAIT have a FOIP review checklist for new systems handling employee data? (Voice clips and inspection records contain staff PII.)
-- Who is the SAIT FOIP/privacy officer to contact for the review?
+- Designate one SAIT IT staff member as the ongoing maintainer. That person should review the OPERATIONS_RUNBOOK.md and ADMIN_GUIDE.pdf from the handover package.
+- Dependency updates: Renovate is configured in the repo and will open PRs for outdated packages. Someone needs to merge them.
+- CVE SLA: HIGH or CRITICAL vulnerabilities with an available patch should be merged within 7 calendar days of detection (see OPERATIONS_RUNBOOK.md).
+- Backup target: designate an off-host backup destination (NFS share, Azure Blob, or other) for nightly Postgres dumps and MinIO mirrors. The OPERATIONS_RUNBOOK.md documents the backup configuration.
 
-## 6. Dev Staging
+## 6. Handover Checklist
 
-- The team uses a personally-owned mini-PC (accessible via Tailscale VPN) as a shared dev environment for Sprints 0-4. No SAIT data is stored on it. Is this acceptable?
-- The team migrates to SAIT infrastructure at the end of Sprint 4 (week of July 26). SAIT IT provisioning must be complete before that date.
+Before the system goes live:
+
+- [ ] VM provisioned and accessible via SSH
+- [ ] Entra ID app registration created in SAIT tenant; App Roles defined
+- [ ] Staff accounts assigned to App Roles
+- [ ] DNS subdomain provisioned and pointing at VM
+- [ ] Production `.env` file configured with SAIT tenant credentials and secrets
+- [ ] `docker compose up` on the VM; all services healthy
+- [ ] Smoke test: operator login, QR scan, checklist submission, supervisor approval, manager dashboard, PDF export
+- [ ] Backup target configured; first backup verified
+- [ ] Restore drill completed (per OPERATIONS_RUNBOOK.md)
+- [ ] FOIP review completed or waived in writing by SAIT privacy office
+- [ ] Maintainer has reviewed OPERATIONS_RUNBOOK.md and ADMIN_GUIDE.pdf
