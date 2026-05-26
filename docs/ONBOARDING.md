@@ -1,4 +1,4 @@
-# Welcome to Team Meridian
+# Welcome to Team Meridian (Version 1)
 
 Welcome aboard. This is your day-1 to day-3 checklist. If anything is broken,
 ping the chat; do not silently struggle.

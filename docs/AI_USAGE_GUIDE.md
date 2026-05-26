@@ -1,4 +1,4 @@
-# AI Usage Guide for Team Meridian (MAT-Inspect)
+# AI Usage Guide for Team Meridian (MAT-Inspect) (Version 1)
 
 This guide governs how team members use AI assistants (Claude, ChatGPT, Cursor, GitHub Copilot, and similar) on the MAT-Inspect capstone project.
 
