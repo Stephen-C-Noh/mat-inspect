@@ -1,0 +1,34 @@
+# Keep the build context small and force all build artifacts to be produced
+# inside the Dockerfile, never copied from the developer's working tree.
+
+# Dependency directories — re-installed inside the image
+**/node_modules
+
+# Build outputs — re-produced inside the image
+**/dist
+**/.next
+**/build
+**/coverage
+**/tsconfig.tsbuildinfo
+
+# VCS and CI
+.git
+.github
+
+# Local env files (never bake secrets into images)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Editor / OS / tooling
+.vscode
+.idea
+.husky
+**/.cache
+**/*.log
+**/.DS_Store
+
+# Docs and project meta — not needed at runtime
+docs
+*.md
+.claude
