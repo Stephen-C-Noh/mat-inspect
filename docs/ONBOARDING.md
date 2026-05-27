@@ -31,11 +31,16 @@ If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. I
       `curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/main/scripts/install.sh | sh -s -- -b /usr/local/bin`
 - [ ] Install ruff (required by pre-commit hook):
       `curl -LsSf https://astral.sh/ruff/install.sh | sh`
-- [ ] Run the stack:
+- [ ] Install Node dependencies (required for local dev tools and pre-commit hooks):
+      `npm install`
+- [ ] Copy the environment file and start the stack:
       `cp .env.example .env && docker compose up`
 - [ ] Open http://localhost:3000 and confirm "Hello, MAT-Inspect" (operator PWA stub)
 - [ ] Open http://localhost:3001 and confirm "Hello, MAT-Inspect" (dashboard stub)
-- [ ] Check all service health endpoints return 200: - http://localhost/health (Caddy / API gateway) - http://localhost:9000/minio/health/live (MinIO)
+- [ ] Check service health endpoints return 200: - http://localhost:3000/health (PWA stub) - http://localhost:3001/health (dashboard stub, routed via host port 3001) - http://localhost:9000/minio/health/live (MinIO)
+      Note: Caddy binds to the hostname `mat-inspect.staging`, not `localhost`.
+      To test through Caddy, add `127.0.0.1 mat-inspect.staging` to `/etc/hosts`
+      and trust Caddy's local CA certificate (`caddy trust` after `docker compose up`).
 - [ ] Read these docs in order: 1. [CONTRIBUTING.md](CONTRIBUTING.md) — Git workflow, branch naming, commit style 2. [CODING_STANDARDS.md](CODING_STANDARDS.md) — Code style and layer structure 3. [AI_USAGE_GUIDE.md](AI_USAGE_GUIDE.md) — AI tools policy 4. [ARCHITECTURE.md](ARCHITECTURE.md) — System design overview
 
 ## Day 2 (Aim for 2 hours)

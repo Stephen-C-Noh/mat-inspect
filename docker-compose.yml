@@ -84,6 +84,9 @@ services:
       PORT: '3000'
       SERVICE_NAME: core-api
       DATABASE_URL: ${CORE_API_DB_URL}
+      HMAC_SECRET: ${HMAC_SECRET}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
     depends_on:
       postgres:
         condition: service_healthy
