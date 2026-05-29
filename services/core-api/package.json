@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@mat-inspect/shared-types": "^0.0.0",
-    "drizzle-orm": "^0.41.0",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",
     "jose": "^6.2.3",
     "pino": "^10.3.1",
