@@ -38,3 +38,4 @@ SAIT School of Manufacturing, Automation, and Transportation.
 ## License
 
 MIT
+Setup tested
