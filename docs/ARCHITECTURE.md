@@ -131,10 +131,11 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ca
 
 +----------------+      +-----------------------+
 | MinIO          |      | Observability         |
-| (S3: photos,   |      | Prometheus, Grafana,  |
-| voice clips,   |      | Loki, Promtail,       |
-| PDF exports)   |      | Uptime Kuma           |
-+----------------+      +-----------------------+
+| (S3: photos,   |      | OTel Collector +      |
+| voice clips,   |      | Azure Monitor         |
+| PDF exports)   |      | (metrics, logs,       |
++----------------+      | uptime checks)        |
+                        +-----------------------+
 ```
 
 ### 5.2 Microservices
@@ -412,7 +413,7 @@ The AI Service introduces new threats. Mitigations:
 | A06 Vulnerable Components                      | Trivy on every build, Renovate, npm audit                                                  |
 | A07 Identification and Authentication Failures | Entra ID (MFA, Smart Lockout, conditional access managed by SAIT IT)                       |
 | A08 Software and Data Integrity Failures       | Hash-chained audit, signed PDF exports                                                     |
-| A09 Security Logging and Monitoring Failures   | Loki, alerts on suspicious patterns                                                        |
+| A09 Security Logging and Monitoring Failures   | Azure Monitor Logs, alerts on suspicious patterns                                          |
 | A10 SSRF                                       | Allow-list URL fetching only                                                               |
 
 ### 8.7 Privacy (FOIP)
@@ -625,22 +626,20 @@ The capstone scope cannot deliver active-active high availability. The architect
 | Manager Dashboard      | Next.js app for supervisors and managers                                |
 | PostgreSQL 16          | Core and audit schemas                                                  |
 | MinIO                  | S3-compatible object storage: photos, voice clips, PDF exports          |
-| Prometheus + Grafana   | Metrics and dashboards                                                  |
-| Loki + Promtail        | Structured log aggregation                                              |
-| Uptime Kuma            | Uptime monitoring and alerting                                          |
+| Azure Monitor          | Metrics, logs, and availability checks (Azure-native, no containers)    |
 
 **Memory budget on an 8 GB VM:**
 
-| Component                                                    | Est. RAM    |
-| ------------------------------------------------------------ | ----------- |
-| AI Service (Whisper `small.en` loaded)                       | ~1.5 GB     |
-| PostgreSQL                                                   | ~200 MB     |
-| MinIO                                                        | ~128 MB     |
-| Core API + Media + Audit (3 Node services)                   | ~450 MB     |
-| PWA + Dashboard (2 Next.js containers)                       | ~300 MB     |
-| Caddy + Prometheus + Grafana + Loki + Promtail + Uptime Kuma | ~1.0 GB     |
-| **Total estimate**                                           | **~3.6 GB** |
-| Headroom on 8 GB VM                                          | ~4.4 GB     |
+| Component                                  | Est. RAM    |
+| ------------------------------------------ | ----------- |
+| AI Service (Whisper `small.en` loaded)     | ~1.5 GB     |
+| PostgreSQL                                 | ~200 MB     |
+| MinIO                                      | ~128 MB     |
+| Core API + Media + Audit (3 Node services) | ~450 MB     |
+| PWA + Dashboard (2 Next.js containers)     | ~300 MB     |
+| Caddy                                      | ~50 MB      |
+| **Total estimate**                         | **~2.6 GB** |
+| Headroom on 8 GB VM                        | ~5.4 GB     |
 
 The team-owned mini-PC has 32 GB RAM; headroom is not a concern during development.
 
@@ -706,9 +705,9 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 **Isolation from host owner's existing services:**
 
-- The MAT project lives in `~/projects/mat-inspect/` with its own Docker Compose file, its own Caddy container (on host ports 80 and 443), its own Postgres, its own MinIO, its own observability stack.
+- The MAT project lives in `~/projects/mat-inspect/` with its own Docker Compose file, its own Caddy container (on host ports 80 and 443), its own Postgres, its own MinIO. Observability goes to Azure Monitor via the team's Azure subscription.
 - All project services except Caddy stay on the project's internal Docker network and are not exposed to the host.
-- The project does not reuse the host owner's personal homelab services (Gitea, personal Prometheus, etc.). Keeping the project self-contained makes the Sprint 4 migration a single-command lift.
+- The project does not reuse the host owner's personal homelab services (Gitea, etc.). Keeping the project self-contained makes the Sprint 4 migration a single-command lift.
 
 **Caddy and HTTPS on dev staging:**
 
@@ -743,13 +742,23 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 ## 13. Observability
 
-| Concern    | Tool                 | Notes                                                                         |
-| ---------- | -------------------- | ----------------------------------------------------------------------------- |
-| Metrics    | Prometheus           | Service health, request rates, error rates, AI transcription latency          |
-| Dashboards | Grafana              | Per-service dashboards, compliance KPIs                                       |
-| Logs       | Loki + Promtail      | Structured JSON logs, 30-day retention                                        |
-| Uptime     | Uptime Kuma          | External-style ping checks                                                    |
-| Alerts     | Alertmanager + email | Service down, audit chain break, disk full, AI Service errors above threshold |
+| Concern    | Tool                               | Notes                                                                         |
+| ---------- | ---------------------------------- | ----------------------------------------------------------------------------- |
+| Metrics    | Azure Monitor                      | Service health, request rates, error rates, AI transcription latency          |
+| Dashboards | Azure Monitor Workbooks            | Per-service dashboards, compliance KPIs                                       |
+| Logs       | Azure Monitor Logs (Log Analytics) | Structured JSON logs, 30-day retention                                        |
+| Uptime     | Azure Monitor Availability Tests   | HTTP ping checks, replaces Uptime Kuma                                        |
+| Alerts     | Azure Monitor Alerts               | Service down, audit chain break, disk full, AI Service errors above threshold |
+
+Services are instrumented with the Azure Monitor OpenTelemetry Distro
+(`@azure/monitor-opentelemetry` for Node.js, `azure-monitor-opentelemetry` for Python).
+Telemetry is exported directly to Azure Monitor via the
+`APPLICATIONINSIGHTS_CONNECTION_STRING` environment variable. No Collector container is
+used.
+
+Dev points at a workspace under the team's Azure subscription. At handover, SAIT IT
+changes the connection string to point at their own workspace. No other change is
+required.
 
 Logs are structured JSON. No PII (user IDs only, never names; equipment IDs only).
 

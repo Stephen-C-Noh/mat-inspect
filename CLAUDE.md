@@ -65,7 +65,7 @@ Pinned versions as of project start. Match these when generating code.
 - Caddy 2.x reverse proxy with built-in local CA in dev, ACME in prod
 - Azure AD / Entra ID for auth (all users are SAIT staff with existing SAIT accounts; no Keycloak)
 - MinIO for S3-compatible object storage
-- Prometheus, Grafana, Loki, Promtail, Uptime Kuma for observability
+- Azure Monitor for observability (metrics, logs, availability checks); instrumented via `@azure/monitor-opentelemetry` (Node.js) and `azure-monitor-opentelemetry` (Python); see ADR 0003
 - GitHub Actions for CI/CD
 
 **Do not suggest:**
@@ -75,7 +75,8 @@ Pinned versions as of project start. Match these when generating code.
 - Redux (we use Zustand)
 - Material UI (we use shadcn/ui)
 - TypeORM, Sequelize, or raw `pg` client (use Drizzle)
-- Keycloak (replaced by Entra ID; see ADR)
+- Keycloak (replaced by Entra ID; see ADR 0002)
+- Prometheus, Grafana, Loki, Promtail, Uptime Kuma (replaced by Azure Monitor; see ADR 0003)
 - Yarn or pnpm unless you check `package.json` first; npm is the default
 
 ---
