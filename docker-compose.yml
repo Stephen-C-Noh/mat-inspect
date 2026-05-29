@@ -76,6 +76,7 @@ services:
       - mat-internal
 
   core-api:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/core-api:${TAG:-latest}
     build:
       context: .
       dockerfile: services/core-api/Dockerfile
@@ -99,6 +100,7 @@ services:
       - mat-internal
 
   media:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/media:${TAG:-latest}
     build:
       context: .
       dockerfile: services/media/Dockerfile
@@ -118,6 +120,7 @@ services:
       - mat-internal
 
   audit:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/audit:${TAG:-latest}
     build:
       context: .
       dockerfile: services/audit/Dockerfile
@@ -138,6 +141,7 @@ services:
       - mat-internal
 
   ai:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/ai:${TAG:-latest}
     build:
       context: ./services/ai
       target: runtime
@@ -157,6 +161,7 @@ services:
       - mat-internal
 
   pwa:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/pwa:${TAG:-latest}
     build:
       context: ./apps/pwa
       target: runtime
@@ -174,6 +179,7 @@ services:
       - mat-internal
 
   dashboard:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/dashboard:${TAG:-latest}
     build:
       context: ./apps/dashboard
       target: runtime
