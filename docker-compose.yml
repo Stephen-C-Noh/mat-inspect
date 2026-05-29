@@ -95,6 +95,7 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
@@ -115,6 +116,7 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
@@ -136,6 +138,7 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
@@ -155,7 +158,7 @@ services:
         ]
       interval: 10s
       timeout: 5s
-      start_period: 15s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
@@ -174,6 +177,7 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
@@ -192,6 +196,7 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
