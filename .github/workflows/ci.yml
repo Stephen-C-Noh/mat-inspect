@@ -130,6 +130,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Lowercase owner
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -148,7 +151,7 @@ jobs:
           target: runtime
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/mat-inspect/${{ matrix.name }}:latest
-            ghcr.io/${{ github.repository_owner }}/mat-inspect/${{ matrix.name }}:sha-${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/mat-inspect/${{ matrix.name }}:latest
+            ghcr.io/${{ env.OWNER }}/mat-inspect/${{ matrix.name }}:sha-${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
