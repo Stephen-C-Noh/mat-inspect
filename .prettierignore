@@ -3,3 +3,6 @@ node_modules/
 dist/
 .next/
 db/migrations/
+
+# Azure Monitor workbook exports: JSON artifacts that round-trip through the portal
+*.workbook
