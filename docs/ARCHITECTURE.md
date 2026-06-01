@@ -12,7 +12,8 @@
 - v3: AI required by sponsor; voice-to-text feature added back to MVP
 - v4: Added development staging infrastructure on team-owned hardware (Section 12.7); forced migration to school infrastructure made an explicit Sprint 4 deliverable
 - v5: Reviewer feedback applied. Audit chain implementation specifics (Section 8.4), Whisper accuracy escalation path (Section 9.1), offline-first downgraded to short-drop tolerance (Section 10.1), SPOF acknowledgement with managed-services recommendation (Section 12.3), CI gates enforced with explicit severity thresholds (Section 14)
-- v6 (this document): Deployment strategy updated. SAIT IT confirmed no infrastructure access during the capstone. All services run in Docker on team-owned hardware for the full project duration. Entra ID app registration moved to a team-owned personal Azure tenant for development; SAIT IT registers their own app at handover. Sprint 4 migration milestone reframed as DR rehearsal and handover package assembly. Azure cost estimate repositioned as a post-handover reference document.
+- v6: Deployment strategy updated. SAIT IT confirmed no infrastructure access during the capstone. All services run in Docker on team-owned hardware for the full project duration. Entra ID app registration moved to a team-owned personal Azure tenant for development; SAIT IT registers their own app at handover. Sprint 4 migration milestone reframed as DR rehearsal and handover package assembly. Azure cost estimate repositioned as a post-handover reference document.
+- v7 (this document): Full Azure migration for production. MinIO replaced by Azure Blob Storage (ADR 0004); self-hosted PostgreSQL replaced by Azure Database for PostgreSQL Flexible Server in production (ADR 0005). Dev and dev-staging on the mini-PC are unchanged except MinIO is replaced by Azurite. Self-hosted observability stack was replaced by Azure Monitor in v6 (ADR 0003).
 
 ---
 
@@ -116,8 +117,8 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ca
                          |             |                 |
                          |   +---------v------+          |
                          |   |  Media Service |          |
-                         |   |  (Node, MinIO  |          |
-                         |   |  client)       |          |
+                         |   |  (Node, Azure  |          |
+                         |   |  Blob client)  |          |
 +----------------+       |   +-------+--------+          |
 | PostgreSQL     +<------+           |                   |
 | core schema    |                   |                   |
@@ -130,27 +131,27 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ca
 +----------------+
 
 +----------------+      +-----------------------+
-| MinIO          |      | Observability         |
-| (S3: photos,   |      | OTel Collector +      |
-| voice clips,   |      | Azure Monitor         |
-| PDF exports)   |      | (metrics, logs,       |
-+----------------+      | uptime checks)        |
-                        +-----------------------+
+| Azure Blob     |      | Observability         |
+| Storage        |      | Azure Monitor         |
+| (photos,       |      | (metrics, logs,       |
+| voice clips,   |      | uptime checks)        |
+| PDF exports)   |      +-----------------------+
++----------------+
 ```
 
 ### 5.2 Microservices
 
 Four services are built by the team. Three are off-the-shelf images with configuration only.
 
-| Service                | Language / Framework              | Built by Team | Responsibility                                                                                                                   |
-| ---------------------- | --------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Caddy                  | image only                        | No            | TLS termination, reverse proxy, routing, ACME certs                                                                              |
-| Azure Entra ID         | external (team-owned tenant)      | No            | OAuth2/OIDC, JWT issuance, MFA, account lockout; team-owned personal tenant for dev; SAIT IT registers their own app at handover |
-| PostgreSQL             | image only                        | No            | Two logical schemas: core, audit                                                                                                 |
-| Core API Service       | Node.js + Fastify + TypeScript    | Yes           | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications                                  |
-| Media Service          | Node.js + Fastify + TypeScript    | Yes           | Photo upload, voice clip upload, MinIO write, presigned URLs                                                                     |
-| Audit / Report Service | Node.js + Fastify + TypeScript    | Yes           | Hash-chained audit log writer, PDF generation, CSV export                                                                        |
-| AI Service             | Python + FastAPI + faster-whisper | Yes           | Voice-to-text transcription; (stretch) photo defect suggestion                                                                   |
+| Service                | Language / Framework                                                   | Built by Team | Responsibility                                                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Caddy                  | image only                                                             | No            | TLS termination, reverse proxy, routing, ACME certs                                                                              |
+| Azure Entra ID         | external (team-owned tenant)                                           | No            | OAuth2/OIDC, JWT issuance, MFA, account lockout; team-owned personal tenant for dev; SAIT IT registers their own app at handover |
+| PostgreSQL             | image only (dev); Azure Database for PostgreSQL Flexible Server (prod) | No            | Two logical schemas: core, audit                                                                                                 |
+| Core API Service       | Node.js + Fastify + TypeScript                                         | Yes           | Equipment registry, checklist templates, inspection submissions, defect workflow, notifications                                  |
+| Media Service          | Node.js + Fastify + TypeScript                                         | Yes           | Photo upload, voice clip upload, Azure Blob Storage write, SAS token generation                                                  |
+| Audit / Report Service | Node.js + Fastify + TypeScript                                         | Yes           | Hash-chained audit log writer, PDF generation, CSV export                                                                        |
+| AI Service             | Python + FastAPI + faster-whisper                                      | Yes           | Voice-to-text transcription; (stretch) photo defect suggestion                                                                   |
 
 **Why these boundaries:**
 
@@ -165,7 +166,7 @@ Four services are built by the team. Three are off-the-shelf images with configu
 | --------------------- | -------------------------------------------------- | ----------------------------------------------- |
 | PostgreSQL (core_db)  | Equipment, checklists, inspections, defects        | Primary business data                           |
 | PostgreSQL (audit_db) | Hash-chained audit log, retention metadata         | INSERT-only role; writes only via Audit Service |
-| MinIO                 | Photo evidence, voice clips, generated PDF exports | S3-compatible, self-hosted                      |
+| Azure Blob Storage    | Photo evidence, voice clips, generated PDF exports | Azure-managed; Azurite emulator for dev         |
 
 Each schema is owned by a distinct database role with least-privilege grants.
 
@@ -307,7 +308,7 @@ Database-level invariants:
 2. Selects equipment and date range.
 3. Generates a signed PDF. PDF contains: per-inspection records, photos, voice transcripts (audio not embedded; transcripts only), signatures, audit log hash chain segment, system version.
 4. PDF generated by Audit/Report Service; the file itself is digitally signed (PDF signature with the system's signing key).
-5. PDF and its hash are stored in MinIO. AuditEvent records the export.
+5. PDF and its hash are stored in Azure Blob Storage. AuditEvent records the export.
 
 ---
 
@@ -340,7 +341,7 @@ Endpoints without a declared permission fail closed.
 - TLS 1.3 everywhere. Caddy handles ACME for public hostnames, internal CA for campus-only deployments.
 - Internal service traffic on a private Docker network, not exposed to host.
 - Database connections use TLS.
-- MinIO uses server-side encryption (SSE-S3).
+- Azure Blob Storage has server-side encryption enabled by default; no explicit configuration required.
 - Secrets stored in Docker secrets (prod) or `.env` (dev only, never committed). For Azure deployment, secrets backend is Azure Key Vault.
 - Database backups encrypted with age or GPG before transfer off-host.
 
@@ -395,7 +396,7 @@ This is the level of specificity required for the audit log to actually have evi
 
 The AI Service introduces new threats. Mitigations:
 
-- **Audio clips contain voice biometrics.** Treat as PII. Stored encrypted at rest in MinIO. Access logged. Retention: 90 days (transcripts kept for 7 years; audio is shorter-lived).
+- **Audio clips contain voice biometrics.** Treat as PII. Stored encrypted at rest in Azure Blob Storage (SSE on by default). Access logged. Retention: 90 days (transcripts kept for 7 years; audio is shorter-lived).
 - **Prompt injection via voice:** Operators could speak instructions that try to manipulate downstream consumers of the transcript. Mitigation: the transcript is stored as plain text and never fed to an LLM in this version. If a future feature does feed transcripts to an LLM, treat them as untrusted input.
 - **Model accuracy is not perfect.** Operator must confirm the transcript before submission. Schema requires `notes_source` field to track whether the operator edited the AI output.
 - **AI Service runs locally on-prem.** Audio never leaves SAIT infrastructure. No third-party API calls. This satisfies likely FOIP requirements without requiring external data processing agreements.
@@ -462,7 +463,7 @@ Controls:
 - Runtime: Python 3.12 + FastAPI in a Docker container. CPU-only inference (no GPU required for short clips of under 30 seconds).
 - Endpoint: `POST /api/v1/ai/transcribe` accepts an audio blob (webm or wav, max 30 seconds, max 2 MB), returns `{transcript, confidence, language, processing_ms}`.
 - Authentication: same JWT validation as other services.
-- Audio handling: clip is uploaded to MinIO by Media Service first, then AI Service is given a presigned URL. AI Service streams the audio in, transcribes, returns. The clip is referenced by `voice_clip_id` in the Response record.
+- Audio handling: clip is uploaded to Azure Blob Storage by Media Service first, then AI Service is given a SAS token URL. AI Service streams the audio in, transcribes, returns. The clip is referenced by `voice_clip_id` in the Response record.
 
 **Why this model:**
 
@@ -598,14 +599,14 @@ All services run in Docker containers via Docker Compose for the full capstone p
 
 **Why all-in-Docker:**
 
-- Any Linux host can run the full stack with `docker compose up`. No environment-specific code changes are needed between the mini-PC, a personal Azure VM, or a SAIT campus VM.
-- MinIO is fully S3-compatible. The Media Service uses the AWS SDK v3 S3 client, which connects to MinIO identically to any S3-compatible service. No code changes are needed if storage is moved to a different provider.
-- PostgreSQL 16 in Docker uses the same wire protocol and Drizzle ORM connection string as any other Postgres host. No code changes are needed if the database is moved to a managed service.
-- Migration between any two hosts is: `pg_dump` + `mc mirror` + `git pull` + `docker compose up`.
+- Any Linux host can run the full stack with `docker compose up`. No environment-specific code changes are needed between the mini-PC and the Azure VM.
+- The Media Service uses `@azure/storage-blob`. Dev and dev-staging point `AZURE_STORAGE_CONNECTION_STRING` at Azurite; production points at a real Azure Blob Storage account. No code changes between environments.
+- PostgreSQL 16 in Docker (dev) uses the same wire protocol and Drizzle ORM connection string as Azure Database for PostgreSQL Flexible Server (prod). Only `DATABASE_URL` differs.
+- Migration between hosts is: `pg_dump` + `azcopy sync` (Blob Storage) + `git pull` + `docker compose up`.
 
 **Capstone period (Sprints 0 to 6):** All environments run on the team-owned mini-PC or individual developer laptops. See Section 12.7 for the staging host configuration.
 
-**Post-handover:** SAIT IT provisions their own host when the School of MAT requests deployment. The handover package includes a runbook covering deployment to any Linux VM (Azure, campus, or other). If SAIT IT later chooses to move Postgres or object storage to managed services, that is their decision and requires updating the relevant environment variables (and the storage SDK if replacing MinIO with Azure Blob Storage, which is not S3-compatible). See AZURE_COST_ESTIMATE.md for cost reference.
+**Post-handover:** SAIT IT provisions an Azure VM when the School of MAT requests deployment. The handover package includes a runbook covering deployment to an Azure VM. Azure Blob Storage and Azure Database for PostgreSQL Flexible Server are provisioned by SAIT IT in their own tenant; the only change required is updating `AZURE_STORAGE_CONNECTION_STRING` and `DATABASE_URL` to point at their resources. See AZURE_COST_ESTIMATE.md for cost reference.
 
 ### 12.3 Deployment Topology
 
@@ -619,29 +620,42 @@ The capstone scope cannot deliver active-active high availability. The architect
 | ---------------------- | ----------------------------------------------------------------------- |
 | Caddy                  | TLS termination, reverse proxy, ACME cert renewal                       |
 | Core API               | Equipment registry, checklists, inspection submissions, defect workflow |
-| Media Service          | Photo and voice clip uploads, MinIO client, presigned URLs              |
+| Media Service          | Photo and voice clip uploads, Azure Blob Storage client, SAS tokens     |
 | Audit / Report Service | Hash-chained audit log, PDF generation, CSV export                      |
 | AI Service             | Whisper `small.en` voice-to-text transcription                          |
 | Operator PWA           | Mobile-first Next.js app for Lab Techs                                  |
 | Manager Dashboard      | Next.js app for supervisors and managers                                |
-| PostgreSQL 16          | Core and audit schemas                                                  |
-| MinIO                  | S3-compatible object storage: photos, voice clips, PDF exports          |
+| PostgreSQL 16          | Core and audit schemas (dev/dev-staging only; prod uses Azure Database) |
+| Azurite                | Azure Blob Storage emulator (dev/dev-staging only)                      |
 | Azure Monitor          | Metrics, logs, and availability checks (Azure-native, no containers)    |
 
-**Memory budget on an 8 GB VM:**
+**Memory budget — Production (Azure VM, 8 GB):**
+
+PostgreSQL and Blob Storage are managed Azure services; no containers for them in prod.
 
 | Component                                  | Est. RAM    |
 | ------------------------------------------ | ----------- |
 | AI Service (Whisper `small.en` loaded)     | ~1.5 GB     |
-| PostgreSQL                                 | ~200 MB     |
-| MinIO                                      | ~128 MB     |
+| Core API + Media + Audit (3 Node services) | ~450 MB     |
+| PWA + Dashboard (2 Next.js containers)     | ~300 MB     |
+| Caddy                                      | ~50 MB      |
+| **Total estimate**                         | **~2.3 GB** |
+| Headroom on 8 GB Azure VM                  | ~5.7 GB     |
+
+**Memory budget — Dev-staging (mini-PC, 32 GB):**
+
+Includes PostgreSQL and Azurite containers that prod offloads to managed Azure services.
+
+| Component                                  | Est. RAM    |
+| ------------------------------------------ | ----------- |
+| AI Service (Whisper `small.en` loaded)     | ~1.5 GB     |
+| PostgreSQL 16                              | ~200 MB     |
+| Azurite                                    | ~64 MB      |
 | Core API + Media + Audit (3 Node services) | ~450 MB     |
 | PWA + Dashboard (2 Next.js containers)     | ~300 MB     |
 | Caddy                                      | ~50 MB      |
 | **Total estimate**                         | **~2.6 GB** |
-| Headroom on 8 GB VM                        | ~5.4 GB     |
-
-The team-owned mini-PC has 32 GB RAM; headroom is not a concern during development.
+| Headroom on 32 GB mini-PC                  | ~29 GB      |
 
 If the host fails: restore from backup, `git pull`, `docker compose up`. RTO is approximately 1 to 2 hours with the documented runbook. See Section 12.6.
 
@@ -654,8 +668,10 @@ Caddy:
 
 ### 12.5 Backup Strategy
 
-- Postgres: `pg_dump` nightly + WAL archiving every 5 minutes to off-host storage. RPO ~5 minutes.
-- MinIO: `mc mirror` nightly to off-host target.
+- Postgres (dev-staging): `pg_dump` nightly + WAL archiving every 5 minutes to off-host storage. RPO ~5 minutes.
+- Postgres (prod): Azure Database for PostgreSQL automated backups with 7-day retention and geo-redundancy. RPO ~5 minutes; managed by Azure.
+- Azure Blob Storage (prod): geo-redundant storage (GRS) replication is on by default; point-in-time restore available. No manual mirror job required.
+- Azurite (dev-staging): not backed up; dev data only.
 - Configuration: All in Git.
 
 Off-host backup target during the capstone: the host owner's existing rsync target (NAS or similar). Post-handover: SAIT IT designates an appropriate target (NFS share, Azure Blob, or other storage).
@@ -705,7 +721,7 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 **Isolation from host owner's existing services:**
 
-- The MAT project lives in `~/projects/mat-inspect/` with its own Docker Compose file, its own Caddy container (on host ports 80 and 443), its own Postgres, its own MinIO. Observability goes to Azure Monitor via the team's Azure subscription.
+- The MAT project lives in `~/projects/mat-inspect/` with its own Docker Compose file, its own Caddy container (on host ports 80 and 443), its own Postgres, its own Azurite. Observability goes to Azure Monitor via the team's Azure subscription.
 - All project services except Caddy stay on the project's internal Docker network and are not exposed to the host.
 - The project does not reuse the host owner's personal homelab services (Gitea, etc.). Keeping the project self-contained makes the Sprint 4 migration a single-command lift.
 
@@ -730,7 +746,7 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 **Sprint 4 migration (forced rehearsal):**
 
 - The migration to SAIT infrastructure is an explicit Sprint 4 deliverable, not a stretch task.
-- Migration steps: `pg_dump` of all three schemas, `mc mirror` of MinIO, `git pull` on the target VM, `docker compose up -d`, restore dumps, smoke test.
+- Migration steps: `pg_dump` of all schemas, `azcopy sync` of Blob Storage containers, `git pull` on the target VM, `docker compose up -d`, restore dumps, smoke test.
 - After Sprint 4, dev staging on the M5 continues for parallel team work but loses its sponsor-demo role. All sponsor demos from Sprint 5 onward use the SAIT-hosted instance.
 
 **End-of-project decommission:**
@@ -777,7 +793,7 @@ Every PR and every push to `main` runs all stages. Build fails if any stage fail
 1. **Lint and format.** ESLint, Prettier (TypeScript); Ruff (Python); Hadolint (Dockerfiles); Markdownlint (docs). Zero warnings allowed.
 2. **Type check.** TypeScript strict mode for all TS code; mypy strict for Python. No errors allowed.
 3. **Unit tests.** Vitest (TS), pytest (Python). 70 percent coverage target for business logic in `services/*/src/use-cases/`, `services/*/src/domain/`, and `packages/*/src/`. No coverage requirement on glue code.
-4. **Integration tests.** Postgres and MinIO (or Azurite for Azure Blob) in containers via testcontainers; tests run against real dependencies, not mocks.
+4. **Integration tests.** Postgres and Azurite in containers via testcontainers; tests run against real dependencies, not mocks.
 5. **Build container image.** Multi-stage Dockerfile, non-root user, Alpine base for Node services; `python:3.12-slim` for AI Service. Hadolint must pass.
 6. **Security scans (each is a build gate):**
    - **Trivy** on the built image: fails on HIGH or CRITICAL CVEs with available patches. MEDIUM and below logged but not blocking.
@@ -861,7 +877,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 - Stakeholder interviews; job shadow at least 2 inspections per equipment type.
 - Confirm checklist content with sponsor for all four equipment classes. Photograph or transcribe all existing paper checklists.
 - Repo set up on GitHub. Branch protection, PR template, issue templates.
-- Docker Compose skeleton: Postgres, MinIO, Caddy, stubs for Core API, Media, Audit, AI.
+- Docker Compose skeleton: Postgres, Azurite, Caddy, stubs for Core API, Media, Audit, AI.
 - Each student gets the stack running locally.
 - Dev staging set up on team-owned mini-PC (see Section 12.7); all 5 students added to Tailscale; root cert distributed.
 - Register application in team-owned personal Azure tenant (Entra ID Free tier). Define App Roles: Operator, Supervisor, Manager, Admin, Auditor. Create test users and assign roles. Document tenant ID and client ID in `.env.example`.
@@ -905,7 +921,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 - Manager dashboard: live compliance grid, defect inbox, filters, drilldown.
 - Media Service: photo upload and presigned URL download.
 - PWA photo capture on failed items.
-- **AI Service deployed**: faster-whisper `small.en` in a Docker container, `/api/v1/ai/transcribe` endpoint, authentication, MinIO integration.
+- **AI Service deployed**: faster-whisper `small.en` in a Docker container, `/api/v1/ai/transcribe` endpoint, authentication, Azure Blob Storage integration.
 - PWA voice dictation UI: tap-to-record, waveform, transcript display, edit-and-confirm flow.
 - Supervisor flow: acknowledge defect, approve return-to-service.
 
@@ -921,7 +937,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 - Retention policy: 7 years for records, 90 days for raw voice audio (lifecycle job).
 - Security review: Trivy, Semgrep, Gitleaks across whole repo. Fix high and critical findings.
 - Internal pen test: students swap roles and attack each other's services.
-- Backup automation: nightly pg_dump + MinIO mirror configured and verified on dev staging host.
+- Backup automation: nightly pg_dump on dev staging configured and verified; Azure Blob Storage and Azure Database for PostgreSQL automated backups verified on prod.
 - **DR rehearsal:** full backup-and-restore drill on dev staging (simulate host failure; restore from backup to a clean Docker environment; run smoke test). Document time taken and issues found.
 - **Handover package assembled:** DEPLOYMENT.md, SECURITY.md, OPERATIONS_RUNBOOK.md, IT runbook for Entra ID registration in the SAIT tenant, infrastructure setup instructions for SAIT IT.
 - End-to-end inspection flow verified on dev staging with all audit, backup, and observability components running.
@@ -1059,7 +1075,7 @@ So the team is not staring at a blank repo on day one.
 **Week 1 (May 18 to May 24)**
 
 - [ ] Create Git repo (`mat-inspect`) on GitHub; branch protection, PR template, issue templates.
-- [ ] Create `docker-compose.yml` with: Postgres, MinIO, Caddy, and empty service stubs for Core API, Media, Audit, AI.
+- [ ] Create `docker-compose.yml` with: Postgres, Azurite, Caddy, and empty service stubs for Core API, Media, Audit, AI.
 - [ ] Each student gets the stack running locally (`docker compose up`).
 - [ ] Stand up dev staging on the team-owned mini-PC: clone repo to `~/projects/mat-inspect/`, `docker compose up`, verify all stubs respond.
 - [ ] Generate Caddy local CA root cert; distribute to all 5 team members; each installs on their dev devices.

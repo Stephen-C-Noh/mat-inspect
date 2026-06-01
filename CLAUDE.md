@@ -64,7 +64,9 @@ Pinned versions as of project start. Match these when generating code.
 - Docker + Docker Compose
 - Caddy 2.x reverse proxy with built-in local CA in dev, ACME in prod
 - Azure AD / Entra ID for auth (all users are SAIT staff with existing SAIT accounts; no Keycloak)
-- MinIO for S3-compatible object storage
+- Azure Blob Storage for object storage (photos, voice clips, PDF exports); `@azure/storage-blob` SDK; see ADR 0004
+- Azurite (Azure Storage emulator) in Docker Compose for dev and dev-staging
+- Azure Database for PostgreSQL Flexible Server for production; self-hosted PostgreSQL 16 in Docker for dev and dev-staging; see ADR 0005
 - Azure Monitor for observability (metrics, logs, availability checks); instrumented via `@azure/monitor-opentelemetry` (Node.js) and `azure-monitor-opentelemetry` (Python); see ADR 0003
 - GitHub Actions for CI/CD
 
@@ -77,6 +79,8 @@ Pinned versions as of project start. Match these when generating code.
 - TypeORM, Sequelize, or raw `pg` client (use Drizzle)
 - Keycloak (replaced by Entra ID; see ADR 0002)
 - Prometheus, Grafana, Loki, Promtail, Uptime Kuma (replaced by Azure Monitor; see ADR 0003)
+- MinIO (replaced by Azure Blob Storage; see ADR 0004)
+- AWS SDK / `@aws-sdk/client-s3` (use `@azure/storage-blob` instead)
 - Yarn or pnpm unless you check `package.json` first; npm is the default
 
 ---
@@ -129,7 +133,7 @@ Pinned versions as of project start. Match these when generating code.
 
 - Vitest for TypeScript, pytest for Python.
 - Test file naming: `*.test.ts` alongside the source file.
-- Integration tests use real Postgres and MinIO in containers via testcontainers.
+- Integration tests use real Postgres and Azurite in containers via testcontainers.
 - No mocking of internal modules. Mock external services only (SMTP, etc.).
 - Coverage target: 70 percent for business logic. Do not chase coverage on glue code.
 
@@ -144,7 +148,7 @@ mat-inspect/
 │   └── dashboard/            # Next.js manager dashboard
 ├── services/
 │   ├── core-api/             # Node.js + Fastify, main business logic
-│   ├── media/                # Node.js + Fastify, MinIO uploads
+│   ├── media/                # Node.js + Fastify, Azure Blob Storage uploads
 │   ├── audit/                # Node.js + Fastify, hash-chained audit + PDF reports
 │   └── ai/                   # Python + FastAPI, Whisper transcription
 ├── packages/
