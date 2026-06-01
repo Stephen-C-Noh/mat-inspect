@@ -59,7 +59,7 @@ services:
       target: runtime
     environment:
       PORT: '3000'
-      SERVICE_NAME: core-api
+      OTEL_SERVICE_NAME: core-api
       DATABASE_URL: ${CORE_API_DB_URL}
       HMAC_SECRET: ${HMAC_SECRET}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
@@ -85,7 +85,7 @@ services:
       target: runtime
     environment:
       PORT: '3000'
-      SERVICE_NAME: media
+      OTEL_SERVICE_NAME: media
       AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
     depends_on:
@@ -108,7 +108,7 @@ services:
       target: runtime
     environment:
       PORT: '3000'
-      SERVICE_NAME: audit
+      OTEL_SERVICE_NAME: audit
       DATABASE_URL: ${AUDIT_API_DB_URL}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
     depends_on:
@@ -130,6 +130,7 @@ services:
       target: runtime
     environment:
       PORT: '8000'
+      OTEL_SERVICE_NAME: ai
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
     healthcheck:
       test:

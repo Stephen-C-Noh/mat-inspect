@@ -1,0 +1,72 @@
+{
+  "version": "Notebook/1.0",
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# MAT-Inspect — Service Overview\n\nRequest throughput and error rate across all four services (core-api, media, audit, ai)."
+      },
+      "name": "title"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppRequests\n| summarize RequestCount = count() by bin(TimeGenerated, 5m), AppRoleName\n| render timechart",
+        "size": 0,
+        "title": "Request count by service (5-minute buckets)",
+        "timeContext": {
+          "durationMs": 3600000
+        },
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "/subscriptions/24e850a2-dc20-46e6-b3bd-015dbaaa5311/resourceGroups/DefaultResourceGroup-CCAN/providers/microsoft.operationalinsights/workspaces/DefaultWorkspace-24e850a2-dc20-46e6-b3bd-015dbaaa5311-CCAN"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "request-count"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppRequests\n| summarize\n    Total = count(),\n    Errors = countif(toint(ResultCode) >= 500)\n  by bin(TimeGenerated, 5m), AppRoleName\n| extend ErrorRate = round(100.0 * Errors / Total, 2)\n| project TimeGenerated, AppRoleName, ErrorRate\n| render timechart",
+        "size": 0,
+        "title": "5xx error rate % by service (5-minute buckets)",
+        "timeContext": {
+          "durationMs": 3600000
+        },
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "/subscriptions/24e850a2-dc20-46e6-b3bd-015dbaaa5311/resourceGroups/DefaultResourceGroup-CCAN/providers/microsoft.operationalinsights/workspaces/DefaultWorkspace-24e850a2-dc20-46e6-b3bd-015dbaaa5311-CCAN"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "error-rate"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppRequests\n| summarize\n    Requests = count(),\n    Errors = countif(toint(ResultCode) >= 500),\n    AvgDurationMs = round(avg(DurationMs), 1)\n  by AppRoleName\n| order by Requests desc",
+        "size": 0,
+        "title": "Totals by service (last hour)",
+        "timeContext": {
+          "durationMs": 3600000
+        },
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "/subscriptions/24e850a2-dc20-46e6-b3bd-015dbaaa5311/resourceGroups/DefaultResourceGroup-CCAN/providers/microsoft.operationalinsights/workspaces/DefaultWorkspace-24e850a2-dc20-46e6-b3bd-015dbaaa5311-CCAN"
+        ],
+        "visualization": "table"
+      },
+      "name": "totals-table"
+    }
+  ],
+  "styleSettings": {},
+  "fromTemplateId": ""
+}
