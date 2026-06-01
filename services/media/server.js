@@ -1,5 +1,10 @@
 'use strict';
 
+if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
+  const { useAzureMonitor } = require('@azure/monitor-opentelemetry');
+  useAzureMonitor();
+}
+
 const http = require('http');
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
