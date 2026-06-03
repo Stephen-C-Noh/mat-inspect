@@ -1,0 +1,62 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useIsAuthenticated, useMsal } from '@azure/msal-react';
+import { loginRequest } from '@/lib/msal-config';
+import { hasAllowedRole } from '@/lib/auth';
+
+export default function LoginPage() {
+  const { instance, accounts } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (hasAllowedRole(accounts[0] ?? null)) {
+      router.replace('/dashboard');
+    } else {
+      router.replace('/unauthorized');
+    }
+  }, [isAuthenticated, accounts, router]);
+
+  const handleSignIn = async () => {
+    try {
+      const result = await instance.loginPopup(loginRequest);
+      instance.setActiveAccount(result.account);
+    } catch {
+      // User cancelled popup or popup was blocked; stay on login page.
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow">
+        <h1 className="mb-1 text-2xl font-semibold text-gray-900">MAT-Inspect</h1>
+        <p className="mb-6 text-sm text-gray-500">Manager Dashboard</p>
+        <button
+          onClick={handleSignIn}
+          className="flex w-full items-center justify-center gap-3 rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <MicrosoftLogo />
+          Sign in with Microsoft
+        </button>
+      </div>
+    </main>
+  );
+}
+
+const MicrosoftLogo = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 21 21"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+    <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+    <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+    <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+  </svg>
+);
