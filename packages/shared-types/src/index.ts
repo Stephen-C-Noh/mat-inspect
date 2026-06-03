@@ -1,6 +1,6 @@
 export type UserRole = 'operator' | 'supervisor' | 'manager' | 'admin';
 
-export type EquipmentStatus = 'READY' | 'NEEDS_INSPECTION' | 'OUT_OF_SERVICE';
+export type EquipmentStatus = 'READY' | 'AWAITING_INSPECTION' | 'OUT_OF_SERVICE' | 'RETIRED';
 
 export type InspectionResult = 'PASS' | 'FAIL_WARNING' | 'FAIL_BLOCKING';
 
