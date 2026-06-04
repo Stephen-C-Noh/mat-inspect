@@ -167,7 +167,8 @@ services:
   dashboard:
     image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/dashboard:${TAG:-latest}
     build:
-      context: ./apps/dashboard
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
       target: runtime
       args:
         NEXT_PUBLIC_AZURE_TENANT_ID: ${ENTRA_TENANT_ID}
