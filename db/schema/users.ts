@@ -1,7 +1,6 @@
 import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core';
 
-// Shadow table for Entra ID users. The id column holds the oid claim from the
-// Entra ID JWT verbatim so foreign keys in other tables resolve without a lookup.
+// Shadow table: id stores the Entra ID oid claim directly so FK joins need no extra lookup.
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
   displayName: text('display_name').notNull(),

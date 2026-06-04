@@ -4,11 +4,11 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// CORE_API_DB_URL uses the Docker internal hostname; replace it with localhost
-// when the script runs outside the container (local drizzle tooling, CI seed step).
+// DB_HOST_LOCAL: use localhost (Docker Desktop) or <project>-postgres-1.orb.local (OrbStack).
+const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
 const rawUrl =
   process.env['DATABASE_URL'] ??
-  process.env['CORE_API_DB_URL']?.replace('@postgres:', '@localhost:');
+  process.env['CORE_API_DB_URL']?.replace('@postgres:', `@${localHost}:`);
 
 if (!rawUrl) {
   process.stderr.write('DATABASE_URL or CORE_API_DB_URL must be set\n');

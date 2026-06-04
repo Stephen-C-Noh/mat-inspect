@@ -9,13 +9,14 @@
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "node --env-file=../../.env --import=tsx/esm ../../db/migrate.ts",
     "db:seed": "node --env-file=../../.env --import=tsx/esm ../../db/seed.ts"
   },
   "dependencies": {
+    "@azure/monitor-opentelemetry": "^1.0.0",
     "@mat-inspect/shared-types": "^0.0.0",
-    "drizzle-orm": "^0.41.0",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",
     "jose": "^6.2.3",
     "pg": "^8.21.0",

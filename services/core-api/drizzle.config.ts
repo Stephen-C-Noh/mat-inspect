@@ -1,18 +1,17 @@
 import { defineConfig } from 'drizzle-kit';
 
+// DB_HOST_LOCAL: use localhost (Docker Desktop) or <project>-postgres-1.orb.local (OrbStack).
+const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
+
+// Fallback URL is safe for db:generate, which reads schema files and never connects.
+const dbUrl =
+  process.env['DATABASE_URL'] ??
+  process.env['CORE_API_DB_URL']?.replace('@postgres:', `@${localHost}:`) ??
+  `postgresql://${localHost}/core_db`;
+
 export default defineConfig({
   dialect: 'postgresql',
   schema: '../../db/schema/*.ts',
   out: '../../db/migrations',
-  dbCredentials: {
-    // CORE_API_DB_URL uses the Docker internal hostname; replace it with localhost
-    // when drizzle-kit runs outside the container (local dev, CI migration step).
-    // drizzle-kit generate only reads schema files and never connects; the URL
-    // is required by the config shape but unused during generate. db:migrate and
-    // db:push require a real value supplied via DATABASE_URL or CORE_API_DB_URL.
-    url:
-      process.env['DATABASE_URL'] ??
-      process.env['CORE_API_DB_URL']?.replace('@postgres:', '@localhost:') ??
-      'postgresql://localhost/unused',
-  },
+  dbCredentials: { url: dbUrl },
 });
