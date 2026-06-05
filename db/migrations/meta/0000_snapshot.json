@@ -1,5 +1,5 @@
 {
-  "id": "00198273-92ca-4b9b-b2d2-51fe5ef42e09",
+  "id": "e05426d8-73ed-462c-81c8-b9941dbbbfd6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -34,6 +34,30 @@
           "primaryKey": false,
           "notNull": true
         },
+        "make": {
+          "name": "make",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "serial_number": {
+          "name": "serial_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manufacturer_specs_url": {
+          "name": "manufacturer_specs_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "equipment_status",
@@ -41,6 +65,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'AWAITING_INSPECTION'"
+        },
+        "current_status_since": {
+          "name": "current_status_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "location": {
           "name": "location",
@@ -101,6 +132,20 @@
           "primaryKey": false,
           "notNull": true
         },
+        "certifications": {
+          "name": "certifications",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -150,7 +195,7 @@
       "values": [
         "OVERHEAD_CRANE",
         "TRUCK",
-        "PALLET_JACK",
+        "ELECTRIC_PALLET_JACK",
         "FORKLIFT"
       ]
     }
