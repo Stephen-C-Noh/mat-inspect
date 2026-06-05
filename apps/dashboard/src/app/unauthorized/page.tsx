@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { SwitchAccountButton } from '@/components/switch-account-button';
 
 export default function UnauthorizedPage() {
   return (
@@ -7,12 +7,10 @@ export default function UnauthorizedPage() {
         <p className="mb-1 text-4xl font-bold text-gray-300">403</p>
         <h1 className="mb-3 text-xl font-semibold text-gray-900">Access Denied</h1>
         <p className="mb-6 text-sm text-gray-600">
-          Your account does not have access to this dashboard. Only Manager and Admin roles are
-          permitted. Contact your SAIT administrator to request access.
+          Your account does not have access to this dashboard. Only Supervisor, Manager, and Admin
+          roles are permitted. Contact your SAIT administrator to request access.
         </p>
-        <Link href="/login" className="text-sm text-blue-600 hover:underline">
-          Sign in with a different account
-        </Link>
+        <SwitchAccountButton />
       </div>
     </main>
   );
