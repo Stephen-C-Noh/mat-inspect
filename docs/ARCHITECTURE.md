@@ -178,6 +178,7 @@ Each schema is owned by a distinct database role with least-privilege grants.
 Equipment
   id (uuid)
   asset_tag (string, unique, printed on QR sticker)
+  name (string, human-friendly label, e.g., "Overhead Crane 1")
   type (enum: OVERHEAD_CRANE, TRUCK, ELECTRIC_PALLET_JACK, FORKLIFT)
   make, model, serial_number
   location (string, e.g., "Bay 3")

@@ -37,6 +37,23 @@ Recommended Flexible Server configuration for production:
   retention policy; exports older than 7 days move to archive storage)
 - TLS: enforced (`require_secure_transport = ON`)
 
+## Operational Notes
+
+The claim above that only `DATABASE_URL` differs holds for the schema and migrations.
+Two production steps still differ from the dev container. Both are connection or
+provisioning concerns, not code or schema changes.
+
+- TLS in the connection string. The managed server enforces TLS
+  (`require_secure_transport = ON`) and refuses unencrypted connections. The
+  application sets no SSL options in code; the `pg` pool reads only the connection
+  string. The production `DATABASE_URL` must include `sslmode=require`, for example
+  `postgresql://user:pass@host:5432/core_db?sslmode=require`. Without it the driver
+  connects without TLS and the server rejects the connection.
+- Database creation. The dev container creates `core_db` and `audit_db` through the
+  Docker init script (`infra/docker/postgres-init.sql`). Flexible Server has no
+  equivalent init hook. Create both databases on the managed instance (Azure CLI or
+  portal) before the first migration runs.
+
 ## Consequences
 
 Positive: SAIT IT inherits a managed database with automated backups, patching, and
