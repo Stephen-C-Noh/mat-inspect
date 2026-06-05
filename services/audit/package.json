@@ -4,5 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "@azure/monitor-opentelemetry": "^1.0.0"
   }
 }

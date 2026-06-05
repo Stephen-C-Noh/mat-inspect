@@ -1,3 +1,4 @@
+import './instrumentation.js';
 import { buildApp } from './app.js';
 import { logger } from './lib/logger.js';
 

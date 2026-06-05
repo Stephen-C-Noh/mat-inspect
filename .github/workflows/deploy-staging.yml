@@ -1,7 +1,9 @@
 name: Deploy to Staging
 
 on:
-  push:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
     branches: [main]
 
 concurrency:
@@ -12,7 +14,10 @@ jobs:
   deploy:
     name: Deploy to M5 Plus
     runs-on: ubuntu-latest
-    needs: []
+    # Only deploy when CI passed. The workflow_run trigger fires on both success and failure.
+    if: github.event.workflow_run.conclusion == 'success'
+    permissions:
+      packages: read
 
     steps:
       - name: Connect to Tailscale
@@ -23,13 +28,18 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_OWNER: ${{ github.repository_owner }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
+          envs: GHCR_TOKEN,GHCR_OWNER
           script: |
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_OWNER" --password-stdin
             cd ~/projects/mat-inspect
             git pull
             docker compose pull
-            docker compose up -d --remove-orphans --wait --wait-timeout 120
+            docker compose up -d --remove-orphans --wait --wait-timeout 180
             ./scripts/docker-health-check.sh

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-SERVICES="postgres minio caddy core-api media audit ai pwa dashboard"
+SERVICES="postgres azurite caddy core-api media audit ai pwa dashboard"
 
 echo "Service health:"
 echo "---"

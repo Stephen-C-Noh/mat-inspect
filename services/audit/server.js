@@ -1,9 +1,14 @@
 'use strict';
 
+if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
+  const { useAzureMonitor } = require('@azure/monitor-opentelemetry');
+  useAzureMonitor();
+}
+
 const http = require('http');
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
-const SERVICE = process.env.SERVICE_NAME ?? 'service';
+const SERVICE = process.env.OTEL_SERVICE_NAME ?? 'service';
 
 const server = http.createServer((req, res) => {
   if (req.url === '/health') {

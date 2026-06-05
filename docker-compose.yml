@@ -12,47 +12,23 @@ services:
       # Loopback-only: host tooling needs access; 0.0.0.0 would expose to LAN (Docker bypasses iptables).
       - '127.0.0.1:5432:5432'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - mat-internal
 
-  minio:
-    image: minio/minio:RELEASE.2024-06-26T01-06-18Z
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.33.0
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0
     volumes:
-      - minio_data:/data
-    ports:
-      - '9000:9000'
-      - '9001:9001'
+      - azurite_data:/data
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 10000 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - mat-internal
-
-  minio-init:
-    image: minio/mc:RELEASE.2024-11-17T19-35-25Z
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set myminio http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
-      mc mb --ignore-existing myminio/mat-inspect-media &&
-      mc mb --ignore-existing myminio/mat-inspect-reports &&
-      echo 'MinIO buckets ready'
-      "
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     networks:
       - mat-internal
 
@@ -79,17 +55,19 @@ services:
       - mat-internal
 
   core-api:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/core-api:${TAG:-latest}
     build:
       context: .
       dockerfile: services/core-api/Dockerfile
       target: runtime
     environment:
       PORT: '3000'
-      SERVICE_NAME: core-api
+      OTEL_SERVICE_NAME: core-api
       DATABASE_URL: ${CORE_API_DB_URL}
       HMAC_SECRET: ${HMAC_SECRET}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,38 +75,45 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
 
   media:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/media:${TAG:-latest}
     build:
       context: .
       dockerfile: services/media/Dockerfile
       target: runtime
     environment:
       PORT: '3000'
-      SERVICE_NAME: media
+      OTEL_SERVICE_NAME: media
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
     depends_on:
-      minio:
+      azurite:
         condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
 
   audit:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/audit:${TAG:-latest}
     build:
       context: .
       dockerfile: services/audit/Dockerfile
       target: runtime
     environment:
       PORT: '3000'
-      SERVICE_NAME: audit
+      OTEL_SERVICE_NAME: audit
       DATABASE_URL: ${AUDIT_API_DB_URL}
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
     depends_on:
       postgres:
         condition: service_healthy
@@ -136,16 +121,20 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
 
   ai:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/ai:${TAG:-latest}
     build:
       context: ./services/ai
       target: runtime
     environment:
       PORT: '8000'
+      OTEL_SERVICE_NAME: ai
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
     healthcheck:
       test:
         [
@@ -154,12 +143,13 @@ services:
         ]
       interval: 10s
       timeout: 5s
-      start_period: 15s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
 
   pwa:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/pwa:${TAG:-latest}
     build:
       context: ./apps/pwa
       target: runtime
@@ -172,11 +162,13 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
 
   dashboard:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/dashboard:${TAG:-latest}
     build:
       context: ./apps/dashboard
       target: runtime
@@ -189,13 +181,14 @@ services:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 5s
+      start_period: 60s
       retries: 3
     networks:
       - mat-internal
 
 volumes:
   postgres_data:
-  minio_data:
+  azurite_data:
   caddy_data:
   caddy_config:
 
