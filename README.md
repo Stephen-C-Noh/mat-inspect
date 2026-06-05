@@ -33,6 +33,8 @@ Open http://localhost:3001 for the manager dashboard.
 
 ## Contributors
 
+| Name           | GitHub    |
+| -------------- | --------- |
 | Adan Hernandez | @4d4n-HDZ |
 
 ## Sponsor

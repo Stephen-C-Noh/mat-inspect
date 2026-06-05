@@ -91,10 +91,14 @@ const seed = async () => {
     .onConflictDoNothing({ target: equipment.assetTag });
 
   process.stdout.write(`Inserted ${EQUIPMENT_RECORDS.length} equipment records.\n`);
-  await pool.end();
 };
 
-seed().catch((err) => {
+try {
+  await seed();
+} catch (err) {
   process.stderr.write(`Seed failed: ${String(err)}\n`);
-  process.exit(1);
-});
+  process.exitCode = 1;
+} finally {
+  // Always close the pool so the process can exit cleanly, even on failure.
+  await pool.end();
+}

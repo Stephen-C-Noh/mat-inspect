@@ -20,6 +20,13 @@ const db = drizzle(pool);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-await migrate(db, { migrationsFolder: path.join(__dirname, 'migrations') });
-process.stdout.write('Migrations applied\n');
-await pool.end();
+try {
+  await migrate(db, { migrationsFolder: path.join(__dirname, 'migrations') });
+  process.stdout.write('Migrations applied\n');
+} catch (err) {
+  process.stderr.write(`Migration failed: ${String(err)}\n`);
+  process.exitCode = 1;
+} finally {
+  // Always close the pool so the process can exit cleanly, even on failure.
+  await pool.end();
+}
