@@ -1,4 +1,4 @@
-# MAT Pre-Use Inspection System: Capstone Plan (v3)
+# MAT Pre-Use Inspection System: Capstone Plan (v7)
 
 **Sponsor:** SAIT School of Manufacturing, Automation, and Transportation (Main Campus)
 **Team Size:** 5 students
