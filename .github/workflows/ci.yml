@@ -125,7 +125,7 @@ jobs:
             context: apps/pwa
             dockerfile: apps/pwa/Dockerfile
           - name: dashboard
-            context: apps/dashboard
+            context: .
             dockerfile: apps/dashboard/Dockerfile
     steps:
       - uses: actions/checkout@v4
