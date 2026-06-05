@@ -31,6 +31,12 @@ Open http://localhost:3001 for the manager dashboard.
 
 5 students, see CODEOWNERS for area ownership.
 
+## Contributors
+
+| Name           | GitHub    |
+| -------------- | --------- |
+| Adan Hernandez | @4d4n-HDZ |
+
 ## Sponsor
 
 SAIT School of Manufacturing, Automation, and Transportation.
