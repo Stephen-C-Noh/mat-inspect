@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "node --env-file=../../.env --import=tsx/esm src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc",
     "type-check": "tsc --noEmit",
