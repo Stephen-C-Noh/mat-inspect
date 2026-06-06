@@ -8,5 +8,9 @@
   },
   "include": ["src"],
   "exclude": ["**/*.test.ts"],
-  "references": [{ "path": "../../packages/shared-types" }]
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/shared-schemas" },
+    { "path": "../../db" }
+  ]
 }

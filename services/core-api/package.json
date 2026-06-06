@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "node --env-file=../../.env --import=tsx/esm src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc",
     "type-check": "tsc --noEmit",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@azure/monitor-opentelemetry": "^1.0.0",
+    "@mat-inspect/shared-schemas": "^0.0.0",
     "@mat-inspect/shared-types": "^0.0.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",

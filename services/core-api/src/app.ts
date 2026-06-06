@@ -1,6 +1,7 @@
 import Fastify, { type FastifyError } from 'fastify';
 import { HttpError } from './lib/http-error.js';
 import { logger } from './lib/logger.js';
+import { listEquipmentRoute } from './routes/equipment/list.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
@@ -43,6 +44,8 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   });
 
   app.get('/health', async () => ({ status: 'ok', service: 'core-api' }));
+
+  await app.register(listEquipmentRoute, { prefix: '/api/v1' });
 
   if (process.env['NODE_ENV'] !== 'production') {
     const { devTokenRoutes } = await import('./routes/dev-token.js');
