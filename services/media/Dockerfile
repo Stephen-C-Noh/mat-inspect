@@ -8,7 +8,7 @@ ARG NODE_VERSION=22
 # ---- prod-deps: install only production deps (workspace-aware) ----
 FROM node:${NODE_VERSION}-alpine AS prod-deps
 WORKDIR /repo
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-utils/package.json packages/shared-utils/

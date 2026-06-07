@@ -8,7 +8,7 @@ ARG NODE_VERSION=22
 # ---- deps: install all workspace deps (incl. dev, needed for the build stage) ----
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /repo
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-utils/package.json packages/shared-utils/
@@ -31,7 +31,7 @@ RUN npm run build --workspace=@mat-inspect/shared-types \
 # ---- prod-deps: install only production deps for the runtime image ----
 FROM node:${NODE_VERSION}-alpine AS prod-deps
 WORKDIR /repo
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-utils/package.json packages/shared-utils/
