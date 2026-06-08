@@ -3,7 +3,7 @@
 import { useEquipmentList } from '../hooks/use-equipment';
 import { Card } from '../components/ui/card';
 
-// Logic to determine the color theme based on your schema's status
+// Maps equipment status to a color theme so the operator can read equipment state at a glance.
 const getThemeByStatus = (status: string) => {
   switch (status) {
     case 'READY':
@@ -51,10 +51,8 @@ export default function EquipmentPage() {
 
   return (
     <main className="p-6 bg-slate-50 min-h-screen flex flex-col items-center">
-      {/* Centered Title */}
       <h1 className="text-3xl font-bold mb-8 text-slate-800 text-center">Equipment List</h1>
 
-      {/* Centered list container */}
       <div className="flex flex-col gap-4 w-full max-w-5xl">
         {equipmentList?.map((item) => {
           const theme = getThemeByStatus(item.status);
@@ -65,7 +63,6 @@ export default function EquipmentPage() {
               className={`w-full flex flex-col md:flex-row items-center justify-between p-4 transition-all
                 border-2 shadow-sm hover:shadow-md ${theme.card}`}
             >
-              {/* Identity Section */}
               <div className="w-full md:w-1/4 mb-3 md:mb-0">
                 <h2 className="text-lg font-bold text-slate-900 leading-tight">{item.name}</h2>
                 <span className="text-xs font-mono bg-white/50 text-slate-500 px-1.5 py-0.5 rounded border border-black/5">
@@ -73,7 +70,6 @@ export default function EquipmentPage() {
                 </span>
               </div>
 
-              {/* Specs Section */}
               <div className="w-full md:w-2/4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <InfoItem label="Type" value={item.type} />
                 <InfoItem label="Make" value={item.make} />
@@ -81,7 +77,6 @@ export default function EquipmentPage() {
                 <InfoItem label="Loc" value={item.location} />
               </div>
 
-              {/* Status Button Section */}
               <div className="w-full md:w-1/4 mt-4 md:mt-0 flex justify-end">
                 <button
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide border cursor-pointer active:scale-95 transition-transform ${theme.badge}`}

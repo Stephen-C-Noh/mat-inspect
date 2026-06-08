@@ -5,14 +5,13 @@ export const useEquipmentList = (): UseQueryResult<Equipment[], Error> => {
   return useQuery<Equipment[], Error>({
     queryKey: ['equipment'],
     queryFn: async () => {
-      // TODO: Replace /dev/token with actual MSAL/Azure Auth flow once integrated.
-      // Currently using a dev bypass for local PWA operation as per DEV-7 requirements.
-
+      // TODO: replace /dev/token with the MSAL/Azure auth flow once integrated.
+      // The dev bypass exists so the PWA runs locally without Entra ID (DEV-7 scaffolding).
       const tokenRes = await fetch('/dev/token?role=operator');
       if (!tokenRes.ok) throw new Error('Token acquisition failed');
       const { token } = await tokenRes.json();
 
-      // Fetch records
+      // The core-api requires a bearer token on every request, so attach it here.
       const res = await fetch('/api/v1/equipment', {
         headers: { Authorization: `Bearer ${token}` },
       });

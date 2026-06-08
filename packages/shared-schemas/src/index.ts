@@ -2,16 +2,30 @@ import { z } from 'zod';
 
 export const uuidSchema = z.string().uuid();
 
+export const equipmentTypeSchema = z.enum([
+  'OVERHEAD_CRANE',
+  'TRUCK',
+  'ELECTRIC_PALLET_JACK',
+  'FORKLIFT',
+]);
+
+export const equipmentStatusSchema = z.enum([
+  'READY',
+  'AWAITING_INSPECTION',
+  'OUT_OF_SERVICE',
+  'RETIRED',
+]);
+
 export const equipmentSchema = z.object({
   id: z.string().uuid(),
   assetTag: z.string().min(1),
   name: z.string().min(1),
-  type: z.string().min(1),
+  type: equipmentTypeSchema,
   make: z.string().nullable(),
   model: z.string().nullable(),
   serialNumber: z.string().nullable(),
   location: z.string().nullable(),
-  status: z.enum(['READY', 'AWAITING_INSPECTION', 'OUT_OF_SERVICE', 'RETIRED']),
+  status: equipmentStatusSchema,
   currentStatusSince: z.string().datetime(),
   manufacturerSpecsUrl: z.string().url().optional().nullable(),
   createdAt: z.string().datetime(),
