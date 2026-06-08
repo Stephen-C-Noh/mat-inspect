@@ -24,9 +24,10 @@ FROM deps AS build
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages packages
 COPY services/core-api/tsconfig.json services/core-api/
+COPY db db
 COPY services/core-api/src services/core-api/src
 RUN npm run build --workspace=@mat-inspect/shared-types \
- && npm run build --workspace=@mat-inspect/core-api
+  && npm run build --workspace=@mat-inspect/core-api
 
 # ---- prod-deps: install only production deps for the runtime image ----
 FROM node:${NODE_VERSION}-alpine AS prod-deps
