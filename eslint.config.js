@@ -6,9 +6,9 @@ import tsParser from '@typescript-eslint/parser';
 export default [
   {
     ignores: [
-      'node_modules/',
-      'dist/',
-      '.next/',
+      '**/node_modules/',
+      '**/dist/',
+      '**/.next/',
       'db/migrations/',
       'apps/*/next-env.d.ts',
       '.claude/',

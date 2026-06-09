@@ -11,6 +11,7 @@ COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
 COPY services/audit/package.json services/audit/
 COPY apps/pwa/package.json apps/pwa/
+COPY apps/dashboard/package.json apps/dashboard/
 RUN npm ci --ignore-scripts
 
 FROM deps AS build

@@ -78,11 +78,11 @@ export default function EquipmentPage() {
               </div>
 
               <div className="w-full md:w-1/4 mt-4 md:mt-0 flex justify-end">
-                <button
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide border cursor-pointer active:scale-95 transition-transform ${theme.badge}`}
+                <span
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide border ${theme.badge}`}
                 >
                   {item.status}
-                </button>
+                </span>
               </div>
             </Card>
           );

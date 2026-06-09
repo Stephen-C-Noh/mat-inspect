@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactElement, ReactNode } from 'react';
 
 type CardProps = {
@@ -7,10 +5,9 @@ type CardProps = {
   className?: string;
 };
 
+// Base only sets structural defaults (corner radius, shadow). Padding, border,
+// and background are left to the caller so its classes do not collide with base
+// utilities, which Tailwind does not resolve by string order.
 export const Card = ({ children, className = '' }: CardProps): ReactElement => {
-  return (
-    <div className={`rounded-3xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`rounded-3xl shadow-sm ${className}`}>{children}</div>;
 };

@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { Equipment } from '@mat-inspect/shared-schemas';
+import { equipmentSchema, type Equipment } from '@mat-inspect/shared-schemas';
 
 export const useEquipmentList = (): UseQueryResult<Equipment[], Error> => {
   return useQuery<Equipment[], Error>({
@@ -17,7 +17,10 @@ export const useEquipmentList = (): UseQueryResult<Equipment[], Error> => {
       });
 
       if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
-      return res.json();
+
+      // Validate the response against the shared schema so a backend contract
+      // change surfaces here instead of as a silent runtime shape mismatch.
+      return equipmentSchema.array().parse(await res.json());
     },
   });
 };
