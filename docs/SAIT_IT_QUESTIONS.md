@@ -11,7 +11,7 @@
 - Provision a Linux VM with at least 8 GB RAM, 2 vCPU, 64 GB SSD. Ubuntu 24.04 LTS recommended.
 - The team recommends Azure (Standard B2ms in Canada East or Canada Central) for alignment with SAIT's existing Microsoft infrastructure. A campus VM is equally viable; the Docker Compose stack runs identically on either.
 - Grant one team member or designated SAIT admin SSH access for the initial deployment. After handover, SSH access transfers to SAIT IT.
-- See AZURE_COST_ESTIMATE.md for Azure cost reference (~CAD $142-175/month for the full Azure-managed stack; less if running self-hosted Postgres and MinIO on the VM).
+- See AZURE_COST_ESTIMATE.md for Azure cost reference (~CAD $142-175/month for the full Azure-managed stack; less if running self-hosted Postgres on the VM).
 
 ## 2. Authentication (Entra ID)
 
@@ -38,7 +38,7 @@
 - Designate one SAIT IT staff member as the ongoing maintainer. That person should review the OPERATIONS_RUNBOOK.md and ADMIN_GUIDE.pdf from the handover package.
 - Dependency updates: Renovate is configured in the repo and will open PRs for outdated packages. Someone needs to merge them.
 - CVE SLA: HIGH or CRITICAL vulnerabilities with an available patch should be merged within 7 calendar days of detection (see OPERATIONS_RUNBOOK.md).
-- Backup target: designate an off-host backup destination (NFS share, Azure Blob, or other) for nightly Postgres dumps and MinIO mirrors. The OPERATIONS_RUNBOOK.md documents the backup configuration.
+- Backup target: designate an off-host backup destination (NFS share, Azure Blob, or other) for nightly Postgres dumps and object storage backups. The OPERATIONS_RUNBOOK.md documents the backup configuration.
 
 ## 6. Handover Checklist
 

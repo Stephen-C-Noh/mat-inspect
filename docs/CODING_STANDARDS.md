@@ -48,7 +48,7 @@ mat-inspect/
 │   └── dashboard/             # Next.js manager dashboard
 ├── services/
 │   ├── core-api/              # Node.js + Fastify, main business logic
-│   ├── media/                 # Node.js + Fastify, MinIO uploads
+│   ├── media/                 # Node.js + Fastify, Azure Blob Storage uploads
 │   ├── audit/                 # Node.js + Fastify, hash-chained audit + PDF reports
 │   └── ai/                    # Python + FastAPI, Whisper transcription
 ├── packages/

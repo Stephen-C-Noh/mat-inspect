@@ -260,7 +260,7 @@
 5. Operator stops recording (tap) or recording auto-stops at 30 seconds
 6. PWA uploads audio blob to Media Service; receives `voiceClipId`
 7. PWA calls `POST /api/v1/ai/transcribe` with `voiceClipId`
-8. AI Service downloads clip from MinIO via presigned URL, transcribes with faster-whisper, returns text
+8. AI Service downloads clip from Azure Blob Storage via a SAS URL, transcribes with faster-whisper, returns text
 9. PWA inserts transcript into notes field; `notesSource = VOICE_TRANSCRIBED`
 10. Operator may edit (`notesSource` becomes VOICE_EDITED) or accept as-is
 
@@ -577,14 +577,14 @@ If the PWA cannot reach the server on initial load (e.g., operator scans QR befo
 
 ### 11.1 Retention Policy
 
-| Data Type                    | Retention                      | Enforcement                                                         |
-| ---------------------------- | ------------------------------ | ------------------------------------------------------------------- |
-| Inspection records           | 7 years from `submittedAt`     | Lifecycle job tags records for review; no automatic deletion in MVP |
-| Audit events                 | 7 years from event time        | Never auto-deleted; legal-hold flag prevents deletion if set        |
-| Voice audio clips            | 90 days from creation          | Lifecycle job deletes from MinIO; transcripts remain on Inspection  |
-| Photos                       | 7 years from upload            | Tied to Inspection retention                                        |
-| User accounts (soft-deleted) | Indefinite (audit integrity)   | Hard delete only on documented legal request                        |
-| Backups                      | 30 days local, 1 year off-site | Backup retention policy on storage target                           |
+| Data Type                    | Retention                      | Enforcement                                                                     |
+| ---------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
+| Inspection records           | 7 years from `submittedAt`     | Lifecycle job tags records for review; no automatic deletion in MVP             |
+| Audit events                 | 7 years from event time        | Never auto-deleted; legal-hold flag prevents deletion if set                    |
+| Voice audio clips            | 90 days from creation          | Lifecycle job deletes from Azure Blob Storage; transcripts remain on Inspection |
+| Photos                       | 7 years from upload            | Tied to Inspection retention                                                    |
+| User accounts (soft-deleted) | Indefinite (audit integrity)   | Hard delete only on documented legal request                                    |
+| Backups                      | 30 days local, 1 year off-site | Backup retention policy on storage target                                       |
 
 ### 11.2 Right to Data Access (FOIP)
 
@@ -593,7 +593,7 @@ If the PWA cannot reach the server on initial load (e.g., operator scans QR befo
 
 1. User opens profile, taps "Export my data"
 2. System generates a ZIP containing: account record, all inspections, all photos and voice clips associated with their submissions
-3. ZIP is delivered via download link (presigned URL, valid 24 hours)
+3. ZIP is delivered via download link (SAS URL, valid 24 hours)
 4. Audit event USER_DATA_EXPORTED is logged
 
 **Acceptance Criteria:**
@@ -680,7 +680,7 @@ All timestamps are stored in UTC. UI displays in user's local timezone (Mountain
 If photo upload succeeds but the Inspection POST fails:
 
 - PWA retries Inspection POST up to 3 times
-- After 3 failures, photos remain in MinIO (orphaned, cleaned by daily job)
+- After 3 failures, photos remain in Azure Blob Storage (orphaned, cleaned by daily job)
 - Operator sees "submission failed, please retry"
 - On retry, the same photo IDs are referenced (no duplicate upload)
 

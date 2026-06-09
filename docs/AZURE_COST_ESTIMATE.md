@@ -9,7 +9,7 @@
 
 ## Architecture Summary
 
-This estimate covers the Azure-managed-services deployment option. SAIT IT may also choose to run the full stack in Docker on a single VM (including self-hosted Postgres and MinIO), which reduces cost but increases operational burden. Both options use the same application code and Docker Compose configuration.
+This estimate covers the Azure-managed-services deployment option. SAIT IT may also choose to run the stateless stack in Docker on a single VM with self-hosted Postgres, which reduces cost but increases operational burden. Object storage is Azure Blob Storage in either case (ADR 0004). Both options use the same application code and Docker Compose configuration.
 
 The recommended Azure posture moves the persistent layer to managed services and runs all stateless services on a single VM. This eliminates the database as a single point of failure.
 
@@ -17,7 +17,7 @@ The recommended Azure posture moves the persistent layer to managed services and
 - **All application containers** run on one Azure VM via Docker Compose.
 - **Entra ID** is the sole identity provider, using SAIT's existing institutional tenant at no extra cost.
 
-**Note on MinIO vs. Azure Blob Storage:** The application's Media Service uses an S3-compatible client (AWS SDK v3) targeting MinIO. If SAIT IT chooses Azure Blob Storage instead, the storage client in the Media Service must be updated to use the Azure SDK (one service file). If SAIT IT keeps MinIO running in Docker on the VM, no code changes are needed and cost is lower.
+**Note on object storage:** The Media Service uses the Azure Blob Storage SDK (`@azure/storage-blob`). In dev and dev-staging it targets Azurite, the Azure Storage emulator; in production it targets Azure Blob Storage (ADR 0004). The original MinIO plan was dropped, so the stack has no S3-compatible client and no AWS SDK.
 
 ---
 
@@ -27,7 +27,7 @@ The recommended Azure posture moves the persistent layer to managed services and
 | --------------------------------------------- | -------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Azure VM                                      | Standard B2ms (2 vCPU, 8 GB RAM, 16 GB SSD)        | ~$95-110           | Hosts all application containers. 8 GB RAM is the minimum comfortable size for the Whisper AI service (~1.5 GB in-process). Upgrading to `medium.en` model would require B4ms (~double cost).                                                         |
 | Azure Database for PostgreSQL Flexible Server | Burstable B1ms (1 vCore, 2 GB RAM) + 32 GB storage | ~$33-40            | Hosts both logical schemas (core_db and audit_db). Managed automated backups, point-in-time recovery (PITR) to 35 days, automated patching.                                                                                                           |
-| Azure Blob Storage                            | LRS, hot tier                                      | ~$4-8              | Replaces self-hosted MinIO. Stores inspection photos, voice clips (90-day retention), and generated PDF reports. Estimated initial volume: 50-100 GB.                                                                                                 |
+| Azure Blob Storage                            | LRS, hot tier                                      | ~$4-8              | Replaces the originally planned self-hosted MinIO (ADR 0004). Stores inspection photos, voice clips (90-day retention), and generated PDF reports. Estimated initial volume: 50-100 GB.                                                               |
 | Azure Key Vault                               | Standard tier                                      | ~$3-5              | Stores service secrets (DB passwords, audit chain signing key, SMTP credentials). Secrets are injected into containers at startup; nothing is hardcoded or in `.env` in production.                                                                   |
 | Azure Container Registry (ACR)                | Basic tier                                         | ~$7-10             | Stores the 5 built container images (~5-10 GB total). During development the team uses GitHub Container Registry (GHCR), but production images should be pushed to an ACR under the SAIT tenant so SAIT IT retains full control over the image store. |
 | Azure Entra ID                                | SAIT institutional tenant                          | $0                 | Covered by SAIT's existing Microsoft 365 license. SAIT IT registers the app in their tenant and assigns App Roles to users or groups via the Azure portal. See SAIT_IT_QUESTIONS.md for setup steps.                                                  |
@@ -44,7 +44,7 @@ All of the following run inside the single B2ms as Docker containers:
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Caddy                  | TLS termination, reverse proxy, ACME cert renewal (Let's Encrypt)                                                |
 | Core API               | Main business logic: equipment registry, checklists, inspection submissions, defect workflow (Node.js + Fastify) |
-| Media Service          | Photo and voice clip upload handler, MinIO/Blob Storage client, presigned URL generation (Node.js + Fastify)     |
+| Media Service          | Photo and voice clip upload handler, Azure Blob Storage client, SAS URL generation (Node.js + Fastify)           |
 | Audit / Report Service | Hash-chained audit log writer, PDF report generation, CSV export (Node.js + Fastify)                             |
 | AI Service             | Voice-to-text transcription using faster-whisper `small.en` model (~500 MB, CPU inference) (Python + FastAPI)    |
 | Operator PWA           | Mobile-first Next.js app for Lab Techs (QR scan, checklist, voice dictation)                                     |

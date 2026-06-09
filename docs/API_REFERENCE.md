@@ -67,8 +67,8 @@ Authentication is handled by Entra ID. The application exposes thin wrappers for
 | POST   | `/inspections`                     | 👤   | Submit a completed inspection (idempotent via Idempotency-Key) |
 | GET    | `/inspections`                     | 🔒   | List inspections, paginated, filterable                        |
 | GET    | `/inspections/:id`                 | 🔒   | Get a single inspection with all responses                     |
-| GET    | `/inspections/:id/photos/:photoId` | 🔒   | Presigned URL to a photo                                       |
-| GET    | `/inspections/:id/voice/:clipId`   | 🔒   | Presigned URL to a voice clip (90-day retention)               |
+| GET    | `/inspections/:id/photos/:photoId` | 🔒   | SAS URL to a photo                                             |
+| GET    | `/inspections/:id/voice/:clipId`   | 🔒   | SAS URL to a voice clip (90-day retention)                     |
 | GET    | `/me/inspections`                  | 🔒   | Current user's own inspection history                          |
 | GET    | `/me/inspections/in-progress`      | 🔒   | Resumeable inspection from a crashed session, if any           |
 
@@ -104,10 +104,10 @@ Authentication is handled by Entra ID. The application exposes thin wrappers for
 
 ## Media
 
-| Method | Endpoint        | Auth | Description                                  |
-| ------ | --------------- | ---- | -------------------------------------------- |
-| POST   | `/media/upload` | 🔒   | Upload photo or voice clip; returns mediaId  |
-| GET    | `/media/:id`    | 🔒   | Presigned URL for download (15-min validity) |
+| Method | Endpoint        | Auth | Description                                 |
+| ------ | --------------- | ---- | ------------------------------------------- |
+| POST   | `/media/upload` | 🔒   | Upload photo or voice clip; returns mediaId |
+| GET    | `/media/:id`    | 🔒   | SAS URL for download (15-min validity)      |
 
 **POST /media/upload form fields:**
 
@@ -160,11 +160,11 @@ Authentication is handled by Entra ID. The application exposes thin wrappers for
 
 ## Reports and Exports
 
-| Method | Endpoint              | Auth | Description                                       |
-| ------ | --------------------- | ---- | ------------------------------------------------- |
-| POST   | `/reports/export`     | 👷   | Start an export job (PDF or CSV)                  |
-| GET    | `/reports/:jobId`     | 🔒   | Poll job status; returns presigned URL when ready |
-| GET    | `/reports/me/exports` | 🔒   | List my export history                            |
+| Method | Endpoint              | Auth | Description                                 |
+| ------ | --------------------- | ---- | ------------------------------------------- |
+| POST   | `/reports/export`     | 👷   | Start an export job (PDF or CSV)            |
+| GET    | `/reports/:jobId`     | 🔒   | Poll job status; returns SAS URL when ready |
+| GET    | `/reports/me/exports` | 🔒   | List my export history                      |
 
 **POST /reports/export body:**
 
@@ -201,7 +201,7 @@ Authentication is handled by Entra ID. The application exposes thin wrappers for
 {
   "jobId": "uuid",
   "status": "READY",
-  "downloadUrl": "https://...minio presigned url...",
+  "downloadUrl": "https://...azure blob sas url...",
   "expiresAt": "2026-05-17T18:00:00Z",
   "format": "PDF",
   "inspectionCount": 47,

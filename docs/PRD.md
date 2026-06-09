@@ -3,7 +3,7 @@
 ## MAT-Inspect: Pre-Use Inspection System
 
 **Version:** 1.0 | **Date:** May 18, 2026
-**Stack:** Next.js 15 + TypeScript, Node.js + Fastify, Python + FastAPI, PostgreSQL, Azure AD / Entra ID, MinIO, Docker, faster-whisper, Tailwind CSS
+**Stack:** Next.js 15 + TypeScript, Node.js + Fastify, Python + FastAPI, PostgreSQL, Azure AD / Entra ID, Azure Blob Storage, Docker, faster-whisper, Tailwind CSS
 **Purpose:** Reference document defining WHAT we are building and WHY for the MAT School capstone project
 
 ---
@@ -390,15 +390,15 @@ See `docs/ARCHITECTURE.md` Section 15 for the full sprint plan. Summary:
 
 ## 11. EXTERNAL DEPENDENCIES
 
-| Service or Library     | Purpose                                                    | Hosting Choice                                                  |
-| ---------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
-| Azure AD / Entra ID    | Authentication and identity                                | SAIT existing tenant; provided by SAIT IT                       |
-| PostgreSQL 16          | Primary relational data                                    | Self-hosted Docker container; managed Postgres if on Azure      |
-| MinIO                  | S3-compatible object storage for photos, voice clips, PDFs | Self-hosted Docker container; or Azure Blob Storage on Azure    |
-| faster-whisper         | On-prem speech-to-text                                     | Self-hosted Docker container, CPU inference                     |
-| SMTP                   | Outbound email                                             | SAIT institutional SMTP relay (preferred) or SendGrid free tier |
-| GitHub                 | Source control, CI/CD                                      | GitHub Free for educational use                                 |
-| Docker, Docker Compose | Container runtime                                          | Self-hosted, all environments                                   |
+| Service or Library     | Purpose                                      | Hosting Choice                                                                       |
+| ---------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Azure AD / Entra ID    | Authentication and identity                  | SAIT existing tenant; provided by SAIT IT                                            |
+| PostgreSQL 16          | Primary relational data                      | Self-hosted Docker container; managed Postgres if on Azure                           |
+| Azure Blob Storage     | Object storage for photos, voice clips, PDFs | Azurite emulator in dev and dev-staging; Azure Blob Storage in production (ADR 0004) |
+| faster-whisper         | On-prem speech-to-text                       | Self-hosted Docker container, CPU inference                                          |
+| SMTP                   | Outbound email                               | SAIT institutional SMTP relay (preferred) or SendGrid free tier                      |
+| GitHub                 | Source control, CI/CD                        | GitHub Free for educational use                                                      |
+| Docker, Docker Compose | Container runtime                            | Self-hosted, all environments                                                        |
 
 No payment processing. No third-party AI APIs in production (all AI inference is on-prem).
 

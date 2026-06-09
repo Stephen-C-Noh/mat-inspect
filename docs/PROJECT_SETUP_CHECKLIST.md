@@ -197,7 +197,7 @@ The point of this step: a teammate clones, runs `docker compose up`, and sees gr
 
 - [ ] Create `/docker-compose.yml` at repo root with:
   - Postgres 16 container with an init script creating two databases: `core_db`, `audit_db`
-  - MinIO container with two pre-created buckets: `mat-inspect-media`, `mat-inspect-reports`
+  - Azurite container with two pre-created blob containers: `mat-inspect-media`, `mat-inspect-reports`
   - Caddy 2 container with reverse proxy config
   - 4 service stubs (core-api, media, audit, ai) each returning `{ "status": "ok" }` on `/health`
   - 2 app stubs (PWA, dashboard) showing "Hello, MAT-Inspect"

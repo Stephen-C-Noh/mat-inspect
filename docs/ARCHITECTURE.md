@@ -919,7 +919,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Weeks 7 to 8 (June 29 to July 12)**
 
 - Manager dashboard: live compliance grid, defect inbox, filters, drilldown.
-- Media Service: photo upload and presigned URL download.
+- Media Service: photo upload and SAS URL download.
 - PWA photo capture on failed items.
 - **AI Service deployed**: faster-whisper `small.en` in a Docker container, `/api/v1/ai/transcribe` endpoint, authentication, Azure Blob Storage integration.
 - PWA voice dictation UI: tap-to-record, waveform, transcript display, edit-and-confirm flow.
