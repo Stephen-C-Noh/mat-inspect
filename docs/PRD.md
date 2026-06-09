@@ -195,7 +195,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 ### Inspection State Machine
 
-- Equipment defaults to AWAITING_INSPECTION at start of each shift window
+- Equipment defaults to AWAITING_INSPECTION at the start of each calendar day, lab-local
 - An Inspection with `result = PASS` is required to transition Equipment to READY
 - Any blocking failure transitions Equipment to OUT_OF_SERVICE automatically and creates a Defect
 - Equipment in OUT_OF_SERVICE cannot transition to READY without: (a) Defect status RESOLVED, (b) supervisor return-to-service approval, (c) a fresh passing Inspection

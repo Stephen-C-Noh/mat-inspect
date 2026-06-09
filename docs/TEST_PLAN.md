@@ -131,7 +131,7 @@ The system under test consists of:
 
 Objectives are listed in order of business risk.
 
-1. Confirm that no path exists that allows equipment to reach READY status without a valid, signed inspection from an authorized operator within the current shift window. (OHS s.257)
+1. Confirm that no path exists that allows equipment to reach READY status without a valid, attested inspection from an authorized operator dated the current calendar day, lab-local, and performed after the most recent return-to-service. (OHS s.257; ADR 0006, ADR 0007)
 2. Confirm that inspection records cannot be modified or deleted after submission.
 3. Confirm that the audit chain is tamper-evident: any inserted, modified, or deleted event is detected on verification.
 4. Confirm that voice clips and photos do not leave SAIT-controlled infrastructure.

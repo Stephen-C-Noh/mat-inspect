@@ -124,21 +124,21 @@
 
 **States:**
 
-- AWAITING_INSPECTION (initial state at shift start)
-- READY (last inspection PASS or FAIL_WARNING within current shift window)
+- AWAITING_INSPECTION (default at the start of each calendar day, lab-local; the absence of a current passing inspection, not a written state)
+- READY (a passing inspection, PASS or FAIL_WARNING, dated the current calendar day, lab-local, and performed after the most recent return-to-service)
 - OUT_OF_SERVICE (a BLOCKING defect is OPEN, ACKNOWLEDGED, or IN_REPAIR)
 - RETIRED (permanently removed from service)
 
 **Transitions:**
 
-| From                | To                  | Trigger                                                   |
-| ------------------- | ------------------- | --------------------------------------------------------- |
-| AWAITING_INSPECTION | READY               | New Inspection submitted with result PASS or FAIL_WARNING |
-| AWAITING_INSPECTION | OUT_OF_SERVICE      | New Inspection submitted with result FAIL_BLOCKING        |
-| READY               | AWAITING_INSPECTION | Shift window ends                                         |
-| READY               | OUT_OF_SERVICE      | Mid-shift inspection with FAIL_BLOCKING result            |
-| OUT_OF_SERVICE      | AWAITING_INSPECTION | All blocking Defects RESOLVED + supervisor approval       |
-| any                 | RETIRED             | Admin action                                              |
+| From                | To                  | Trigger                                                                                |
+| ------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| AWAITING_INSPECTION | READY               | New Inspection submitted with result PASS or FAIL_WARNING                              |
+| AWAITING_INSPECTION | OUT_OF_SERVICE      | New Inspection submitted with result FAIL_BLOCKING                                     |
+| READY               | AWAITING_INSPECTION | Calendar day rolls over, lab-local (computed; no written transition, no scheduled job) |
+| READY               | OUT_OF_SERVICE      | A later inspection the same day returns FAIL_BLOCKING                                  |
+| OUT_OF_SERVICE      | AWAITING_INSPECTION | All blocking Defects RESOLVED + supervisor approval                                    |
+| any                 | RETIRED             | Admin action                                                                           |
 
 **Invariants (enforced by database triggers and service-level checks):**
 
@@ -148,7 +148,7 @@
 **Acceptance Criteria:**
 
 - AC-2.3.1: Concurrent inspection submissions are serialized; final state reflects the most recent valid submission
-- AC-2.3.2: Shift window end is configurable (default: 8 hours from first inspection of the day on that equipment, or end-of-business if no inspection)
+- AC-2.3.2: An inspection is valid only for the lab-local calendar day on which it was submitted; at the next lab-local day the equipment reads as AWAITING_INSPECTION with no scheduled reset job (ADR 0006)
 
 ---
 
@@ -169,7 +169,7 @@
 
 - `key` (stable string identifier, used in InspectionResponse)
 - `prompt` (operator-facing question)
-- `type` (BOOLEAN, BOOLEAN_PHOTO_ON_FAIL, MEASUREMENT, TEXT, SIGNATURE)
+- `type` (BOOLEAN, BOOLEAN_PHOTO_ON_FAIL). Abnormal readings go in free-text notes against the item, not as structured numeric data; there is no per-item signature type (ADR 0007)
 - `required` (boolean)
 - `failSeverity` (BLOCKING or WARNING)
 - `regulatoryReference` (optional, e.g., "OHS Part 19 s.257")
@@ -663,17 +663,17 @@ If PWA crashes or phone dies during an inspection:
 - On next login, operator is offered to resume the in-progress inspection
 - If not resumed within 24 hours, partial state is discarded
 
-### 13.3 Shift Window Boundary
+### 13.3 Calendar Day Boundary
 
-If an operator starts an inspection at 4:55 PM but submits at 5:01 PM (after shift end):
+If an operator starts an inspection at 11:58 PM but submits at 12:01 AM (after the lab-local day rolls over):
 
 - Inspection is accepted; `submittedAt` records the actual submission time
-- The inspection is associated with the shift that was active at `startedAt`
-- Equipment status update applies to the shift in which the inspection was submitted
+- Inspection validity is determined by the lab-local calendar day of `submittedAt`, not `startedAt`, so this inspection is valid for the new day
+- Equipment readiness for the new day is satisfied by this inspection (ADR 0006)
 
 ### 13.4 Daylight Saving Time
 
-All timestamps are stored in UTC. UI displays in user's local timezone (Mountain Time for SAIT). DST transitions do not affect shift window logic; shift windows are defined in UTC offsets.
+All timestamps are stored in UTC. UI displays in the user's local timezone (Mountain Time for SAIT). Calendar-day validity is computed in lab-local time (America/Edmonton), so a DST transition shifts the UTC instant of the day boundary; the day boundary is defined in lab-local time, not a fixed UTC offset.
 
 ### 13.5 Network Partial Failure During Submission
 
