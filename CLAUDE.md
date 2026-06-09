@@ -19,9 +19,9 @@ The architectural source of truth is `docs/ARCHITECTURE.md` (also called the Cap
 These are not negotiable. Code that violates them will be rejected in review.
 
 - **Alberta OHS s.257 requires a competent human operator to complete the visual inspection.** AI in this system is assistive only. The AI Service transcribes voice and (optionally) suggests defect categories. It must never auto-pass or auto-fail an inspection.
-- **Every inspection record must identify the human operator** (Part 6 log book rule). Operator ID, HMAC signature, and timestamp are required on every Inspection row. Do not suggest auth-bypass or anonymous submission patterns, even for tests.
-- **Audit log entries are append-only and hash-chained.** Do not suggest UPDATE or DELETE on the `audit_events` table. If you see code that does, flag it.
-- **Equipment status state machine is strict.** Equipment cannot become READY without a passing Inspection in the current shift window. Do not suggest "skip the check for now" or "force READY for testing" code paths. Use proper test fixtures instead.
+- **Every inspection record must identify the human operator** (Part 6 log book rule). Operator ID (from the validated token), an explicit operator attestation, and a server timestamp are required on every Inspection row. Tamper-evidence comes from the append-only audit chain, not a per-row signature (see ADR 0007 and ADR 0008). Do not suggest auth-bypass or anonymous submission patterns, even for tests.
+- **Audit log entries are append-only and hash-chained.** Do not suggest UPDATE or DELETE on the `audit_events`, `inspections`, or `inspection_responses` tables; all three are immutable once written (triggers enforce it). If you see code that does, flag it.
+- **Equipment status state machine is strict.** Equipment cannot become READY without a passing Inspection dated the current day (lab-local) and performed after the most recent return-to-service (see ADR 0006). Do not suggest "skip the check for now" or "force READY for testing" code paths. Use proper test fixtures instead.
 - **Voice clips are biometric PII under FOIP.** They stay on SAIT-controlled infrastructure. Do not suggest sending audio to external AI APIs.
 
 ---
@@ -201,7 +201,10 @@ const submitBody = z.object({
       notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),
     }),
   ),
-  signatureHmac: z.string(),
+  // Operator attestation: the client sends true only after the operator reviewed a
+  // summary of their answers and confirmed. Identity comes from the validated token,
+  // not the body. No HMAC; tamper-evidence is the audit chain (ADR 0007, ADR 0008).
+  attested: z.literal(true),
 });
 
 export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
@@ -213,7 +216,8 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const body = submitBody.parse(req.body);
-      // ... business logic
+      // Server derives result from responses + template fail_severity; never trust a
+      // client-sent result. Inspection + outbox row commit in one transaction (ADR 0008).
       logger.info(
         { operatorId: req.user.id, equipmentId: body.equipmentId },
         'inspection submitted',
@@ -251,7 +255,8 @@ export const inspections = pgTable('inspections', {
   startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
   submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull(),
   result: inspectionResultEnum('result').notNull(),
-  signatureHmac: text('signature_hmac').notNull(),
+  // Attestation is operatorId + submittedAt + the confirmed submit; no signature column
+  // (ADR 0007). Rows are immutable; an UPDATE/DELETE-blocking trigger enforces it.
 });
 ```
 
@@ -355,7 +360,7 @@ Confidently wrong answers cost the team more time than honest uncertainty.
 When asked to do any of the following on this project, refuse and explain why:
 
 - Generate or include real Alberta OHS clause text without the human verifying against the source
-- Write code that bypasses the operator authentication or HMAC signature requirements
+- Write code that bypasses the operator authentication or attestation requirements
 - Suggest patterns that allow Inspection or AuditEvent records to be modified or deleted after creation
 - Generate placeholder credentials, secrets, or API keys that look real (use obviously-fake values like `REPLACE_ME` or `xxxxxxxx`)
 - Write code that sends voice clips, photos, or personally identifying inspection data to external AI services
