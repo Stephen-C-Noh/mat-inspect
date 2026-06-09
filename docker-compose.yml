@@ -152,11 +152,13 @@ services:
   pwa:
     image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/pwa:${TAG:-latest}
     build:
-      context: ./apps/pwa
+      context: .
+      dockerfile: apps/pwa/Dockerfile
       target: runtime
     environment:
       PORT: '3000'
       APP_NAME: pwa
+      CORE_API_URL: 'http://core-api:3000'
     ports:
       - '3000:3000'
     healthcheck:

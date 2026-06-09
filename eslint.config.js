@@ -5,7 +5,15 @@ import tsParser from '@typescript-eslint/parser';
 /** @type {import('eslint').Linter.FlatConfig[]} */
 export default [
   {
-    ignores: ['node_modules/', 'dist/', '.next/', 'db/migrations/', 'apps/*/next-env.d.ts'],
+    ignores: [
+      '**/node_modules/',
+      '**/dist/',
+      '**/.next/',
+      'db/migrations/',
+      'apps/*/next-env.d.ts',
+      '.claude/',
+      '*.workbook',
+    ],
   },
   {
     files: ['**/*.ts', '**/*.tsx'],
