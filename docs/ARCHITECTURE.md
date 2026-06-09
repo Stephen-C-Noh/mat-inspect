@@ -215,7 +215,6 @@ Inspection
   started_at, submitted_at (timestamps)
   result (enum: PASS, FAIL_WARNING, FAIL_BLOCKING; derived server-side, never client-sent)
   attested_at (timestamp; operator confirmed after reviewing answers; see ADR 0007)
-  device_fingerprint (string, optional)
 
 InspectionResponse
   id (uuid)
@@ -439,16 +438,16 @@ Controls:
 
 ### 8.8 Threat Model Highlights
 
-| Threat                                                        | Likelihood | Impact | Mitigation                                                                                                                                |
-| ------------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Operator submits under another identity                       | Low        | High   | Identity is taken from the validated Entra ID token, not the request body; short token lifetime (ADR 0007)                                |
-| Manager edits an inspection after the fact                    | Low        | High   | Inspections immutable (UPDATE/DELETE-blocking trigger); audit chain seals a content digest, so any post-hoc edit is detectable (ADR 0008) |
-| QR code is replaced with a malicious one                      | Medium     | Medium | QR contains only non-secret asset_tag; server validates against registry; suspicious scan patterns alert Admin                            |
-| Stolen JWT used from another device                           | Low        | Medium | Short token lifetime, device fingerprint logged                                                                                           |
-| Database backup leaked                                        | Low        | High   | Backups encrypted at rest, transferred over SSH only                                                                                      |
-| Voice clip leak                                               | Low        | High   | Encrypted at rest, 90-day retention, access logged                                                                                        |
-| Supply chain (npm or pip package) compromise                  | Medium     | High   | Lockfile pinning, Trivy, audits                                                                                                           |
-| AI transcript hallucinates a "pass" that masks a real failure | Low        | High   | Operator confirms transcript; transcripts are notes only, never drive pass/fail decisions; pass/fail driven by structured checklist items |
+| Threat                                                        | Likelihood | Impact | Mitigation                                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Operator submits under another identity                       | Low        | High   | Identity is taken from the validated Entra ID token, not the request body; short token lifetime (ADR 0007)                                                                                                                               |
+| Manager edits an inspection after the fact                    | Low        | High   | Inspections immutable (UPDATE/DELETE-blocking trigger); audit chain seals a content digest, so any post-hoc edit is detectable (ADR 0008)                                                                                                |
+| QR code is replaced with a malicious one                      | Medium     | Medium | QR contains only non-secret asset_tag; server validates against registry; suspicious scan patterns alert Admin                                                                                                                           |
+| Stolen JWT used from another device                           | Low        | Medium | Short token lifetime; identity is taken from the validated token (ADR 0007); request IP and User-Agent are captured in ephemeral Azure Monitor access logs for forensics (ADR 0003), never on the immutable Inspection record (ADR 0011) |
+| Database backup leaked                                        | Low        | High   | Backups encrypted at rest, transferred over SSH only                                                                                                                                                                                     |
+| Voice clip leak                                               | Low        | High   | Encrypted at rest, 90-day retention, access logged                                                                                                                                                                                       |
+| Supply chain (npm or pip package) compromise                  | Medium     | High   | Lockfile pinning, Trivy, audits                                                                                                                                                                                                          |
+| AI transcript hallucinates a "pass" that masks a real failure | Low        | High   | Operator confirms transcript; transcripts are notes only, never drive pass/fail decisions; pass/fail driven by structured checklist items                                                                                                |
 
 ---
 
