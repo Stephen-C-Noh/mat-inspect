@@ -217,10 +217,8 @@ POSTGRES_DB=postgres
 ENTRA_TENANT_ID=REPLACE_ME
 ENTRA_CLIENT_ID=REPLACE_ME
 
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=changeme
-
-HMAC_SECRET=replace-with-32-char-random-string
+# Azurite (Azure Storage emulator) in dev; the well-known dev shortcut connection string
+AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
 
 CORE_API_DB_URL=postgresql://mat:changeme@postgres:5432/core_db
 AUDIT_API_DB_URL=postgresql://mat:changeme@postgres:5432/audit_db
@@ -243,7 +241,6 @@ AUDIT_API_DB_URL=postgresql://mat:changeme@postgres:5432/audit_db
 # Security-sensitive: requires 2 reviewers
 /services/audit/  @stephen-c-noh @teammate-backend-lead
 /services/core-api/src/middleware/auth.ts  @stephen-c-noh @teammate-backend-lead
-/services/core-api/src/lib/hmac.ts  @stephen-c-noh @teammate-backend-lead
 /services/core-api/src/domain/inspection.ts  @stephen-c-noh @teammate-backend-lead
 /db/migrations/  @stephen-c-noh @teammate-backend-lead
 ```

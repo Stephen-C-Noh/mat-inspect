@@ -102,7 +102,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Entra ID authentication with role-based access control
 - Equipment registry with QR-code addressable assets (10 machines at MVP)
 - Versioned checklist templates per equipment class (overhead crane, forklift, truck, electric pallet jack)
-- Inspection submission with HMAC operator signature
+- Inspection submission with operator attestation (ADR 0007)
 - Equipment status state machine (READY, AWAITING_INSPECTION, OUT_OF_SERVICE, RETIRED)
 - Pass and Fail flows with automatic defect creation on blocking failures
 - Defect workflow with supervisor acknowledgement and return-to-service approval
@@ -278,7 +278,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Audit log append-only at the database role level
 - Container security: non-root user, read-only root filesystem, dropped capabilities
 - Dependency scanning: Trivy on every image build, Semgrep on source, Gitleaks on commit
-- HMAC signing on every Inspection submission
+- Operator attestation on every Inspection submission; tamper-evidence via the hash-chained audit log and content digest (ADR 0007, ADR 0008)
 
 ### Compliance
 
@@ -326,13 +326,14 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 ### Checklist Item Types
 
-| Type                  | Description                     | Validation               |
-| --------------------- | ------------------------------- | ------------------------ |
-| BOOLEAN               | Yes or No                       | Required answer          |
-| BOOLEAN_PHOTO_ON_FAIL | Yes or No; photo required if No | Photo upload validated   |
-| MEASUREMENT           | Numeric value                   | Min, max, units          |
-| TEXT                  | Free text                       | Max 500 characters       |
-| SIGNATURE             | Operator confirmation           | HMAC of canonical record |
+| Type                  | Description                     | Validation             |
+| --------------------- | ------------------------------- | ---------------------- |
+| BOOLEAN               | Yes or No                       | Required answer        |
+| BOOLEAN_PHOTO_ON_FAIL | Yes or No; photo required if No | Photo upload validated |
+
+Items are boolean only. An abnormal reading goes in free-text notes against the item (max
+500 characters), not as structured numeric data. The operator attestation is a single
+confirm action over the whole Inspection, not a per-item signature (ADR 0007).
 
 ### Inspection Results
 

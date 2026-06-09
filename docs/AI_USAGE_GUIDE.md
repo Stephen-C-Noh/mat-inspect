@@ -55,7 +55,7 @@ Use extreme care or avoid:
 
 - **Architectural decisions.** AI gives plausible but generic advice. Architecture decisions on this project go in ADRs, written by humans, after team discussion.
 - **Alberta OHS citations.** AI hallucinates regulatory clauses. Every OHS reference in this project (in code comments, in docs, in the SECURITY.md) must be verified against the actual source on `search-ohs-laws.alberta.ca` before it ships.
-- **Security-sensitive code.** Auth flows, HMAC implementation, hash chain logic, JWT validation. AI may suggest patterns that look correct but have subtle holes. Two human reviewers minimum on these.
+- **Security-sensitive code.** Auth flows, audit hash chain logic, content digest computation, JWT validation. AI may suggest patterns that look correct but have subtle holes. Two human reviewers minimum on these.
 - **Audit Service code.** This is the legal record of inspections. Treat AI output here as a starting point only.
 - **Database migrations.** High blast radius. Read the migration carefully. Run it in dev first. Always.
 - **Final capstone deliverables.** The professor reads them. The sponsor reads them. AI-fluffed text reads exactly as AI-fluffed text and undermines credibility.

@@ -283,7 +283,6 @@ Audit events are read-only via API. Writes happen automatically as a side effect
 | `CERT_EXPIRED`                 | 403    | Operator's certification for the equipment class has expired           |
 | `CERT_MISSING`                 | 403    | Operator has no certification for this equipment class                 |
 | `VALIDATION_ERROR`             | 400    | Input failed Zod validation; includes per-field errors                 |
-| `HMAC_INVALID`                 | 400    | Submission signature does not match canonical record                   |
 | `IDEMPOTENCY_MISMATCH`         | 409    | Same Idempotency-Key used with different body                          |
 | `EQUIPMENT_NOT_FOUND`          | 404    | Asset tag or ID does not resolve                                       |
 | `EQUIPMENT_RETIRED`            | 410    | Equipment exists but is RETIRED; cannot inspect                        |

@@ -521,11 +521,11 @@ Severity codes: **BLOCKING** (release cannot proceed), **HIGH** (must fix before
 - Expected result: API returns 200 with the original inspection ID; no second Inspection record is created in the database
 - Failure severity: HIGH
 
-**TC-INSP-005: Tampered HMAC signature is rejected**
+**TC-INSP-005: Post-submission tampering of a response is blocked and detectable**
 
-- Preconditions: Valid inspection payload is prepared
-- Steps: Modify one field in the payload after computing the HMAC; submit the payload with the original HMAC
-- Expected result: API returns 400 with a signature validation error; no Inspection record is created
+- Preconditions: A valid inspection with responses has been submitted; its content digest is sealed in the audit chain
+- Steps: Attempt a direct UPDATE on an `inspection_responses` row; separately, recompute the content digest from the (unchanged) row and compare it to the value sealed in the chain
+- Expected result: The UPDATE is rejected by the immutability trigger (ADR 0008); any out-of-band change would make the recomputed digest diverge from the sealed value
 - Failure severity: BLOCKING
 
 **TC-INSP-006: BOOLEAN_PHOTO_ON_FAIL item requires photo when answered No**
@@ -688,7 +688,7 @@ Severity codes: **BLOCKING** (release cannot proceed), **HIGH** (must fix before
 
 - Preconditions: At least 5 inspections exist; Manager is logged in
 - Steps: Export a PDF for the last 7 days; open the PDF
-- Expected result: PDF contains a digital signature; each inspection shows its HMAC; the appendix contains `prev_hash` and `this_hash` for each audit event in the range
+- Expected result: PDF contains a digital signature; each inspection shows its content digest; the appendix contains `prev_hash` and `this_hash` for each audit event in the range
 - Failure severity: HIGH
 
 **TC-AUDIT-003: Audit events cannot be updated or deleted**

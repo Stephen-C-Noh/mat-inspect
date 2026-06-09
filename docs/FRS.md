@@ -213,20 +213,19 @@
 6. For free-text notes on a failed item: operator may tap voice dictation
 7. PWA records up to 30 seconds of audio, uploads via Media Service, calls AI Service for transcription
 8. Operator reviews transcript, edits if needed (`notesSource` becomes VOICE_EDITED), confirms
-9. Operator taps Submit
-10. PWA computes HMAC over canonical record using session key
-11. PWA calls `POST /api/v1/inspections` with full payload + signature
-12. Core API validates JWT, validates payload via Zod, validates HMAC, validates operator certification
-13. Core API persists Inspection and InspectionResponses in a transaction
-14. Core API evaluates result and triggers state machine transition
-15. Core API publishes events (inspection.submitted, defect.opened if applicable) to bus
-16. PWA receives response and displays result screen
+9. Operator reviews a summary of their answers and confirms (attestation, ADR 0007)
+10. PWA calls `POST /api/v1/inspections` with the full payload and an Idempotency-Key
+11. Core API validates JWT, validates payload via Zod, validates operator certification
+12. Core API persists Inspection and InspectionResponses in a transaction
+13. Core API evaluates result and triggers state machine transition
+14. In the same transaction, Core API writes an audit event to the outbox (ADR 0008)
+15. PWA receives response and displays result screen
 
 **Alternate Flows:**
 
 - Offline: PWA stores submission in IndexedDB queue; syncs when network returns
 - Voice unavailable (AI Service down): notes field falls back to typed; `notesSource = TYPED`
-- HMAC validation fails server-side: 400 error; client treats as a bug, prompts operator to refresh and retry once
+- Same Idempotency-Key replayed with a different body: 409 `IDEMPOTENCY_MISMATCH`; client treats as a bug
 
 **Validation Rules:**
 
@@ -234,12 +233,11 @@
 - Photo required for any BOOLEAN_PHOTO_ON_FAIL item answered No
 - Operator certification must cover the equipment class
 - Operator certification expiry must be in the future at submission time
-- HMAC signature must match canonical record
+- `attested` must be the literal `true` (operator confirmation, ADR 0007)
 - Each response value must match its item type:
   - BOOLEAN: must be true or false
-  - MEASUREMENT: numeric, within item's min/max
-  - TEXT: max 500 characters
-  - SIGNATURE: matches expected canonical signature
+  - BOOLEAN_PHOTO_ON_FAIL: must be true or false; a No requires an attached photo
+  - Free-text notes (any item): max 500 characters
 
 **Acceptance Criteria:**
 
@@ -415,13 +413,13 @@
 5. Audit/Report Service queries Postgres, fetches photos and audit chain segments
 6. Generates PDF with embedded photos, signatures (operator name + timestamp), audit chain segment, system version
 7. Signs the PDF using the system's signing key
-8. Uploads PDF to MinIO; returns presigned URL when job completes
+8. Uploads PDF to Azure Blob Storage; returns a time-limited SAS URL when the job completes
 9. App displays download link
 
 **PDF Contents:**
 
 - Cover page: filter summary, generation timestamp, generated-by user, system version
-- For each inspection: equipment metadata, all responses, photo thumbnails, voice transcripts, HMAC signature
+- For each inspection: equipment metadata, all responses, photo thumbnails, voice transcripts, operator attestation (operator id and server timestamp), content digest (ADR 0008)
 - Audit chain segment: prev_hash and this_hash for each event in the export range
 - Appendix: instructions to independently verify the hash chain
 
@@ -511,9 +509,10 @@ The PWA assumes reliable WiFi or LTE in the MAT lab (confirmed during the client
 
 **Validation:**
 
-- HMAC signature is computed at the moment of tap, not on each retry
-- The Idempotency-Key is bound to the HMAC, so the server treats a retried submission as the same logical write
-- Server validates HMAC against the session that was active at `startedAt`
+- The Idempotency-Key is generated once at tap time and reused on every retry
+- The server scopes the key to the authenticated operator and binds it to a digest of the
+  request body, so a retried submission is treated as the same logical write (ADR 0009)
+- A repeat of the same key with a different body is rejected as `IDEMPOTENCY_MISMATCH`
 
 **Acceptance Criteria:**
 
