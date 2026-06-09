@@ -108,7 +108,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Defect workflow with supervisor acknowledgement and return-to-service approval
 - Manager dashboard with daily compliance grid and defect inbox
 - Append-only audit log with hash chain for tamper evidence
-- SMTP email notifications for failed inspections
+- Failed-inspection alerts to all active Supervisors via email (SMTP), Web Push, and a persistent dashboard unresolved-failure queue (ADR 0010)
 
 ### P1: Core Differentiators (must ship for capstone defense)
 
@@ -119,7 +119,6 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - CSV export for managers
 - Hash chain verification on Audit Service startup and on export
 - 7-year retention for inspection records, 90-day retention for voice audio
-- Web Push notifications for on-shift supervisors
 
 ### P2: Value Adds (if Sprint 3 has capacity)
 
@@ -138,6 +137,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Integration with equipment manufacturer telemetry
 - Microsoft Entra ID federation for SAIT SSO (configurable now, deferred for capstone)
 - mTLS between internal services
+- Push receipt acknowledgement and SMS escalation for safety alerts (closed-loop delivery; see ADR 0010 appendix)
 
 ---
 
@@ -354,18 +354,18 @@ confirm action over the whole Inspection, not a per-item signature (ADR 0007).
 
 ## 9. EMAIL AND PUSH NOTIFICATIONS
 
-| Trigger                                       | Recipient                         | Channel                           |
-| --------------------------------------------- | --------------------------------- | --------------------------------- |
-| User account created                          | Operator, Supervisor, Manager     | Email (welcome + onboarding link) |
-| Password reset requested                      | User                              | Email (1-hour token)              |
-| Failed inspection submitted                   | All Supervisors on shift          | Email + Web Push                  |
-| Defect acknowledged                           | Inspection operator               | Email                             |
-| Defect resolved                               | Inspection operator, Supervisor   | Email                             |
-| Return-to-service approved                    | Lab Tech who reported, Supervisor | Email                             |
-| Certification expiry warning (30, 14, 7 days) | Operator, Supervisor              | Email                             |
-| Inspection not performed by mid-shift         | On-shift Supervisor               | Email + Web Push                  |
-| Audit chain verification failure              | Admin                             | Email (critical alert)            |
-| Backup failure                                | Admin                             | Email (critical alert)            |
+| Trigger                                                                  | Recipient                         | Channel                            |
+| ------------------------------------------------------------------------ | --------------------------------- | ---------------------------------- |
+| User account created                                                     | Operator, Supervisor, Manager     | Email (welcome + onboarding link)  |
+| Password reset requested                                                 | User                              | Email (1-hour token)               |
+| Failed inspection submitted                                              | All active Supervisors            | Email + Web Push + dashboard queue |
+| Defect acknowledged                                                      | Inspection operator               | Email                              |
+| Defect resolved                                                          | Inspection operator, Supervisor   | Email                              |
+| Return-to-service approved                                               | Lab Tech who reported, Supervisor | Email                              |
+| Certification expiry warning (30, 14, 7 days)                            | Operator, Supervisor              | Email                              |
+| Equipment not inspected by the daily cutoff time, lab-local (cutoff TBD) | All active Supervisors            | Email + Web Push                   |
+| Audit chain verification failure                                         | Admin                             | Email (critical alert)             |
+| Backup failure                                                           | Admin                             | Email (critical alert)             |
 
 ---
 

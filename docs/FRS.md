@@ -297,7 +297,7 @@
 **Acceptance Criteria:**
 
 - AC-5.1.1: Audit event DEFECT_OPENED is logged
-- AC-5.1.2: Email and Web Push notifications sent to all Supervisors on shift within 60 seconds
+- AC-5.1.2: Email and Web Push notifications sent to all active Supervisors within 60 seconds, and the failure is added to the persistent dashboard unresolved-failure queue (ADR 0010)
 - AC-5.1.3: Digital lockout tag is displayed to the operator with Defect ID prominent
 
 ### 5.2 Supervisor Acknowledges Defect
