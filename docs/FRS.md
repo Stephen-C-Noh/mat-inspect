@@ -64,17 +64,17 @@
 
 ### 1.3 Role Permissions
 
-| Capability                | Operator |   Supervisor    | Manager | Admin | Auditor |
-| ------------------------- | :------: | :-------------: | :-----: | :---: | :-----: |
-| Submit inspection         |   yes    |       yes       |   no    |  no   |   no    |
-| View own inspections      |   yes    |       yes       |   yes   |  yes  |   yes   |
-| View all inspections      |    no    | yes (own shift) |   yes   |  yes  |   yes   |
-| Acknowledge defect        |    no    |       yes       |   yes   |  no   |   no    |
-| Approve return-to-service |    no    |       yes       |   yes   |  no   |   no    |
-| Manage users              |    no    |       no        |   no    |  yes  |   no    |
-| Edit checklist templates  |    no    |       no        |   no    |  yes  |   no    |
-| Export PDF report         |    no    |       yes       |   yes   |  yes  |   yes   |
-| Export CSV                |    no    |       no        |   yes   |  yes  |   yes   |
+| Capability                | Operator | Supervisor | Manager | Admin | Auditor |
+| ------------------------- | :------: | :--------: | :-----: | :---: | :-----: |
+| Submit inspection         |   yes    |    yes     |   no    |  no   |   no    |
+| View own inspections      |   yes    |    yes     |   yes   |  yes  |   yes   |
+| View all inspections      |    no    |    yes     |   yes   |  yes  |   yes   |
+| Acknowledge defect        |    no    |    yes     |   yes   |  no   |   no    |
+| Approve return-to-service |    no    |    yes     |   yes   |  no   |   no    |
+| Manage users              |    no    |     no     |   no    |  yes  |   no    |
+| Edit checklist templates  |    no    |     no     |   no    |  yes  |   no    |
+| Export PDF report         |    no    |    yes     |   yes   |  yes  |   yes   |
+| Export CSV                |    no    |     no     |   yes   |  yes  |   yes   |
 
 ---
 

@@ -78,7 +78,7 @@ Authentication is handled by Entra ID. The application exposes thin wrappers for
 **Authorization rules:**
 
 - Operator can read only their own inspections
-- Supervisor can read inspections from their shift
+- Supervisor can read all inspections (lab-wide; no shift partition exists, so a Supervisor monitoring team compliance sees everything)
 - Manager, Admin, Auditor can read all
 
 ---
