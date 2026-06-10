@@ -37,7 +37,7 @@ If WSL2 is already installed, confirm it is version 2: `wsl --list --verbose`. I
       `cp .env.example .env && docker compose up`
 - [ ] Open http://localhost:3000 and confirm "Hello, MAT-Inspect" (operator PWA stub)
 - [ ] Open http://localhost:3001 and confirm "Hello, MAT-Inspect" (dashboard stub)
-- [ ] Check service health endpoints return 200: - http://localhost:3000/health (PWA stub) - http://localhost:3001/health (dashboard stub, routed via host port 3001) - http://localhost:9000/minio/health/live (MinIO)
+- [ ] Check service health endpoints return 200: - http://localhost:3000/health (PWA stub) - http://localhost:3001/health (dashboard stub, routed via host port 3001). For object storage, confirm the Azurite blob endpoint is reachable at http://localhost:10000 (Azurite has no /health route; a response, even 400, means it is up).
       Note: Caddy binds to the hostname `mat-inspect.staging`, not `localhost`.
       To test through Caddy, add `127.0.0.1 mat-inspect.staging` to `/etc/hosts`
       and trust Caddy's local CA certificate (`caddy trust` after `docker compose up`).

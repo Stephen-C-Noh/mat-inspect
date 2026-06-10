@@ -3,7 +3,7 @@
 ## MAT-Inspect: Pre-Use Inspection System
 
 **Version:** 1.0 | **Date:** May 18, 2026
-**Stack:** Next.js 15 + TypeScript, Node.js + Fastify, Python + FastAPI, PostgreSQL, Azure AD / Entra ID, MinIO, Docker, faster-whisper, Tailwind CSS
+**Stack:** Next.js 15 + TypeScript, Node.js + Fastify, Python + FastAPI, PostgreSQL, Azure AD / Entra ID, Azure Blob Storage, Docker, faster-whisper, Tailwind CSS
 **Purpose:** Reference document defining WHAT we are building and WHY for the MAT School capstone project
 
 ---
@@ -16,15 +16,15 @@ Replace paper pre-use inspection sheets at SAIT's MAT (Manufacturing, Automation
 
 ### Business Goals
 
-| Goal                           | Current State                          | Target                                      |
-| ------------------------------ | -------------------------------------- | ------------------------------------------- |
-| Inspection completion rate     | ~60% (paper, often skipped)            | 100% (system enforces before equipment use) |
-| Audit retrieval time           | Hours to days (paper files)            | Under 1 minute (filtered PDF export)        |
-| Defect-to-acknowledgement time | Often missed                           | Under 1 hour (auto-notification)            |
-| Records retention              | Variable, paper-based                  | 7 years, indexed, queryable                 |
-| Inspection variability         | High (handwritten, inconsistent items) | Zero (versioned digital templates)          |
-| Manager visibility             | None during shift                      | Real-time dashboard                         |
-| Alberta OHS audit risk         | High (cannot demonstrate compliance)   | Low (cryptographically signed records)      |
+| Goal                           | Current State                          | Target                                                      |
+| ------------------------------ | -------------------------------------- | ----------------------------------------------------------- |
+| Inspection completion rate     | ~60% (paper, often skipped)            | 100% (system enforces before equipment use)                 |
+| Audit retrieval time           | Hours to days (paper files)            | Under 1 minute (filtered PDF export)                        |
+| Defect-to-acknowledgement time | Often missed                           | Under 1 hour (auto-notification)                            |
+| Records retention              | Variable, paper-based                  | 7 years, indexed, queryable                                 |
+| Inspection variability         | High (handwritten, inconsistent items) | Zero (versioned digital templates)                          |
+| Manager visibility             | None during shift                      | Real-time dashboard                                         |
+| Alberta OHS audit risk         | High (cannot demonstrate compliance)   | Low (tamper-evident records via the hash-chained audit log) |
 
 ---
 
@@ -34,7 +34,7 @@ Replace paper pre-use inspection sheets at SAIT's MAT (Manufacturing, Automation
 
 **Operator (Lab Tech)**
 
-- Scans QR code, completes inspection on phone, dictates defect notes by voice, submits with signature.
+- Scans QR code, completes inspection on phone, dictates defect notes by voice, reviews answers and confirms (operator attestation).
 
 **Supervisor**
 
@@ -102,24 +102,23 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Entra ID authentication with role-based access control
 - Equipment registry with QR-code addressable assets (10 machines at MVP)
 - Versioned checklist templates per equipment class (overhead crane, forklift, truck, electric pallet jack)
-- Inspection submission with HMAC operator signature
+- Inspection submission with operator attestation (ADR 0007)
 - Equipment status state machine (READY, AWAITING_INSPECTION, OUT_OF_SERVICE, RETIRED)
 - Pass and Fail flows with automatic defect creation on blocking failures
 - Defect workflow with supervisor acknowledgement and return-to-service approval
 - Manager dashboard with daily compliance grid and defect inbox
 - Append-only audit log with hash chain for tamper evidence
-- SMTP email notifications for failed inspections
+- Failed-inspection alerts to all active Supervisors via email (SMTP), Web Push, and a persistent dashboard unresolved-failure queue (ADR 0010)
 
 ### P1: Core Differentiators (must ship for capstone defense)
 
 - Voice-to-text defect notes via on-prem AI Service (faster-whisper small.en)
 - Photo evidence capture and storage for defect items
 - PWA offline mode with submission queueing
-- PDF report export with embedded photos, signatures, and audit chain segment
+- PDF report export with embedded photos, operator attestations, and audit chain segment
 - CSV export for managers
 - Hash chain verification on Audit Service startup and on export
 - 7-year retention for inspection records, 90-day retention for voice audio
-- Web Push notifications for on-shift supervisors
 
 ### P2: Value Adds (if Sprint 3 has capacity)
 
@@ -138,6 +137,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Integration with equipment manufacturer telemetry
 - Microsoft Entra ID federation for SAIT SSO (configurable now, deferred for capstone)
 - mTLS between internal services
+- Push receipt acknowledgement and SMS escalation for safety alerts (closed-loop delivery; see ADR 0010 appendix)
 
 ---
 
@@ -195,7 +195,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 ### Inspection State Machine
 
-- Equipment defaults to AWAITING_INSPECTION at start of each shift window
+- Equipment defaults to AWAITING_INSPECTION at the start of each calendar day, lab-local
 - An Inspection with `result = PASS` is required to transition Equipment to READY
 - Any blocking failure transitions Equipment to OUT_OF_SERVICE automatically and creates a Defect
 - Equipment in OUT_OF_SERVICE cannot transition to READY without: (a) Defect status RESOLVED, (b) supervisor return-to-service approval, (c) a fresh passing Inspection
@@ -278,7 +278,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Audit log append-only at the database role level
 - Container security: non-root user, read-only root filesystem, dropped capabilities
 - Dependency scanning: Trivy on every image build, Semgrep on source, Gitleaks on commit
-- HMAC signing on every Inspection submission
+- Operator attestation on every Inspection submission; tamper-evidence via the hash-chained audit log and content digest (ADR 0007, ADR 0008)
 
 ### Compliance
 
@@ -326,13 +326,14 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 ### Checklist Item Types
 
-| Type                  | Description                     | Validation               |
-| --------------------- | ------------------------------- | ------------------------ |
-| BOOLEAN               | Yes or No                       | Required answer          |
-| BOOLEAN_PHOTO_ON_FAIL | Yes or No; photo required if No | Photo upload validated   |
-| MEASUREMENT           | Numeric value                   | Min, max, units          |
-| TEXT                  | Free text                       | Max 500 characters       |
-| SIGNATURE             | Operator confirmation           | HMAC of canonical record |
+| Type                  | Description                     | Validation             |
+| --------------------- | ------------------------------- | ---------------------- |
+| BOOLEAN               | Yes or No                       | Required answer        |
+| BOOLEAN_PHOTO_ON_FAIL | Yes or No; photo required if No | Photo upload validated |
+
+Items are boolean only. An abnormal reading goes in free-text notes against the item (max
+500 characters), not as structured numeric data. The operator attestation is a single
+confirm action over the whole Inspection, not a per-item signature (ADR 0007).
 
 ### Inspection Results
 
@@ -353,18 +354,18 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 ## 9. EMAIL AND PUSH NOTIFICATIONS
 
-| Trigger                                       | Recipient                         | Channel                           |
-| --------------------------------------------- | --------------------------------- | --------------------------------- |
-| User account created                          | Operator, Supervisor, Manager     | Email (welcome + onboarding link) |
-| Password reset requested                      | User                              | Email (1-hour token)              |
-| Failed inspection submitted                   | All Supervisors on shift          | Email + Web Push                  |
-| Defect acknowledged                           | Inspection operator               | Email                             |
-| Defect resolved                               | Inspection operator, Supervisor   | Email                             |
-| Return-to-service approved                    | Lab Tech who reported, Supervisor | Email                             |
-| Certification expiry warning (30, 14, 7 days) | Operator, Supervisor              | Email                             |
-| Inspection not performed by mid-shift         | On-shift Supervisor               | Email + Web Push                  |
-| Audit chain verification failure              | Admin                             | Email (critical alert)            |
-| Backup failure                                | Admin                             | Email (critical alert)            |
+| Trigger                                                                  | Recipient                         | Channel                            |
+| ------------------------------------------------------------------------ | --------------------------------- | ---------------------------------- |
+| User account created                                                     | Operator, Supervisor, Manager     | Email (welcome + onboarding link)  |
+| Password reset requested                                                 | User                              | Email (1-hour token)               |
+| Failed inspection submitted                                              | All active Supervisors            | Email + Web Push + dashboard queue |
+| Defect acknowledged                                                      | Inspection operator               | Email                              |
+| Defect resolved                                                          | Inspection operator, Supervisor   | Email                              |
+| Return-to-service approved                                               | Lab Tech who reported, Supervisor | Email                              |
+| Certification expiry warning (30, 14, 7 days)                            | Operator, Supervisor              | Email                              |
+| Equipment not inspected by the daily cutoff time, lab-local (cutoff TBD) | All active Supervisors            | Email + Web Push                   |
+| Audit chain verification failure                                         | Admin                             | Email (critical alert)             |
+| Backup failure                                                           | Admin                             | Email (critical alert)             |
 
 ---
 
@@ -389,15 +390,15 @@ See `docs/ARCHITECTURE.md` Section 15 for the full sprint plan. Summary:
 
 ## 11. EXTERNAL DEPENDENCIES
 
-| Service or Library     | Purpose                                                    | Hosting Choice                                                  |
-| ---------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
-| Azure AD / Entra ID    | Authentication and identity                                | SAIT existing tenant; provided by SAIT IT                       |
-| PostgreSQL 16          | Primary relational data                                    | Self-hosted Docker container; managed Postgres if on Azure      |
-| MinIO                  | S3-compatible object storage for photos, voice clips, PDFs | Self-hosted Docker container; or Azure Blob Storage on Azure    |
-| faster-whisper         | On-prem speech-to-text                                     | Self-hosted Docker container, CPU inference                     |
-| SMTP                   | Outbound email                                             | SAIT institutional SMTP relay (preferred) or SendGrid free tier |
-| GitHub                 | Source control, CI/CD                                      | GitHub Free for educational use                                 |
-| Docker, Docker Compose | Container runtime                                          | Self-hosted, all environments                                   |
+| Service or Library     | Purpose                                      | Hosting Choice                                                                       |
+| ---------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Azure AD / Entra ID    | Authentication and identity                  | SAIT existing tenant; provided by SAIT IT                                            |
+| PostgreSQL 16          | Primary relational data                      | Self-hosted Docker container; managed Postgres if on Azure                           |
+| Azure Blob Storage     | Object storage for photos, voice clips, PDFs | Azurite emulator in dev and dev-staging; Azure Blob Storage in production (ADR 0004) |
+| faster-whisper         | On-prem speech-to-text                       | Self-hosted Docker container, CPU inference                                          |
+| SMTP                   | Outbound email                               | SAIT institutional SMTP relay (preferred) or SendGrid free tier                      |
+| GitHub                 | Source control, CI/CD                        | GitHub Free for educational use                                                      |
+| Docker, Docker Compose | Container runtime                            | Self-hosted, all environments                                                        |
 
 No payment processing. No third-party AI APIs in production (all AI inference is on-prem).
 

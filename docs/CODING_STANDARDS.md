@@ -48,7 +48,7 @@ mat-inspect/
 │   └── dashboard/             # Next.js manager dashboard
 ├── services/
 │   ├── core-api/              # Node.js + Fastify, main business logic
-│   ├── media/                 # Node.js + Fastify, MinIO uploads
+│   ├── media/                 # Node.js + Fastify, Azure Blob Storage uploads
 │   ├── audit/                 # Node.js + Fastify, hash-chained audit + PDF reports
 │   └── ai/                    # Python + FastAPI, Whisper transcription
 ├── packages/
@@ -86,7 +86,7 @@ services/core-api/src/
 ├── domain/             # Domain types and pure logic (state machines, etc.)
 ├── middleware/         # Fastify hooks: auth, validation, error handling
 ├── schemas/            # Zod schemas (often re-exports from packages/shared-schemas)
-├── lib/                # App-specific utilities: logger, error helpers, hmac
+├── lib/                # App-specific utilities: logger, error helpers, audit-client
 ├── config/             # Loads env into a typed config object
 └── index.ts            # Entry point
 ```
@@ -220,16 +220,14 @@ import { inspectionRepo } from '../repositories/inspection-repo';
 import { equipmentRepo } from '../repositories/equipment-repo';
 import { auditClient } from '../lib/audit-client';
 import { computeResult, evaluateStatus } from '../domain/inspection';
-import { verifyHmac } from '../lib/hmac';
 import { httpError } from '../lib/errors';
 
 export async function submitInspection(input: SubmitInspectionInput) {
   // 1. Validate operator certification
-  // 2. Verify HMAC
-  // 3. Compute result via pure domain function
-  // 4. Persist Inspection + Responses + status change in a transaction
-  // 5. Emit audit event
-  // 6. Return result
+  // 2. Require operator attestation (attested === true); identity is the validated token (ADR 0007)
+  // 3. Compute result via pure domain function (server-derived, never trust the client)
+  // 4. Persist Inspection + Responses + status change + outbox row + idempotency row in one transaction (ADR 0008, ADR 0009)
+  // 5. Return result
 }
 ```
 
@@ -313,7 +311,8 @@ export const submitInspectionSchema = z.object({
       }),
     )
     .min(1),
-  signatureHmac: z.string().min(1),
+  // Operator attestation, not a signature (ADR 0007). True only after review-and-confirm.
+  attested: z.literal(true),
 });
 
 export type SubmitInspectionInput = z.infer<typeof submitInspectionSchema>;
@@ -346,7 +345,8 @@ export const inspections = pgTable('inspections', {
   startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
   submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
   result: inspectionResultEnum('result').notNull(),
-  signatureHmac: text('signature_hmac').notNull(),
+  // Attestation is operatorId + submittedAt + the confirmed submit; no signature column
+  // (ADR 0007). Rows are immutable; an UPDATE/DELETE-blocking trigger enforces it (ADR 0008).
 });
 ```
 
@@ -572,10 +572,9 @@ export const ACCESS_TOKEN_TTL_MINUTES = 15;
 export const REFRESH_TOKEN_TTL_DAYS = 7;
 export const ACCOUNT_LOCKOUT_THRESHOLD = 5;
 export const ACCOUNT_LOCKOUT_DURATION_MINUTES = 30;
-export const SHIFT_WINDOW_HOURS = 8;
 export const VOICE_AUDIO_RETENTION_DAYS = 90;
 export const INSPECTION_RETENTION_YEARS = 7;
-export const HMAC_HEADER_NAME = 'X-Signature-Hmac';
+export const IDEMPOTENCY_KEY_TTL_HOURS = 24; // ADR 0009
 ```
 
 ---

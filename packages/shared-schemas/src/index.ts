@@ -46,7 +46,10 @@ export const submitInspectionSchema = z.object({
   equipmentId: uuidSchema,
   templateId: uuidSchema,
   responses: z.array(inspectionResponseSchema),
-  signatureHmac: z.string(),
+  // Operator attestation, not a signature. True only after the operator reviewed a summary
+  // of their answers and confirmed. Identity comes from the validated token; tamper-evidence
+  // is the audit chain (ADR 0007, ADR 0008). No HMAC.
+  attested: z.literal(true),
 });
 
 export type InspectionResponse = z.infer<typeof inspectionResponseSchema>;

@@ -64,17 +64,17 @@
 
 ### 1.3 Role Permissions
 
-| Capability                | Operator |   Supervisor    | Manager | Admin | Auditor |
-| ------------------------- | :------: | :-------------: | :-----: | :---: | :-----: |
-| Submit inspection         |   yes    |       yes       |   no    |  no   |   no    |
-| View own inspections      |   yes    |       yes       |   yes   |  yes  |   yes   |
-| View all inspections      |    no    | yes (own shift) |   yes   |  yes  |   yes   |
-| Acknowledge defect        |    no    |       yes       |   yes   |  no   |   no    |
-| Approve return-to-service |    no    |       yes       |   yes   |  no   |   no    |
-| Manage users              |    no    |       no        |   no    |  yes  |   no    |
-| Edit checklist templates  |    no    |       no        |   no    |  yes  |   no    |
-| Export PDF report         |    no    |       yes       |   yes   |  yes  |   yes   |
-| Export CSV                |    no    |       no        |   yes   |  yes  |   yes   |
+| Capability                | Operator | Supervisor | Manager | Admin | Auditor |
+| ------------------------- | :------: | :--------: | :-----: | :---: | :-----: |
+| Submit inspection         |   yes    |    yes     |   no    |  no   |   no    |
+| View own inspections      |   yes    |    yes     |   yes   |  yes  |   yes   |
+| View all inspections      |    no    |    yes     |   yes   |  yes  |   yes   |
+| Acknowledge defect        |    no    |    yes     |   yes   |  no   |   no    |
+| Approve return-to-service |    no    |    yes     |   yes   |  no   |   no    |
+| Manage users              |    no    |     no     |   no    |  yes  |   no    |
+| Edit checklist templates  |    no    |     no     |   no    |  yes  |   no    |
+| Export PDF report         |    no    |    yes     |   yes   |  yes  |   yes   |
+| Export CSV                |    no    |     no     |   yes   |  yes  |   yes   |
 
 ---
 
@@ -124,21 +124,21 @@
 
 **States:**
 
-- AWAITING_INSPECTION (initial state at shift start)
-- READY (last inspection PASS or FAIL_WARNING within current shift window)
+- AWAITING_INSPECTION (default at the start of each calendar day, lab-local; the absence of a current passing inspection, not a written state)
+- READY (a passing inspection, PASS or FAIL_WARNING, dated the current calendar day, lab-local, and performed after the most recent return-to-service)
 - OUT_OF_SERVICE (a BLOCKING defect is OPEN, ACKNOWLEDGED, or IN_REPAIR)
 - RETIRED (permanently removed from service)
 
 **Transitions:**
 
-| From                | To                  | Trigger                                                   |
-| ------------------- | ------------------- | --------------------------------------------------------- |
-| AWAITING_INSPECTION | READY               | New Inspection submitted with result PASS or FAIL_WARNING |
-| AWAITING_INSPECTION | OUT_OF_SERVICE      | New Inspection submitted with result FAIL_BLOCKING        |
-| READY               | AWAITING_INSPECTION | Shift window ends                                         |
-| READY               | OUT_OF_SERVICE      | Mid-shift inspection with FAIL_BLOCKING result            |
-| OUT_OF_SERVICE      | AWAITING_INSPECTION | All blocking Defects RESOLVED + supervisor approval       |
-| any                 | RETIRED             | Admin action                                              |
+| From                | To                  | Trigger                                                                                |
+| ------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| AWAITING_INSPECTION | READY               | New Inspection submitted with result PASS or FAIL_WARNING                              |
+| AWAITING_INSPECTION | OUT_OF_SERVICE      | New Inspection submitted with result FAIL_BLOCKING                                     |
+| READY               | AWAITING_INSPECTION | Calendar day rolls over, lab-local (computed; no written transition, no scheduled job) |
+| READY               | OUT_OF_SERVICE      | A later inspection the same day returns FAIL_BLOCKING                                  |
+| OUT_OF_SERVICE      | AWAITING_INSPECTION | All blocking Defects RESOLVED + supervisor approval                                    |
+| any                 | RETIRED             | Admin action                                                                           |
 
 **Invariants (enforced by database triggers and service-level checks):**
 
@@ -148,7 +148,7 @@
 **Acceptance Criteria:**
 
 - AC-2.3.1: Concurrent inspection submissions are serialized; final state reflects the most recent valid submission
-- AC-2.3.2: Shift window end is configurable (default: 8 hours from first inspection of the day on that equipment, or end-of-business if no inspection)
+- AC-2.3.2: An inspection is valid only for the lab-local calendar day on which it was submitted; at the next lab-local day the equipment reads as AWAITING_INSPECTION with no scheduled reset job (ADR 0006)
 
 ---
 
@@ -169,7 +169,7 @@
 
 - `key` (stable string identifier, used in InspectionResponse)
 - `prompt` (operator-facing question)
-- `type` (BOOLEAN, BOOLEAN_PHOTO_ON_FAIL, MEASUREMENT, TEXT, SIGNATURE)
+- `type` (BOOLEAN, BOOLEAN_PHOTO_ON_FAIL). Abnormal readings go in free-text notes against the item, not as structured numeric data; there is no per-item signature type (ADR 0007)
 - `required` (boolean)
 - `failSeverity` (BLOCKING or WARNING)
 - `regulatoryReference` (optional, e.g., "OHS Part 19 s.257")
@@ -213,20 +213,19 @@
 6. For free-text notes on a failed item: operator may tap voice dictation
 7. PWA records up to 30 seconds of audio, uploads via Media Service, calls AI Service for transcription
 8. Operator reviews transcript, edits if needed (`notesSource` becomes VOICE_EDITED), confirms
-9. Operator taps Submit
-10. PWA computes HMAC over canonical record using session key
-11. PWA calls `POST /api/v1/inspections` with full payload + signature
-12. Core API validates JWT, validates payload via Zod, validates HMAC, validates operator certification
-13. Core API persists Inspection and InspectionResponses in a transaction
-14. Core API evaluates result and triggers state machine transition
-15. Core API publishes events (inspection.submitted, defect.opened if applicable) to bus
-16. PWA receives response and displays result screen
+9. Operator reviews a summary of their answers and confirms (attestation, ADR 0007)
+10. PWA calls `POST /api/v1/inspections` with the full payload and an Idempotency-Key
+11. Core API validates JWT, validates payload via Zod, validates operator certification
+12. Core API persists Inspection and InspectionResponses in a transaction
+13. Core API evaluates result and triggers state machine transition
+14. In the same transaction, Core API writes an audit event to the outbox (ADR 0008)
+15. PWA receives response and displays result screen
 
 **Alternate Flows:**
 
 - Offline: PWA stores submission in IndexedDB queue; syncs when network returns
 - Voice unavailable (AI Service down): notes field falls back to typed; `notesSource = TYPED`
-- HMAC validation fails server-side: 400 error; client treats as a bug, prompts operator to refresh and retry once
+- Same Idempotency-Key replayed with a different body: 409 `IDEMPOTENCY_MISMATCH`; client treats as a bug
 
 **Validation Rules:**
 
@@ -234,12 +233,11 @@
 - Photo required for any BOOLEAN_PHOTO_ON_FAIL item answered No
 - Operator certification must cover the equipment class
 - Operator certification expiry must be in the future at submission time
-- HMAC signature must match canonical record
+- `attested` must be the literal `true` (operator confirmation, ADR 0007)
 - Each response value must match its item type:
   - BOOLEAN: must be true or false
-  - MEASUREMENT: numeric, within item's min/max
-  - TEXT: max 500 characters
-  - SIGNATURE: matches expected canonical signature
+  - BOOLEAN_PHOTO_ON_FAIL: must be true or false; a No requires an attached photo
+  - Free-text notes (any item): max 500 characters
 
 **Acceptance Criteria:**
 
@@ -262,7 +260,7 @@
 5. Operator stops recording (tap) or recording auto-stops at 30 seconds
 6. PWA uploads audio blob to Media Service; receives `voiceClipId`
 7. PWA calls `POST /api/v1/ai/transcribe` with `voiceClipId`
-8. AI Service downloads clip from MinIO via presigned URL, transcribes with faster-whisper, returns text
+8. AI Service downloads clip from Azure Blob Storage via a SAS URL, transcribes with faster-whisper, returns text
 9. PWA inserts transcript into notes field; `notesSource = VOICE_TRANSCRIBED`
 10. Operator may edit (`notesSource` becomes VOICE_EDITED) or accept as-is
 
@@ -299,7 +297,7 @@
 **Acceptance Criteria:**
 
 - AC-5.1.1: Audit event DEFECT_OPENED is logged
-- AC-5.1.2: Email and Web Push notifications sent to all Supervisors on shift within 60 seconds
+- AC-5.1.2: Email and Web Push notifications sent to all active Supervisors within 60 seconds, and the failure is added to the persistent dashboard unresolved-failure queue (ADR 0010)
 - AC-5.1.3: Digital lockout tag is displayed to the operator with Defect ID prominent
 
 ### 5.2 Supervisor Acknowledges Defect
@@ -415,13 +413,13 @@
 5. Audit/Report Service queries Postgres, fetches photos and audit chain segments
 6. Generates PDF with embedded photos, signatures (operator name + timestamp), audit chain segment, system version
 7. Signs the PDF using the system's signing key
-8. Uploads PDF to MinIO; returns presigned URL when job completes
+8. Uploads PDF to Azure Blob Storage; returns a time-limited SAS URL when the job completes
 9. App displays download link
 
 **PDF Contents:**
 
 - Cover page: filter summary, generation timestamp, generated-by user, system version
-- For each inspection: equipment metadata, all responses, photo thumbnails, voice transcripts, HMAC signature
+- For each inspection: equipment metadata, all responses, photo thumbnails, voice transcripts, operator attestation (operator id and server timestamp), content digest (ADR 0008)
 - Audit chain segment: prev_hash and this_hash for each event in the export range
 - Appendix: instructions to independently verify the hash chain
 
@@ -511,9 +509,10 @@ The PWA assumes reliable WiFi or LTE in the MAT lab (confirmed during the client
 
 **Validation:**
 
-- HMAC signature is computed at the moment of tap, not on each retry
-- The Idempotency-Key is bound to the HMAC, so the server treats a retried submission as the same logical write
-- Server validates HMAC against the session that was active at `startedAt`
+- The Idempotency-Key is generated once at tap time and reused on every retry
+- The server scopes the key to the authenticated operator and binds it to a digest of the
+  request body, so a retried submission is treated as the same logical write (ADR 0009)
+- A repeat of the same key with a different body is rejected as `IDEMPOTENCY_MISMATCH`
 
 **Acceptance Criteria:**
 
@@ -578,14 +577,14 @@ If the PWA cannot reach the server on initial load (e.g., operator scans QR befo
 
 ### 11.1 Retention Policy
 
-| Data Type                    | Retention                      | Enforcement                                                         |
-| ---------------------------- | ------------------------------ | ------------------------------------------------------------------- |
-| Inspection records           | 7 years from `submittedAt`     | Lifecycle job tags records for review; no automatic deletion in MVP |
-| Audit events                 | 7 years from event time        | Never auto-deleted; legal-hold flag prevents deletion if set        |
-| Voice audio clips            | 90 days from creation          | Lifecycle job deletes from MinIO; transcripts remain on Inspection  |
-| Photos                       | 7 years from upload            | Tied to Inspection retention                                        |
-| User accounts (soft-deleted) | Indefinite (audit integrity)   | Hard delete only on documented legal request                        |
-| Backups                      | 30 days local, 1 year off-site | Backup retention policy on storage target                           |
+| Data Type                    | Retention                      | Enforcement                                                                     |
+| ---------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
+| Inspection records           | 7 years from `submittedAt`     | Lifecycle job tags records for review; no automatic deletion in MVP             |
+| Audit events                 | 7 years from event time        | Never auto-deleted; legal-hold flag prevents deletion if set                    |
+| Voice audio clips            | 90 days from creation          | Lifecycle job deletes from Azure Blob Storage; transcripts remain on Inspection |
+| Photos                       | 7 years from upload            | Tied to Inspection retention                                                    |
+| User accounts (soft-deleted) | Indefinite (audit integrity)   | Hard delete only on documented legal request                                    |
+| Backups                      | 30 days local, 1 year off-site | Backup retention policy on storage target                                       |
 
 ### 11.2 Right to Data Access (FOIP)
 
@@ -594,7 +593,7 @@ If the PWA cannot reach the server on initial load (e.g., operator scans QR befo
 
 1. User opens profile, taps "Export my data"
 2. System generates a ZIP containing: account record, all inspections, all photos and voice clips associated with their submissions
-3. ZIP is delivered via download link (presigned URL, valid 24 hours)
+3. ZIP is delivered via download link (SAS URL, valid 24 hours)
 4. Audit event USER_DATA_EXPORTED is logged
 
 **Acceptance Criteria:**
@@ -664,24 +663,24 @@ If PWA crashes or phone dies during an inspection:
 - On next login, operator is offered to resume the in-progress inspection
 - If not resumed within 24 hours, partial state is discarded
 
-### 13.3 Shift Window Boundary
+### 13.3 Calendar Day Boundary
 
-If an operator starts an inspection at 4:55 PM but submits at 5:01 PM (after shift end):
+If an operator starts an inspection at 11:58 PM but submits at 12:01 AM (after the lab-local day rolls over):
 
 - Inspection is accepted; `submittedAt` records the actual submission time
-- The inspection is associated with the shift that was active at `startedAt`
-- Equipment status update applies to the shift in which the inspection was submitted
+- Inspection validity is determined by the lab-local calendar day of `submittedAt`, not `startedAt`, so this inspection is valid for the new day
+- Equipment readiness for the new day is satisfied by this inspection (ADR 0006)
 
 ### 13.4 Daylight Saving Time
 
-All timestamps are stored in UTC. UI displays in user's local timezone (Mountain Time for SAIT). DST transitions do not affect shift window logic; shift windows are defined in UTC offsets.
+All timestamps are stored in UTC. UI displays in the user's local timezone (Mountain Time for SAIT). Calendar-day validity is computed in lab-local time (America/Edmonton), so a DST transition shifts the UTC instant of the day boundary; the day boundary is defined in lab-local time, not a fixed UTC offset.
 
 ### 13.5 Network Partial Failure During Submission
 
 If photo upload succeeds but the Inspection POST fails:
 
 - PWA retries Inspection POST up to 3 times
-- After 3 failures, photos remain in MinIO (orphaned, cleaned by daily job)
+- After 3 failures, photos remain in Azure Blob Storage (orphaned, cleaned by daily job)
 - Operator sees "submission failed, please retry"
 - On retry, the same photo IDs are referenced (no duplicate upload)
 

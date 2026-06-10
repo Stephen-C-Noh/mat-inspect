@@ -10,7 +10,7 @@
 
 ### 1. Development Risk Analysis
 
-The primary risk is a defect that undermines regulatory compliance. Alberta OHS s.257 requires an authorized operator to complete a visual inspection before equipment operation. A bug that allows equipment to reach READY status without a valid signed inspection, or that allows inspection records to be modified after submission, creates legal liability for SAIT and safety risk for Lab Techs.
+The primary risk is a defect that undermines regulatory compliance. Alberta OHS s.257 requires an authorized operator to complete a visual inspection before equipment operation. A bug that allows equipment to reach READY status without a valid attested inspection, or that allows inspection records to be modified after submission, creates legal liability for SAIT and safety risk for Lab Techs.
 
 Secondary risks, ranked by severity:
 
@@ -101,7 +101,7 @@ Earlier defect detection is cheaper. The testing effort is distributed across sp
 | ----------------------- | ------------------------------------------- | ------------------ |
 | Static                  | ESLint, Ruff, Semgrep, manual code review   | Every PR           |
 | White-box (unit)        | Vitest (TypeScript), pytest (Python)        | Every PR, CI-gated |
-| White-box (integration) | testcontainers (Postgres + MinIO)           | Every PR, CI-gated |
+| White-box (integration) | testcontainers (Postgres + Azurite)         | Every PR, CI-gated |
 | Black-box (system)      | Manual test cases against dev staging       | Sprints 4 and 5    |
 | Black-box (UAT)         | Simulated pilot with sponsor                | Sprint 5           |
 | Security                | Trivy, Semgrep, Gitleaks, internal pen test | Sprint 4           |
@@ -122,16 +122,16 @@ The system under test consists of:
 - **PWA** (`apps/pwa`): mobile web app used by Operators to complete inspections
 - **Dashboard** (`apps/dashboard`): desktop web app used by Managers and Supervisors
 - **Core API** (`services/core-api`): business logic, inspection submission, defect workflow
-- **Media Service** (`services/media`): photo and voice clip upload via MinIO
+- **Media Service** (`services/media`): photo and voice clip upload via Azure Blob Storage (Azurite in tests)
 - **Audit/Report Service** (`services/audit`): hash-chained audit log, PDF export, CSV export
 - **AI Service** (`services/ai`): voice transcription via faster-whisper
-- **Infrastructure**: Caddy, PostgreSQL 16, MinIO, Entra ID (team-owned tenant)
+- **Infrastructure**: Caddy, PostgreSQL 16, Azurite, Entra ID (team-owned tenant)
 
 #### 2. Testing Objectives
 
 Objectives are listed in order of business risk.
 
-1. Confirm that no path exists that allows equipment to reach READY status without a valid, signed inspection from an authorized operator within the current shift window. (OHS s.257)
+1. Confirm that no path exists that allows equipment to reach READY status without a valid, attested inspection from an authorized operator dated the current calendar day, lab-local, and performed after the most recent return-to-service. (OHS s.257; ADR 0006, ADR 0007)
 2. Confirm that inspection records cannot be modified or deleted after submission.
 3. Confirm that the audit chain is tamper-evident: any inserted, modified, or deleted event is detected on verification.
 4. Confirm that voice clips and photos do not leave SAIT-controlled infrastructure.
@@ -204,7 +204,7 @@ Production data is never used in the test environment. The seed script is the so
 | Network access | Tailscale VPN; team members connect remotely                                     |
 | TLS            | Caddy local CA in dev mode; all team browsers trust the local CA certificate     |
 | Database       | PostgreSQL 16 container; separate `core_db` and `audit_db` schemas               |
-| Object storage | MinIO container; `inspections` and `reports` buckets pre-created                 |
+| Object storage | Azurite container; `inspections` and `reports` blob containers pre-created       |
 | Auth           | Team-owned Entra ID Free tenant; 5 test users, one per role                      |
 | AI Service     | faster-whisper `small.en` model loaded; CPU inference acceptable for test volume |
 | Observability  | Prometheus, Grafana, Loki running; dashboards configured                         |
@@ -235,7 +235,7 @@ Production data is never used in the test environment. The seed script is the so
 **Integration Testing (Sprints 1 through 4)**
 
 - Development phase: integration
-- Entry criteria: at least one service is deployable via Docker Compose; Postgres and MinIO containers start cleanly
+- Entry criteria: at least one service is deployable via Docker Compose; Postgres and Azurite containers start cleanly
 - Exit criteria: CI green; all testcontainer-based integration tests pass; no test skips without documented reason
 - Test case list: automated; live alongside source in `*.integration.test.ts` files
 - Writing schedule: written alongside the feature that requires cross-service validation
@@ -521,11 +521,11 @@ Severity codes: **BLOCKING** (release cannot proceed), **HIGH** (must fix before
 - Expected result: API returns 200 with the original inspection ID; no second Inspection record is created in the database
 - Failure severity: HIGH
 
-**TC-INSP-005: Tampered HMAC signature is rejected**
+**TC-INSP-005: Post-submission tampering of a response is blocked and detectable**
 
-- Preconditions: Valid inspection payload is prepared
-- Steps: Modify one field in the payload after computing the HMAC; submit the payload with the original HMAC
-- Expected result: API returns 400 with a signature validation error; no Inspection record is created
+- Preconditions: A valid inspection with responses has been submitted; its content digest is sealed in the audit chain
+- Steps: Attempt a direct UPDATE on an `inspection_responses` row; separately, recompute the content digest from the (unchanged) row and compare it to the value sealed in the chain
+- Expected result: The UPDATE is rejected by the immutability trigger (ADR 0008); any out-of-band change would make the recomputed digest diverge from the sealed value
 - Failure severity: BLOCKING
 
 **TC-INSP-006: BOOLEAN_PHOTO_ON_FAIL item requires photo when answered No**
@@ -599,7 +599,7 @@ Severity codes: **BLOCKING** (release cannot proceed), **HIGH** (must fix before
 
 - Preconditions: A voice clip was uploaded 91 days ago (simulate by setting `created_at` in the database to 91 days ago); lifecycle job is configured
 - Steps: Run the lifecycle job
-- Expected result: Voice clip is deleted from MinIO; Inspection record still contains the transcript text; `voiceClipId` on the response is nulled or marked deleted
+- Expected result: Voice clip is deleted from Azure Blob Storage; Inspection record still contains the transcript text; `voiceClipId` on the response is nulled or marked deleted
 - Failure severity: HIGH
 
 ---
@@ -688,7 +688,7 @@ Severity codes: **BLOCKING** (release cannot proceed), **HIGH** (must fix before
 
 - Preconditions: At least 5 inspections exist; Manager is logged in
 - Steps: Export a PDF for the last 7 days; open the PDF
-- Expected result: PDF contains a digital signature; each inspection shows its HMAC; the appendix contains `prev_hash` and `this_hash` for each audit event in the range
+- Expected result: PDF contains a digital signature; each inspection shows its content digest; the appendix contains `prev_hash` and `this_hash` for each audit event in the range
 - Failure severity: HIGH
 
 **TC-AUDIT-003: Audit events cannot be updated or deleted**

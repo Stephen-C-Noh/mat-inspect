@@ -10,7 +10,7 @@
 2. **Never commit `.env` files or secrets.** Gitleaks blocks them; do not bypass.
 3. **Pull before you branch.** Start from the latest `main`.
 4. **One feature per branch.** Keep PRs small and reviewable.
-5. **PR must be reviewed** by at least one teammate. Security-sensitive areas (auth, audit, HMAC) need two reviewers.
+5. **PR must be reviewed** by at least one teammate. Security-sensitive areas (auth, audit chain, hash-chain logic) need two reviewers.
 6. **Never modify the audit log directly.** All audit events flow through the Audit Service.
 7. **AI-assisted code is welcome; AI-unreviewed code is not.** See `docs/AI_USAGE_GUIDE.md`.
 
@@ -29,7 +29,7 @@ type/short-description
 | `chore/`    | Config, deps, tooling                       | `chore/upgrade-fastify-5`        |
 | `docs/`     | Documentation only                          | `docs/update-api-reference`      |
 | `test/`     | Adding or fixing tests                      | `test/inspection-state-machine`  |
-| `refactor/` | Code cleanup, no behavior change            | `refactor/extract-hmac-helper`   |
+| `refactor/` | Code cleanup, no behavior change            | `refactor/extract-audit-client`  |
 | `adr/`      | New or updated Architecture Decision Record | `adr/0007-rate-limiting`         |
 
 Use lowercase and hyphens only. Keep it short but descriptive.
@@ -61,7 +61,7 @@ type: short description in present tense (max 72 chars)
 ```
 feat: add voice transcription endpoint to AI service
 fix: prevent duplicate inspection on retry after network error
-security: rotate HMAC session keys on token refresh
+security: enforce role check on report export endpoint
 compliance: enforce certification expiry on inspection submit
 chore: bump faster-whisper to 1.0.4
 docs: clarify defect resolution workflow in FRS
@@ -170,7 +170,6 @@ Yes / No. If yes, which sections.
 - **At least 2 approvals** required for changes in:
   - `services/audit/` (audit chain, legal record)
   - `services/core-api/src/middleware/auth.ts` (authentication)
-  - `services/core-api/src/lib/hmac.ts` (signature verification)
   - `services/core-api/src/domain/inspection.ts` (state machine and result computation)
   - `db/migrations/` (schema changes)
 - **Author does not merge their own PR.** Reviewer merges.
@@ -218,7 +217,7 @@ Wrong-layer code is the most common review rejection. Reference:
 | Repositories | `services/*/src/repositories/` | Database access via Drizzle, no business logic               |
 | Middleware   | `services/*/src/middleware/`   | Auth, validation, error handling                             |
 | Schemas      | `services/*/src/schemas/`      | Zod schemas (often re-exported from packages/shared-schemas) |
-| Lib          | `services/*/src/lib/`          | App-specific utilities: logger, errors, HMAC                 |
+| Lib          | `services/*/src/lib/`          | App-specific utilities: logger, errors, audit-client         |
 | Config       | `services/*/src/config/`       | Typed environment loading                                    |
 
 ### Frontend Apps
@@ -314,7 +313,6 @@ CODEOWNERS forces 2 reviewers on:
 
 - `services/audit/`
 - `services/core-api/src/middleware/auth.ts`
-- `services/core-api/src/lib/hmac.ts`
 - `services/core-api/src/domain/inspection.ts`
 - `db/migrations/`
 
