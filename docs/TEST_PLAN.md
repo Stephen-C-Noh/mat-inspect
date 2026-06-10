@@ -10,7 +10,7 @@
 
 ### 1. Development Risk Analysis
 
-The primary risk is a defect that undermines regulatory compliance. Alberta OHS s.257 requires an authorized operator to complete a visual inspection before equipment operation. A bug that allows equipment to reach READY status without a valid signed inspection, or that allows inspection records to be modified after submission, creates legal liability for SAIT and safety risk for Lab Techs.
+The primary risk is a defect that undermines regulatory compliance. Alberta OHS s.257 requires an authorized operator to complete a visual inspection before equipment operation. A bug that allows equipment to reach READY status without a valid attested inspection, or that allows inspection records to be modified after submission, creates legal liability for SAIT and safety risk for Lab Techs.
 
 Secondary risks, ranked by severity:
 

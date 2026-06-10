@@ -16,15 +16,15 @@ Replace paper pre-use inspection sheets at SAIT's MAT (Manufacturing, Automation
 
 ### Business Goals
 
-| Goal                           | Current State                          | Target                                      |
-| ------------------------------ | -------------------------------------- | ------------------------------------------- |
-| Inspection completion rate     | ~60% (paper, often skipped)            | 100% (system enforces before equipment use) |
-| Audit retrieval time           | Hours to days (paper files)            | Under 1 minute (filtered PDF export)        |
-| Defect-to-acknowledgement time | Often missed                           | Under 1 hour (auto-notification)            |
-| Records retention              | Variable, paper-based                  | 7 years, indexed, queryable                 |
-| Inspection variability         | High (handwritten, inconsistent items) | Zero (versioned digital templates)          |
-| Manager visibility             | None during shift                      | Real-time dashboard                         |
-| Alberta OHS audit risk         | High (cannot demonstrate compliance)   | Low (cryptographically signed records)      |
+| Goal                           | Current State                          | Target                                                      |
+| ------------------------------ | -------------------------------------- | ----------------------------------------------------------- |
+| Inspection completion rate     | ~60% (paper, often skipped)            | 100% (system enforces before equipment use)                 |
+| Audit retrieval time           | Hours to days (paper files)            | Under 1 minute (filtered PDF export)                        |
+| Defect-to-acknowledgement time | Often missed                           | Under 1 hour (auto-notification)                            |
+| Records retention              | Variable, paper-based                  | 7 years, indexed, queryable                                 |
+| Inspection variability         | High (handwritten, inconsistent items) | Zero (versioned digital templates)                          |
+| Manager visibility             | None during shift                      | Real-time dashboard                                         |
+| Alberta OHS audit risk         | High (cannot demonstrate compliance)   | Low (tamper-evident records via the hash-chained audit log) |
 
 ---
 
@@ -34,7 +34,7 @@ Replace paper pre-use inspection sheets at SAIT's MAT (Manufacturing, Automation
 
 **Operator (Lab Tech)**
 
-- Scans QR code, completes inspection on phone, dictates defect notes by voice, submits with signature.
+- Scans QR code, completes inspection on phone, dictates defect notes by voice, reviews answers and confirms (operator attestation).
 
 **Supervisor**
 
@@ -115,7 +115,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Voice-to-text defect notes via on-prem AI Service (faster-whisper small.en)
 - Photo evidence capture and storage for defect items
 - PWA offline mode with submission queueing
-- PDF report export with embedded photos, signatures, and audit chain segment
+- PDF report export with embedded photos, operator attestations, and audit chain segment
 - CSV export for managers
 - Hash chain verification on Audit Service startup and on export
 - 7-year retention for inspection records, 90-day retention for voice audio
