@@ -4,6 +4,5 @@
 # Security-sensitive paths: require 2 reviewers
 /services/audit/                                    @Stephen-C-Noh @4d4n-HDZ
 /services/core-api/src/middleware/auth.ts           @Stephen-C-Noh @4d4n-HDZ
-/services/core-api/src/lib/hmac.ts                  @Stephen-C-Noh @4d4n-HDZ
 /services/core-api/src/domain/inspection.ts         @Stephen-C-Noh @4d4n-HDZ
 /db/migrations/                                     @Stephen-C-Noh @4d4n-HDZ
