@@ -2,8 +2,9 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": ".",
+    "outDir": "./dist",
     "declaration": true,
     "composite": true
   },
-  "include": ["schema", "migrate.ts", "seed.ts"]
+  "include": ["index.ts", "schema", "migrate.ts", "seed.ts"]
 }

@@ -11,7 +11,7 @@ WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
-COPY packages/shared-utils/package.json packages/shared-utils/
+COPY db/package.json db/
 COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
 COPY services/audit/package.json services/audit/
@@ -37,7 +37,7 @@ WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
-COPY packages/shared-utils/package.json packages/shared-utils/
+COPY db/package.json db/
 COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
 COPY services/audit/package.json services/audit/
@@ -55,8 +55,11 @@ COPY --from=build /repo/packages/shared-types/package.json packages/shared-types
 COPY --from=build /repo/packages/shared-types/dist packages/shared-types/dist
 COPY --from=build /repo/services/core-api/package.json services/core-api/
 COPY --from=build /repo/services/core-api/dist services/core-api/dist
-# core-api imports the compiled Drizzle schema at ../../../../db/schema/*.js
-COPY --from=build /repo/db/schema db/schema
+# core-api imports the Drizzle schema via the @mat-inspect/db workspace package.
+# prod-deps symlinks node_modules/@mat-inspect/db -> ../../db, so ship the package
+# manifest and its emitted output at that target.
+COPY --from=build /repo/db/package.json db/
+COPY --from=build /repo/db/dist db/dist
 USER appuser
 WORKDIR /repo/services/core-api
 EXPOSE 3000
