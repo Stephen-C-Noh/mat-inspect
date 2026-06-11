@@ -127,7 +127,7 @@ jobs:
             context: services/ai
             dockerfile: services/ai/Dockerfile
           - name: pwa
-            context: apps/pwa
+            context: .
             dockerfile: apps/pwa/Dockerfile
           - name: dashboard
             context: .
