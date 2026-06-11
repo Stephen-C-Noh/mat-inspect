@@ -70,7 +70,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - **Profile:** Oversees 6 to 7 Lab Techs across one shift; manages defect resolution and equipment availability
 - **Primary Need:** Know immediately when equipment goes out of service so she can route work around it
 - **Key Pain Point:** Finds out about defects hours later through verbal reports; no audit trail of who reported what when
-- **Critical Features:** Real-time email and push notifications on defect, defect inbox, return-to-service approval workflow, supervisor dashboard view
+- **Critical Features:** Real-time email and Microsoft Teams notifications on defect, defect inbox, return-to-service approval workflow, supervisor dashboard view
 
 ### Persona 3: Robert, MAT School Operations Manager
 
@@ -108,7 +108,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Defect workflow with supervisor acknowledgement and return-to-service approval
 - Manager dashboard with daily compliance grid and defect inbox
 - Append-only audit log with hash chain for tamper evidence
-- Failed-inspection alerts to all active Supervisors via email (SMTP), Web Push, and a persistent dashboard unresolved-failure queue (ADR 0010)
+- Failed-inspection alerts to all active Supervisors via email (SMTP), Microsoft Teams, and a persistent dashboard unresolved-failure queue (ADR 0013, superseding ADR 0010)
 
 ### P1: Core Differentiators (must ship for capstone defense)
 
@@ -137,7 +137,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 - Integration with equipment manufacturer telemetry
 - Microsoft Entra ID federation for SAIT SSO (configurable now, deferred for capstone)
 - mTLS between internal services
-- Push receipt acknowledgement and SMS escalation for safety alerts (closed-loop delivery; see ADR 0010 appendix)
+- Teams acknowledgement (Adaptive Card action) and SMS escalation for safety alerts (closed-loop delivery; see ADR 0013 appendix)
 
 ---
 
@@ -165,7 +165,7 @@ Roles are not hierarchical in code; they are explicit permission sets. A user ma
 
 ### Defect Workflow
 
-- As a Supervisor, I want to receive an email and push notification the moment any equipment fails inspection on my shift
+- As a Supervisor, I want to receive an email and Microsoft Teams notification the moment any equipment fails inspection
 - As a Supervisor, I want to acknowledge a defect, assign it to a qualified person, and track repair progress
 - As a Supervisor, I want to approve return-to-service after repair so equipment is not used prematurely
 - As a Lab Tech, I want a digital lockout tag to display on screen with equipment ID after a failed inspection so I have a clear record of the failure
@@ -352,20 +352,20 @@ confirm action over the whole Inspection, not a per-item signature (ADR 0007).
 
 ---
 
-## 9. EMAIL AND PUSH NOTIFICATIONS
+## 9. EMAIL AND TEAMS NOTIFICATIONS
 
-| Trigger                                                                  | Recipient                         | Channel                            |
-| ------------------------------------------------------------------------ | --------------------------------- | ---------------------------------- |
-| User account created                                                     | Operator, Supervisor, Manager     | Email (welcome + onboarding link)  |
-| Password reset requested                                                 | User                              | Email (1-hour token)               |
-| Failed inspection submitted                                              | All active Supervisors            | Email + Web Push + dashboard queue |
-| Defect acknowledged                                                      | Inspection operator               | Email                              |
-| Defect resolved                                                          | Inspection operator, Supervisor   | Email                              |
-| Return-to-service approved                                               | Lab Tech who reported, Supervisor | Email                              |
-| Certification expiry warning (30, 14, 7 days)                            | Operator, Supervisor              | Email                              |
-| Equipment not inspected by the daily cutoff time, lab-local (cutoff TBD) | All active Supervisors            | Email + Web Push                   |
-| Audit chain verification failure                                         | Admin                             | Email (critical alert)             |
-| Backup failure                                                           | Admin                             | Email (critical alert)             |
+| Trigger                                                                  | Recipient                         | Channel                                   |
+| ------------------------------------------------------------------------ | --------------------------------- | ----------------------------------------- |
+| User account created                                                     | Operator, Supervisor, Manager     | Email (welcome + onboarding link)         |
+| Password reset requested                                                 | User                              | Email (1-hour token)                      |
+| Failed inspection submitted                                              | All active Supervisors            | Email + Microsoft Teams + dashboard queue |
+| Defect acknowledged                                                      | Inspection operator               | Email                                     |
+| Defect resolved                                                          | Inspection operator, Supervisor   | Email                                     |
+| Return-to-service approved                                               | Lab Tech who reported, Supervisor | Email                                     |
+| Certification expiry warning (30, 14, 7 days)                            | Operator, Supervisor              | Email                                     |
+| Equipment not inspected by the daily cutoff time, lab-local (cutoff TBD) | All active Supervisors            | Email + Microsoft Teams                   |
+| Audit chain verification failure                                         | Admin                             | Email (critical alert)                    |
+| Backup failure                                                           | Admin                             | Email (critical alert)                    |
 
 ---
 

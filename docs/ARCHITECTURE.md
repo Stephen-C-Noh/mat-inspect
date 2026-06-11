@@ -288,7 +288,7 @@ Database-level invariants:
 
 1. Submission contains a BLOCKING failure.
 2. Core API creates Defect record, sets Equipment.status to OUT_OF_SERVICE.
-3. Email and Web Push sent to all active Supervisors; the failure is added to the persistent dashboard unresolved-failure queue (ADR 0010).
+3. Email and a Microsoft Teams message sent to all active Supervisors; the failure is added to the persistent dashboard unresolved-failure queue (ADR 0013, superseding ADR 0010).
 4. Audit Service writes EQUIPMENT_STATUS_CHANGED and DEFECT_OPENED events.
 5. PWA displays a digital lockout tag.
 6. Supervisor reviews defect, assigns to qualified person for repair.

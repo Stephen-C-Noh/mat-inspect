@@ -1,7 +1,7 @@
 # ADR 0010: Notification Delivery for Safety Alerts
 
 Date: 2026-06-09
-Status: Accepted
+Status: Superseded by ADR-0013 (Web Push replaced with Microsoft Teams; sponsor-confirmed 2026-06-10)
 
 ## Context
 
