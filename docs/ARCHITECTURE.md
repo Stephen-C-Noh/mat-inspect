@@ -929,7 +929,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 
 ### Sprint 4: Audit, Reporting, Hardening, DR Rehearsal
 
-**Weeks 9 to 10 (July 13 to July 26)**
+**Weeks 9 to 10 (July 17 to July 30)**
 
 - Audit Service hardening: chain verification on startup and the nightly full-chain job, outbox lag monitoring, defense-in-depth CHECK constraint (the chain, outbox, and content digest themselves are built in the Sprint 2 spike).
 - PDF report generation (PDFKit). Per-inspection PDF and range exports. Signed PDFs.
