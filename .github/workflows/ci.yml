@@ -59,6 +59,11 @@ jobs:
 
       - run: npm ci
 
+      # Workspace packages resolve through their built entry (dist/index.js), so the
+      # tests that import them (for example @mat-inspect/db) need the build first.
+      - name: Build packages
+        run: npm run build
+
       - name: Vitest
         # --passWithNoTests is temporary until real test files exist. Remove this flag in Sprint 1.
         run: npm test

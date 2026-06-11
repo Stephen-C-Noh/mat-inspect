@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { equipment } from '../../../../db/schema/equipment.js';
+import { equipment } from '@mat-inspect/db';
 
 const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
 const rawUrl =
