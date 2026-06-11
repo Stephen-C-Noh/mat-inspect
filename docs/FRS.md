@@ -297,7 +297,7 @@
 **Acceptance Criteria:**
 
 - AC-5.1.1: Audit event DEFECT_OPENED is logged
-- AC-5.1.2: Email and Web Push notifications sent to all active Supervisors within 60 seconds, and the failure is added to the persistent dashboard unresolved-failure queue (ADR 0010)
+- AC-5.1.2: Email and a Microsoft Teams message sent to all active Supervisors within 60 seconds, and the failure is added to the persistent dashboard unresolved-failure queue (ADR 0013, superseding ADR 0010)
 - AC-5.1.3: Digital lockout tag is displayed to the operator with Defect ID prominent
 
 ### 5.2 Supervisor Acknowledges Defect
@@ -477,18 +477,26 @@ See `PRD.md` Section 9 for the complete trigger list.
 - AC-8.1.2: Templates are reviewable by the team (no opaque external service)
 - AC-8.1.3: Subject lines never contain PII (use generic patterns: "MAT-Inspect: New defect on equipment XXX")
 
-### 8.2 Web Push Notifications
+### 8.2 Microsoft Teams Notifications
+
+Replaces Web Push (ADR 0013, superseding ADR 0010). The sponsor confirmed Supervisors use Teams
+during work hours on SAIT-issued phones, so Teams is the fast-nudge channel. It carries no
+delivery guarantee; the persistent dashboard queue is the backstop.
 
 **Behavior:**
 
-- Supervisors and Managers may subscribe via the PWA
-- Used for time-sensitive alerts (failed inspection)
-- Subscription stored in Postgres; sent via Web Push protocol (VAPID keys)
+- Used for time-sensitive alerts (failed inspection, missed daily cutoff)
+- Core API posts an Adaptive Card to a designated Supervisors channel via a Power Automate
+  Workflows webhook (not a legacy Office 365 connector)
+- Card content is non-PII: equipment asset tag, Defect ID, severity, and a deep link into the
+  dashboard. No operator name, no transcript text, no photo
+- A Teams post failure is logged and never blocks the inspection event
 
 **Acceptance Criteria:**
 
-- AC-8.2.1: Subscription is opt-in
-- AC-8.2.2: Notification appears on lock screen and home screen on iOS 16+ and Android 12+
+- AC-8.2.1: A failed-inspection card reaches the Supervisors channel within 60 seconds
+- AC-8.2.2: The card contains no PII (asset tag and Defect ID only)
+- AC-8.2.3: A webhook failure is logged as a warning and does not affect the dashboard queue entry
 
 ---
 
