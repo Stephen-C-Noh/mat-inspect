@@ -27,28 +27,28 @@ describe('getRolesFromAccount', () => {
   });
 
   it('returns [] when the roles claim is not an array', () => {
-    expect(getRolesFromAccount(makeAccount({ roles: 'Manager' }))).toEqual([]);
+    expect(getRolesFromAccount(makeAccount({ roles: 'manager' }))).toEqual([]);
   });
 
   it('returns the roles array when present', () => {
-    expect(getRolesFromAccount(makeAccount({ roles: ['Manager', 'Operator'] }))).toEqual([
-      'Manager',
-      'Operator',
+    expect(getRolesFromAccount(makeAccount({ roles: ['manager', 'operator'] }))).toEqual([
+      'manager',
+      'operator',
     ]);
   });
 });
 
 describe('hasAllowedRole', () => {
-  it.each(['Supervisor', 'Manager', 'Admin'])('allows the %s role', (role) => {
+  it.each(['supervisor', 'manager', 'admin'])('allows the %s role', (role) => {
     expect(hasAllowedRole(makeAccount({ roles: [role] }))).toBe(true);
   });
 
-  it.each(['Operator', 'Auditor'])('denies the %s role', (role) => {
+  it.each(['operator', 'auditor'])('denies the %s role', (role) => {
     expect(hasAllowedRole(makeAccount({ roles: [role] }))).toBe(false);
   });
 
   it('allows a user holding multiple roles where one is permitted', () => {
-    expect(hasAllowedRole(makeAccount({ roles: ['Operator', 'Supervisor'] }))).toBe(true);
+    expect(hasAllowedRole(makeAccount({ roles: ['operator', 'supervisor'] }))).toBe(true);
   });
 
   it('denies a user with an empty roles array', () => {
