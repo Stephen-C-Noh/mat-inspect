@@ -31,7 +31,7 @@ export const activeChecklistTemplateRoute: FastifyPluginAsync = async (app) => {
       if (!row) {
         throw httpError(
           404,
-          'NOT_FOUND',
+          'CHECKLIST_TEMPLATE_NOT_FOUND',
           `No active checklist template for equipment type ${type}`,
         );
       }

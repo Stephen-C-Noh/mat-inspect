@@ -23,6 +23,16 @@ export const publishChecklistTemplateRoute: FastifyPluginAsync = async (app) => 
       // to inactive in the same transaction so exactly one row per type is ever active.
       // Old versions are retained (Inspection rows reference template_id + template_version).
       const row = await db.transaction(async (tx) => {
+        // Lock existing rows for this equipment type first. A concurrent publish for
+        // the same type blocks here until this transaction commits, so the two
+        // transactions can't both compute the same maxVersion and both insert an
+        // isActive row (DEV-13 review).
+        await tx
+          .select({ id: checklistTemplates.id })
+          .from(checklistTemplates)
+          .where(eq(checklistTemplates.equipmentType, body.equipmentType))
+          .for('update');
+
         const [maxVersionRow] = await tx
           .select({ maxVersion: max(checklistTemplates.version) })
           .from(checklistTemplates)
