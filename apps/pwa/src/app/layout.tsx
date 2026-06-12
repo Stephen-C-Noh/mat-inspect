@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { MsalProviderWrapper } from '@/components/msal-provider-wrapper';
 import { ReactQueryProvider } from '@/components/query-provider';
 import './globals.css';
 
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ReactQueryProvider>{children}</ReactQueryProvider>
+        <MsalProviderWrapper>
+          <ReactQueryProvider>{children}</ReactQueryProvider>
+        </MsalProviderWrapper>
       </body>
     </html>
   );
