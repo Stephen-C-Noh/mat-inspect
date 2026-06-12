@@ -2,6 +2,7 @@
 
 Date: 2026-05-20
 Status: Accepted
+Amended: 2026-06-11 (corrected the role list to match the shipped `UserRole` enum and ARCHITECTURE.md section 4; added the App Role value casing convention)
 
 ## Context
 
@@ -22,10 +23,18 @@ Services validate JWTs by verifying the signature against the Entra ID JWKS endp
 (`https://login.microsoftonline.com/{tenant-id}/discovery/v2.0/keys`). The shared
 `verifyToken` middleware handles this. No service performs per-endpoint JWT parsing.
 
-Roles (operator, lab-tech, manager, admin) are defined as App Roles on the Entra ID
+Roles (operator, supervisor, manager, admin) are defined as App Roles on the Entra ID
 app registration. The role claim arrives in the token; `requireRole` reads it from
 `req.user.roles` as before. SAIT IT assigns roles to users or groups via the Azure
 portal.
+
+The App Role **Value** must match the `UserRole` enum in
+`packages/shared-types/src/index.ts` exactly: lowercase `operator`, `supervisor`,
+`manager`, `admin`. `requireRole` compares the claim case-sensitively, so a PascalCase
+value such as `Supervisor` will not match and the request fails with 403. The Azure
+portal "Display name" can be human-readable (for example, "Supervisor"); only the
+"Value" field is bound by this convention. ARCHITECTURE.md section 4 is the source of
+truth for the role set; the operator role covers the staff group labelled "Lab Tech".
 
 For local development, a lightweight JWT stub (a local JWKS server that signs tokens
 with a dev key) replaces the Entra ID endpoint. The stub is dev-only and not shipped

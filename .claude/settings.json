@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command'); if echo \"$cmd\" | grep -qE '\\b(cat|grep|egrep|fgrep|zcat|sed|head|tail|less|more|awk|xxd|od|strings|nl|tac|cut|bat|dd|vi|vim|view|nano)\\b[^|;&]*\\.env(\\.[A-Za-z0-9_]+)?\\b'; then printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Reading .env file contents is blocked by project policy (.claude/settings.json).\"}}'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
