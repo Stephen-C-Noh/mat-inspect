@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { equipment } from '@mat-inspect/db';
+import { equipment, checklistTemplates } from '@mat-inspect/db';
 
 const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
 const rawUrl =
@@ -11,4 +11,4 @@ if (!rawUrl) {
 }
 
 export const db = drizzle(rawUrl);
-export { equipment };
+export { equipment, checklistTemplates };

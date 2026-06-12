@@ -34,6 +34,60 @@ export const equipmentSchema = z.object({
 
 export type Equipment = z.infer<typeof equipmentSchema>;
 
+export const checklistItemTypeSchema = z.enum([
+  'BOOLEAN',
+  'BOOLEAN_PHOTO_ON_FAIL',
+  'MEASUREMENT',
+  'TEXT',
+  'SIGNATURE',
+]);
+
+export const failSeveritySchema = z.enum(['BLOCKING', 'WARNING']);
+
+export const checklistItemSchema = z.object({
+  key: z.string().min(1),
+  prompt: z.string().min(1),
+  type: checklistItemTypeSchema,
+  required: z.boolean(),
+  failSeverity: failSeveritySchema,
+  // Cites the source clause, e.g. "OHS Part 19 s.257" (Section 8.8: checklist drives
+  // pass/fail, not free text or AI).
+  regulatoryReference: z.string().min(1).optional(),
+});
+
+export type ChecklistItem = z.infer<typeof checklistItemSchema>;
+
+export const checklistTemplateSchema = z.object({
+  id: uuidSchema,
+  equipmentType: equipmentTypeSchema,
+  version: z.number().int().positive(),
+  isActive: z.boolean(),
+  effectiveFrom: z.string().datetime(),
+  items: z.array(checklistItemSchema).min(1),
+  createdBy: uuidSchema,
+  reviewedBy: uuidSchema.nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export type ChecklistTemplate = z.infer<typeof checklistTemplateSchema>;
+
+// Body for POST /api/v1/checklists. Server derives id, version, isActive, effectiveFrom,
+// createdBy (from the validated token) and createdAt; never trust these from the client.
+export const publishChecklistTemplateSchema = z.object({
+  equipmentType: equipmentTypeSchema,
+  items: z.array(checklistItemSchema).min(1),
+  reviewedBy: uuidSchema.optional(),
+});
+
+export type PublishChecklistTemplate = z.infer<typeof publishChecklistTemplateSchema>;
+
+// Query for GET /api/v1/checklists/active?type=FORKLIFT
+export const activeChecklistQuerySchema = z.object({
+  type: equipmentTypeSchema,
+});
+
+export type ActiveChecklistQuery = z.infer<typeof activeChecklistQuerySchema>;
+
 export const inspectionResponseSchema = z.object({
   itemKey: z.string(),
   value: z.unknown(),
