@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
-import { hasAllowedRole } from '@/lib/auth';
+import { hasAllowedRole } from '@mat-inspect/shared-auth';
+import { ALLOWED_ROLES } from '@/lib/msal-config';
 
 export const AuthGuard = ({
   children,
@@ -14,7 +15,7 @@ export const AuthGuard = ({
   const { accounts } = useMsal();
   const router = useRouter();
   const activeAccount = accounts[0] ?? null;
-  const roleAllowed = hasAllowedRole(activeAccount);
+  const roleAllowed = hasAllowedRole(activeAccount, ALLOWED_ROLES);
 
   useEffect(() => {
     if (!isAuthenticated) {

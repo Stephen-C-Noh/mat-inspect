@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountInfo } from '@azure/msal-browser';
-import { getRolesFromAccount, hasAllowedRole } from './auth';
+import type { UserRole } from '@mat-inspect/shared-types';
+import { getRolesFromAccount, hasAllowedRole } from './index';
 
 // Build a minimal AccountInfo. Only idTokenClaims.roles is read by the helpers.
 const makeAccount = (claims?: Record<string, unknown>): AccountInfo =>
@@ -12,6 +13,11 @@ const makeAccount = (claims?: Record<string, unknown>): AccountInfo =>
     localAccountId: 'local',
     ...(claims ? { idTokenClaims: claims } : {}),
   }) as AccountInfo;
+
+// The two callers of hasAllowedRole pass different allowed sets. Cover both so the
+// shared helper is exercised the way each app uses it.
+const PWA_ROLES = ['operator', 'supervisor'] as const satisfies readonly UserRole[];
+const DASHBOARD_ROLES = ['supervisor', 'manager', 'admin'] as const satisfies readonly UserRole[];
 
 describe('getRolesFromAccount', () => {
   it('returns [] for a null account', () => {
@@ -39,27 +45,37 @@ describe('getRolesFromAccount', () => {
 });
 
 describe('hasAllowedRole', () => {
-  it.each(['supervisor', 'manager', 'admin'])('allows the %s role', (role) => {
-    expect(hasAllowedRole(makeAccount({ roles: [role] }))).toBe(true);
+  it.each(['supervisor', 'manager', 'admin'])('allows the %s dashboard role', (role) => {
+    expect(hasAllowedRole(makeAccount({ roles: [role] }), DASHBOARD_ROLES)).toBe(true);
   });
 
-  it.each(['operator', 'auditor'])('denies the %s role', (role) => {
-    expect(hasAllowedRole(makeAccount({ roles: [role] }))).toBe(false);
+  it.each(['operator', 'auditor'])('denies the %s role on the dashboard', (role) => {
+    expect(hasAllowedRole(makeAccount({ roles: [role] }), DASHBOARD_ROLES)).toBe(false);
+  });
+
+  it.each(['operator', 'supervisor'])('allows the %s pwa role', (role) => {
+    expect(hasAllowedRole(makeAccount({ roles: [role] }), PWA_ROLES)).toBe(true);
+  });
+
+  it.each(['manager', 'admin'])('denies the %s role on the pwa', (role) => {
+    expect(hasAllowedRole(makeAccount({ roles: [role] }), PWA_ROLES)).toBe(false);
   });
 
   it('allows a user holding multiple roles where one is permitted', () => {
-    expect(hasAllowedRole(makeAccount({ roles: ['operator', 'supervisor'] }))).toBe(true);
+    expect(
+      hasAllowedRole(makeAccount({ roles: ['operator', 'supervisor'] }), DASHBOARD_ROLES),
+    ).toBe(true);
   });
 
   it('denies a user with an empty roles array', () => {
-    expect(hasAllowedRole(makeAccount({ roles: [] }))).toBe(false);
+    expect(hasAllowedRole(makeAccount({ roles: [] }), DASHBOARD_ROLES)).toBe(false);
   });
 
   it('denies a null account', () => {
-    expect(hasAllowedRole(null)).toBe(false);
+    expect(hasAllowedRole(null, DASHBOARD_ROLES)).toBe(false);
   });
 
   it('denies when the roles claim is missing', () => {
-    expect(hasAllowedRole(makeAccount({ oid: 'user-1' }))).toBe(false);
+    expect(hasAllowedRole(makeAccount({ oid: 'user-1' }), DASHBOARD_ROLES)).toBe(false);
   });
 });

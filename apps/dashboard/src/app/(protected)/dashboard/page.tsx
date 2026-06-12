@@ -1,7 +1,7 @@
 'use client';
 
 import { useMsal } from '@azure/msal-react';
-import { getRolesFromAccount } from '@/lib/auth';
+import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 
 export default function DashboardPage() {
   const { accounts } = useMsal();

@@ -11,6 +11,7 @@ WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
+COPY packages/shared-auth/package.json packages/shared-auth/
 COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
 COPY services/audit/package.json services/audit/
@@ -20,6 +21,9 @@ RUN npm ci --ignore-scripts
 
 # ---- build: compile the Next.js app to a standalone server ----
 FROM deps AS build
+# The dashboard imports @mat-inspect/shared-auth (and resolves shared-types via
+# tsconfig paths to packages/*/src), so the build needs the package sources.
+COPY packages packages
 COPY apps/dashboard apps/dashboard
 # NEXT_PUBLIC_* vars are inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_AZURE_TENANT_ID
