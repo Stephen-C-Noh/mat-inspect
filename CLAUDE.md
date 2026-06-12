@@ -394,4 +394,20 @@ This file is version controlled. If it is out of date, update it in a PR. The mo
 
 ---
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in JIRA (project DEV, `DEV-*` keys) via the Atlassian integration. GitHub Issues are for automated reports only. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+---
+
 **End of briefing.** Read this file at the start of any session on this project.

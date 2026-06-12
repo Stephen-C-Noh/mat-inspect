@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '../hooks/use-equipment';
 import { Card } from '../components/ui/card';
 
@@ -43,7 +44,9 @@ function InfoItem({ label, value }: { label: string; value: string | null | unde
   );
 }
 
-export default function EquipmentPage() {
+// Data fetching lives here so the equipment query only fires once AuthGuard has
+// confirmed the operator is authenticated and authorized.
+function EquipmentList() {
   const { data: equipmentList, isLoading, error } = useEquipmentList();
 
   if (isLoading) return <div className="p-8 text-center">Loading equipment list...</div>;
@@ -61,7 +64,7 @@ export default function EquipmentPage() {
             <Card
               key={item.id}
               className={`w-full flex flex-col md:flex-row items-center justify-between p-4 transition-all
-                border-2 shadow-sm hover:shadow-md ${theme.card}`}
+                  border-2 shadow-sm hover:shadow-md ${theme.card}`}
             >
               <div className="w-full md:w-1/4 mb-3 md:mb-0">
                 <h2 className="text-lg font-bold text-slate-900 leading-tight">{item.name}</h2>
@@ -89,5 +92,13 @@ export default function EquipmentPage() {
         })}
       </div>
     </main>
+  );
+}
+
+export default function EquipmentPage() {
+  return (
+    <AuthGuard>
+      <EquipmentList />
+    </AuthGuard>
   );
 }
