@@ -1,4 +1,5 @@
 import type { Configuration, PopupRequest } from '@azure/msal-browser';
+import type { UserRole } from '@mat-inspect/shared-types';
 
 export const msalConfig: Configuration = {
   auth: {
@@ -25,5 +26,11 @@ export const loginRequest: PopupRequest = {
 
 // Roles permitted to view the dashboard. Supervisor gets the team dashboard,
 // Manager and Admin get full read access. See ARCHITECTURE.md section 3 (roles).
-export const ALLOWED_ROLES = ['Supervisor', 'Manager', 'Admin'] as const;
+// Values must match the Entra app role values, which are lowercase (see core-api
+// requireRole and shared-types UserRole).
+export const ALLOWED_ROLES = [
+  'supervisor',
+  'manager',
+  'admin',
+] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
