@@ -3,8 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
-import { loginRequest } from '@/lib/msal-config';
-import { hasAllowedRole } from '@/lib/auth';
+import { hasAllowedRole } from '@mat-inspect/shared-auth';
+import { ALLOWED_ROLES, loginRequest } from '@/lib/msal-config';
 
 export default function LoginPage() {
   const { instance, accounts } = useMsal();
@@ -13,7 +13,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (hasAllowedRole(accounts[0] ?? null)) {
+    if (hasAllowedRole(accounts[0] ?? null, ALLOWED_ROLES)) {
       router.replace('/dashboard');
     } else {
       router.replace('/unauthorized');

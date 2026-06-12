@@ -1,0 +1,24 @@
+{
+  "name": "@mat-inspect/shared-auth",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^3.28.0",
+    "@mat-inspect/shared-types": "^0.0.0"
+  },
+  "devDependencies": {
+    "typescript": "*"
+  }
+}

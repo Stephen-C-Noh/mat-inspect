@@ -16,11 +16,12 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      // Resolve the shared package from source, not its built dist. The image
+      // Resolve the shared packages from source, not their built dist. The image
       // copies packages/*/src but .dockerignore excludes dist, and the build
       // never runs the package build step (npm ci --ignore-scripts). Without
       // this, the bare import resolves via node_modules to dist/index.d.ts,
       // which is absent in the image, so next build fails to find the module.
+      "@mat-inspect/shared-auth": ["../../packages/shared-auth/src"],
       "@mat-inspect/shared-types": ["../../packages/shared-types/src"]
     }
   },
