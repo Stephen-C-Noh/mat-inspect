@@ -3,3 +3,4 @@
 // relative path into this project (DEV-28).
 export * from './schema/equipment.js';
 export * from './schema/users.js';
+export * from './schema/checklist-templates.js';

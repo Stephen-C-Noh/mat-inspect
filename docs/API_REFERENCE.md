@@ -273,33 +273,34 @@ Audit events are read-only via API. Writes happen automatically as a side effect
 
 ## Error Codes
 
-| Code                           | Status | Meaning                                                                |
-| ------------------------------ | ------ | ---------------------------------------------------------------------- |
-| `AUTH_TOKEN_MISSING`           | 401    | No token provided                                                      |
-| `AUTH_TOKEN_INVALID`           | 401    | Token signature or claims invalid                                      |
-| `AUTH_TOKEN_EXPIRED`           | 401    | Access token past expiry; client should refresh                        |
-| `AUTH_FORBIDDEN`               | 403    | Authenticated but lacks the required role                              |
-| `MFA_REQUIRED`                 | 403    | Role requires MFA; user has not completed second factor                |
-| `CERT_EXPIRED`                 | 403    | Operator's certification for the equipment class has expired           |
-| `CERT_MISSING`                 | 403    | Operator has no certification for this equipment class                 |
-| `VALIDATION_ERROR`             | 400    | Input failed Zod validation; includes per-field errors                 |
-| `IDEMPOTENCY_MISMATCH`         | 409    | Same Idempotency-Key used with different body                          |
-| `EQUIPMENT_NOT_FOUND`          | 404    | Asset tag or ID does not resolve                                       |
-| `EQUIPMENT_RETIRED`            | 410    | Equipment exists but is RETIRED; cannot inspect                        |
-| `EQUIPMENT_OUT_OF_SERVICE`     | 409    | Cannot mark READY; an unresolved Defect exists                         |
-| `INSPECTION_NOT_FOUND`         | 404    |                                                                        |
-| `INSPECTION_INCOMPLETE`        | 400    | Required items missing from submission                                 |
-| `DEFECT_NOT_FOUND`             | 404    |                                                                        |
-| `DEFECT_INVALID_TRANSITION`    | 409    | Cannot transition Defect from current status to requested status       |
-| `RETURN_TO_SERVICE_BLOCKED`    | 409    | Cannot approve return to service while a blocking Defect is unresolved |
-| `CHECKLIST_TEMPLATE_NOT_FOUND` | 404    | No active template for this equipment type                             |
-| `MEDIA_TOO_LARGE`              | 413    | Upload exceeds size limit                                              |
-| `MEDIA_TYPE_INVALID`           | 400    | Unsupported MIME type                                                  |
-| `AI_SERVICE_UNAVAILABLE`       | 503    | AI Service down; client should fall back to typed notes                |
-| `AUDIT_CHAIN_BROKEN`           | 500    | Audit chain verification failed at the given event ID                  |
-| `REPORT_JOB_NOT_FOUND`         | 404    |                                                                        |
-| `RATE_LIMITED`                 | 429    | Too many requests; check Retry-After                                   |
-| `INTERNAL_ERROR`               | 500    | Unexpected server error; includes X-Request-Id for support             |
+| Code                                  | Status | Meaning                                                                |
+| ------------------------------------- | ------ | ---------------------------------------------------------------------- |
+| `AUTH_TOKEN_MISSING`                  | 401    | No token provided                                                      |
+| `AUTH_TOKEN_INVALID`                  | 401    | Token signature or claims invalid                                      |
+| `AUTH_TOKEN_EXPIRED`                  | 401    | Access token past expiry; client should refresh                        |
+| `AUTH_FORBIDDEN`                      | 403    | Authenticated but lacks the required role                              |
+| `MFA_REQUIRED`                        | 403    | Role requires MFA; user has not completed second factor                |
+| `CERT_EXPIRED`                        | 403    | Operator's certification for the equipment class has expired           |
+| `CERT_MISSING`                        | 403    | Operator has no certification for this equipment class                 |
+| `VALIDATION_ERROR`                    | 400    | Input failed Zod validation; includes per-field errors                 |
+| `IDEMPOTENCY_MISMATCH`                | 409    | Same Idempotency-Key used with different body                          |
+| `EQUIPMENT_NOT_FOUND`                 | 404    | Asset tag or ID does not resolve                                       |
+| `EQUIPMENT_RETIRED`                   | 410    | Equipment exists but is RETIRED; cannot inspect                        |
+| `EQUIPMENT_OUT_OF_SERVICE`            | 409    | Cannot mark READY; an unresolved Defect exists                         |
+| `INSPECTION_NOT_FOUND`                | 404    |                                                                        |
+| `INSPECTION_INCOMPLETE`               | 400    | Required items missing from submission                                 |
+| `DEFECT_NOT_FOUND`                    | 404    |                                                                        |
+| `DEFECT_INVALID_TRANSITION`           | 409    | Cannot transition Defect from current status to requested status       |
+| `RETURN_TO_SERVICE_BLOCKED`           | 409    | Cannot approve return to service while a blocking Defect is unresolved |
+| `CHECKLIST_TEMPLATE_NOT_FOUND`        | 404    | No active template for this equipment type                             |
+| `CHECKLIST_TEMPLATE_INVALID_REVIEWER` | 400    | reviewedBy must not be the publishing admin (no self-review)           |
+| `MEDIA_TOO_LARGE`                     | 413    | Upload exceeds size limit                                              |
+| `MEDIA_TYPE_INVALID`                  | 400    | Unsupported MIME type                                                  |
+| `AI_SERVICE_UNAVAILABLE`              | 503    | AI Service down; client should fall back to typed notes                |
+| `AUDIT_CHAIN_BROKEN`                  | 500    | Audit chain verification failed at the given event ID                  |
+| `REPORT_JOB_NOT_FOUND`                | 404    |                                                                        |
+| `RATE_LIMITED`                        | 429    | Too many requests; check Retry-After                                   |
+| `INTERNAL_ERROR`                      | 500    | Unexpected server error; includes X-Request-Id for support             |
 
 ---
 

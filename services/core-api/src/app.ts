@@ -3,6 +3,8 @@ import { HttpError } from './lib/http-error.js';
 import { logger } from './lib/logger.js';
 import { setupZodValidation } from './lib/zod-validation.js';
 import { listEquipmentRoute } from './routes/equipment/list.js';
+import { publishChecklistTemplateRoute } from './routes/checklists/publish.js';
+import { activeChecklistTemplateRoute } from './routes/checklists/active.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
@@ -51,6 +53,8 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   app.get('/health', async () => ({ status: 'ok', service: 'core-api' }));
 
   await app.register(listEquipmentRoute, { prefix: '/api/v1' });
+  await app.register(publishChecklistTemplateRoute, { prefix: '/api/v1' });
+  await app.register(activeChecklistTemplateRoute, { prefix: '/api/v1' });
 
   if (process.env['NODE_ENV'] !== 'production') {
     const { devTokenRoutes } = await import('./routes/dev-token.js');
