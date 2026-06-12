@@ -125,6 +125,18 @@ describe('checklist templates API', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('rejects POST /checklists when reviewedBy is the publishing admin', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/checklists',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { equipmentType: 'FORKLIFT', items: forkliftItemsV1, reviewedBy: ADMIN_ID },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().title).toBe('CHECKLIST_TEMPLATE_INVALID_REVIEWER');
+  });
+
   it('returns 404 from GET /checklists/active when no template has been published yet', async () => {
     const res = await app.inject({
       method: 'GET',

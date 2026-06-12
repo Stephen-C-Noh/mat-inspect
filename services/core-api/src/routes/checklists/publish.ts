@@ -5,6 +5,7 @@ import {
   publishChecklistTemplateSchema,
 } from '@mat-inspect/shared-schemas';
 import { db, checklistTemplates } from '../../db/index.js';
+import { httpError } from '../../lib/http-error.js';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { serializeChecklistTemplate } from './serialize.js';
@@ -18,6 +19,15 @@ export const publishChecklistTemplateRoute: FastifyPluginAsync = async (app) => 
     },
     async (req, reply) => {
       const body = publishChecklistTemplateSchema.parse(req.body);
+
+      // Self-review would make the reviewedBy field a no-op attestation.
+      if (body.reviewedBy === req.user.id) {
+        throw httpError(
+          400,
+          'CHECKLIST_TEMPLATE_INVALID_REVIEWER',
+          'reviewedBy must not be the publishing admin',
+        );
+      }
 
       // New version becomes active; the previous active row for this equipment type flips
       // to inactive in the same transaction so exactly one row per type is ever active.
