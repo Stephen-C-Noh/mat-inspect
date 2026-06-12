@@ -36,6 +36,12 @@ portal "Display name" can be human-readable (for example, "Supervisor"); only th
 "Value" field is bound by this convention. ARCHITECTURE.md section 4 is the source of
 truth for the role set; the operator role covers the staff group labelled "Lab Tech".
 
+ARCHITECTURE.md also names an Auditor who exports signed PDF reports. Auditor is a
+reporting persona, not an Entra App Role. The shipped role set stays at four (operator,
+supervisor, manager, admin); report export falls under the manager and admin read access
+already listed in section 4. A separate Auditor App Role is out of scope for this ADR and
+would need its own amendment.
+
 For local development, a lightweight JWT stub (a local JWKS server that signs tokens
 with a dev key) replaces the Entra ID endpoint. The stub is dev-only and not shipped
 to staging or production.
