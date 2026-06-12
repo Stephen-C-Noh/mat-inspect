@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "checklist_templates_one_active_per_type" ON "checklist_templates" USING btree ("equipment_type") WHERE "checklist_templates"."is_active" = true;--> statement-breakpoint
+CREATE UNIQUE INDEX "checklist_templates_type_version" ON "checklist_templates" USING btree ("equipment_type","version");

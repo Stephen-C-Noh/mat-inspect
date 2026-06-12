@@ -15,6 +15,13 @@
       "when": 1781231445021,
       "tag": "0001_spicy_zzzax",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781279741058,
+      "tag": "0002_real_skin",
+      "breakpoints": true
     }
   ]
 }
