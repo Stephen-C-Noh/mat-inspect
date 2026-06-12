@@ -57,3 +57,6 @@ coverage/
 
 # Agent skill docs (local only)
 docs/agents/
+
+# Claude Code (commit team settings.json, keep personal local settings out)
+.claude/settings.local.json

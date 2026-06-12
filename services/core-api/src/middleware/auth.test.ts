@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import Fastify, { type FastifyError } from 'fastify';
 import { verifyToken, requireRole } from './auth.js';
@@ -193,5 +193,103 @@ describe('requireRole', () => {
     const res = await app.inject({ method: 'GET', url: '/operator-only' });
 
     expect(res.statusCode).toBe(401);
+  });
+});
+
+// DEV-30 spike: pin the Entra access-token contract. The other suites delete the
+// ENTRA_* env vars, so the issuer and audience branches in verifyToken never run.
+// These tests set both, exercising the validation a real Entra access token must pass.
+describe('verifyToken with Entra issuer and audience validation', () => {
+  const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
+  const TENANT_ID = '22222222-2222-2222-2222-222222222222';
+  // Entra v2 access tokens carry this issuer; jose checks it by exact string match.
+  const ISSUER = `https://login.microsoftonline.com/${TENANT_ID}/v2.0`;
+
+  beforeEach(() => {
+    resetJwksForTest();
+    process.env['ENTRA_CLIENT_ID'] = CLIENT_ID;
+    process.env['ENTRA_TENANT_ID'] = TENANT_ID;
+  });
+
+  afterEach(() => {
+    delete process.env['ENTRA_CLIENT_ID'];
+    delete process.env['ENTRA_TENANT_ID'];
+  });
+
+  // For a single-app registration, an access token issued for api://{clientId}/access_as_user
+  // has aud == clientId. Defaults reflect that; callers override aud/iss/claims to break it.
+  const makeEntraToken = async (
+    opts: { aud?: string; iss?: string; claims?: Record<string, unknown> } = {},
+  ) =>
+    new SignJWT({ oid: 'op-1', roles: ['operator'], tid: TENANT_ID, ...(opts.claims ?? {}) })
+      .setProtectedHeader({ alg: 'RS256', kid: 'test-1' })
+      .setIssuedAt()
+      .setIssuer(opts.iss ?? ISSUER)
+      .setAudience(opts.aud ?? CLIENT_ID)
+      .setExpirationTime('15m')
+      .sign(privateKey);
+
+  it('accepts an access token whose aud equals ENTRA_CLIENT_ID and issuer matches the tenant', async () => {
+    const app = buildTestApp();
+    const token = await makeEntraToken();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/operator-only',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ userId: 'op-1' });
+  });
+
+  it('returns 401 when aud does not equal ENTRA_CLIENT_ID', async () => {
+    const app = buildTestApp();
+    // A token minted for a different resource (or an ID token, whose aud is also the
+    // client id but issued for a different flow) must not be accepted as this API's token.
+    const token = await makeEntraToken({ aud: 'api://some-other-app' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/operator-only',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json().code).toBe('INVALID_TOKEN');
+  });
+
+  it('returns 401 when the issuer is a different tenant', async () => {
+    const app = buildTestApp();
+    // Same signing key and correct aud, but issued by another tenant. A multi-tenant
+    // misconfiguration must not let a foreign-tenant token through.
+    const token = await makeEntraToken({
+      iss: 'https://login.microsoftonline.com/99999999-9999-9999-9999-999999999999/v2.0',
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/operator-only',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json().code).toBe('INVALID_TOKEN');
+  });
+
+  it('returns 403 when a valid token carries no roles (App Role not assigned)', async () => {
+    const app = buildTestApp();
+    // The token authenticates (aud + issuer valid) but Entra emitted no roles claim
+    // because the operator App Role was never assigned to the user. Authz must fail.
+    const token = await makeEntraToken({ claims: { roles: undefined } });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/operator-only',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('FORBIDDEN');
   });
 });
