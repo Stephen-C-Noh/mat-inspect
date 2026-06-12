@@ -17,6 +17,11 @@ FROM deps AS build
 WORKDIR /repo
 COPY packages packages
 COPY apps/pwa apps/pwa
+# NEXT_PUBLIC_* vars are inlined into the client bundle at build time.
+ARG NEXT_PUBLIC_AZURE_TENANT_ID
+ARG NEXT_PUBLIC_AZURE_CLIENT_ID
+ENV NEXT_PUBLIC_AZURE_TENANT_ID=$NEXT_PUBLIC_AZURE_TENANT_ID
+ENV NEXT_PUBLIC_AZURE_CLIENT_ID=$NEXT_PUBLIC_AZURE_CLIENT_ID
 RUN npm run build --workspace=@mat-inspect/pwa
 
 FROM node:${NODE_VERSION}-alpine AS runtime

@@ -1,4 +1,5 @@
 import type { Configuration, PopupRequest } from '@azure/msal-browser';
+import type { UserRole } from '@mat-inspect/shared-types';
 
 export const msalConfig: Configuration = {
   auth: {
@@ -8,7 +9,7 @@ export const msalConfig: Configuration = {
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : '',
   },
   cache: {
-    cacheLocation: 'memory',
+    cacheLocation: 'sessionStorage',
     storeAuthStateInCookie: false,
   },
 };
@@ -18,5 +19,7 @@ export const loginRequest: PopupRequest = {
   prompt: 'select_account',
 };
 
-export const ALLOWED_ROLES = ['Operator', 'Supervisor'] as const;
+// Roles permitted to use the operator PWA. Values must match the Entra app role
+// values, which are lowercase (see core-api requireRole and shared-types UserRole).
+export const ALLOWED_ROLES = ['operator', 'supervisor'] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
