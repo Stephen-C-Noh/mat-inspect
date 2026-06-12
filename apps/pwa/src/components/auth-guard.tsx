@@ -6,27 +6,27 @@ import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { hasAllowedRole } from '@/lib/auth';
 
 export const AuthGuard = ({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }): React.ReactElement | null => {
-    const isAuthenticated = useIsAuthenticated();
-    const { accounts } = useMsal();
-    const router = useRouter();
-    const activeAccount = accounts[0] ?? null;
-    const roleAllowed = hasAllowedRole(activeAccount);
+  const isAuthenticated = useIsAuthenticated();
+  const { accounts } = useMsal();
+  const router = useRouter();
+  const activeAccount = accounts[0] ?? null;
+  const roleAllowed = hasAllowedRole(activeAccount);
 
-    useEffect(() => {
-        if (!isAuthenticated) {
-            router.replace('/login');
-            return;
-        }
-        if (!roleAllowed) {
-            router.replace('/unauthorized');
-        }
-    }, [isAuthenticated, roleAllowed, router]);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login');
+      return;
+    }
+    if (!roleAllowed) {
+      router.replace('/unauthorized');
+    }
+  }, [isAuthenticated, roleAllowed, router]);
 
-    if (!isAuthenticated || !roleAllowed) return null;
+  if (!isAuthenticated || !roleAllowed) return null;
 
-    return <>{children}</>;
+  return <>{children}</>;
 };
