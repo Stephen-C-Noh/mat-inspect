@@ -20,6 +20,10 @@ RUN npm ci --ignore-scripts
 
 # ---- build: compile the Next.js app to a standalone server ----
 FROM deps AS build
+# The dashboard imports @mat-inspect/shared-types, which tsconfig paths resolve to
+# packages/shared-types/src. The build needs those sources, not just the package.json
+# copied into the deps stage (dist is dockerignored and never built here).
+COPY packages packages
 COPY apps/dashboard apps/dashboard
 # NEXT_PUBLIC_* vars are inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_AZURE_TENANT_ID
