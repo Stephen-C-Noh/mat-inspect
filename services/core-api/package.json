@@ -15,10 +15,12 @@
   },
   "dependencies": {
     "@azure/monitor-opentelemetry": "^1.0.0",
+    "@mat-inspect/db": "^0.0.0",
     "@mat-inspect/shared-schemas": "^0.0.0",
     "@mat-inspect/shared-types": "^0.0.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",
+    "fastify-type-provider-zod": "^4.0.2",
     "jose": "^6.2.3",
     "pg": "^8.21.0",
     "pino": "^10.3.1",

@@ -54,3 +54,6 @@ coverage/
 
 # Misc
 *.local
+
+# Agent skill docs (local only)
+docs/agents/

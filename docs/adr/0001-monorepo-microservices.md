@@ -18,6 +18,11 @@ deploy as separate Docker containers (microservices).
 Shared code lives in packages/shared-schemas and packages/shared-types. Services
 import only from packages/, never from each other directly.
 
+The Drizzle schema is shared the same way. db/ stays a top-level directory (it also
+holds migrations and seed scripts) but is a named workspace package, @mat-inspect/db.
+Services consume the schema through the package entry, not a relative path into db/,
+so a production build resolves it from the emitted output at runtime (DEV-28).
+
 ## Consequences
 
 Positive: atomic cross-service changes in a single PR; shared schemas with no

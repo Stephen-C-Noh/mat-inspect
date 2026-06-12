@@ -2,16 +2,30 @@ import { z } from 'zod';
 
 export const uuidSchema = z.string().uuid();
 
+export const equipmentTypeSchema = z.enum([
+  'OVERHEAD_CRANE',
+  'TRUCK',
+  'ELECTRIC_PALLET_JACK',
+  'FORKLIFT',
+]);
+
+export const equipmentStatusSchema = z.enum([
+  'READY',
+  'AWAITING_INSPECTION',
+  'OUT_OF_SERVICE',
+  'RETIRED',
+]);
+
 export const equipmentSchema = z.object({
   id: z.string().uuid(),
   assetTag: z.string().min(1),
   name: z.string().min(1),
-  type: z.string().min(1),
+  type: equipmentTypeSchema,
   make: z.string().nullable(),
   model: z.string().nullable(),
   serialNumber: z.string().nullable(),
   location: z.string().nullable(),
-  status: z.enum(['READY', 'AWAITING_INSPECTION', 'OUT_OF_SERVICE', 'RETIRED']),
+  status: equipmentStatusSchema,
   currentStatusSince: z.string().datetime(),
   manufacturerSpecsUrl: z.string().url().optional().nullable(),
   createdAt: z.string().datetime(),
@@ -32,7 +46,10 @@ export const submitInspectionSchema = z.object({
   equipmentId: uuidSchema,
   templateId: uuidSchema,
   responses: z.array(inspectionResponseSchema),
-  signatureHmac: z.string(),
+  // Operator attestation, not a signature. True only after the operator reviewed a summary
+  // of their answers and confirmed. Identity comes from the validated token; tamper-evidence
+  // is the audit chain (ADR 0007, ADR 0008). No HMAC.
+  attested: z.literal(true),
 });
 
 export type InspectionResponse = z.infer<typeof inspectionResponseSchema>;

@@ -197,7 +197,7 @@ The point of this step: a teammate clones, runs `docker compose up`, and sees gr
 
 - [ ] Create `/docker-compose.yml` at repo root with:
   - Postgres 16 container with an init script creating two databases: `core_db`, `audit_db`
-  - MinIO container with two pre-created buckets: `mat-inspect-media`, `mat-inspect-reports`
+  - Azurite container with two pre-created blob containers: `mat-inspect-media`, `mat-inspect-reports`
   - Caddy 2 container with reverse proxy config
   - 4 service stubs (core-api, media, audit, ai) each returning `{ "status": "ok" }` on `/health`
   - 2 app stubs (PWA, dashboard) showing "Hello, MAT-Inspect"
@@ -217,10 +217,8 @@ POSTGRES_DB=postgres
 ENTRA_TENANT_ID=REPLACE_ME
 ENTRA_CLIENT_ID=REPLACE_ME
 
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=changeme
-
-HMAC_SECRET=replace-with-32-char-random-string
+# Azurite (Azure Storage emulator) in dev; the well-known dev shortcut connection string
+AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
 
 CORE_API_DB_URL=postgresql://mat:changeme@postgres:5432/core_db
 AUDIT_API_DB_URL=postgresql://mat:changeme@postgres:5432/audit_db
@@ -243,7 +241,6 @@ AUDIT_API_DB_URL=postgresql://mat:changeme@postgres:5432/audit_db
 # Security-sensitive: requires 2 reviewers
 /services/audit/  @stephen-c-noh @teammate-backend-lead
 /services/core-api/src/middleware/auth.ts  @stephen-c-noh @teammate-backend-lead
-/services/core-api/src/lib/hmac.ts  @stephen-c-noh @teammate-backend-lead
 /services/core-api/src/domain/inspection.ts  @stephen-c-noh @teammate-backend-lead
 /db/migrations/  @stephen-c-noh @teammate-backend-lead
 ```

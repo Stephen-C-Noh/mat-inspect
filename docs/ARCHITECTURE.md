@@ -38,7 +38,7 @@ Every problem stated in the project brief maps to a specific system feature.
 | Missing records                                            | All submissions written to PostgreSQL with append-only audit log                                               |
 | Limited accountability                                     | Every entry tied to authenticated user ID, timestamp, and device                                               |
 | Cannot demonstrate compliance                              | Hash-chained audit log, signed PDF export, retention policy enforced by service                                |
-| Managers cannot verify completion                          | Real-time dashboard with per-shift, per-equipment status                                                       |
+| Managers cannot verify completion                          | Real-time dashboard with per-day, per-equipment status                                                         |
 | Lack of standardization                                    | Equipment-class checklists with versioning; checklist changes are tracked                                      |
 | Safety risk from unsafe equipment                          | Failed inspection auto-sets equipment status to OUT_OF_SERVICE; return-to-service requires supervisor approval |
 | Audit retrieval is difficult                               | Search by equipment, date range, operator, defect type; export to PDF or CSV                                   |
@@ -51,13 +51,13 @@ Every problem stated in the project brief maps to a specific system feature.
 The system design enforces these Alberta OHS requirements directly in code, not as policy notes.
 
 **Part 19 (Powered Mobile Equipment), s.257:** Operator must complete visual inspection before operating equipment. s.257(4) prohibits starting operation if inspection is not completed.
-**System enforcement:** Equipment status defaults to AWAITING_INSPECTION at shift start. Cannot transition to READY without a valid completed inspection record signed by an authorized operator within the shift window.
+**System enforcement:** Equipment reads as AWAITING_INSPECTION whenever no valid inspection covers the current day. It reads as READY only with a passing inspection dated the current calendar day (lab-local) and performed after the most recent return-to-service, attested by an authorized operator. Readiness is computed, not stored on a schedule; there are no shifts (see ADR 0006).
 
 **Part 19, s.260:** Employer must ensure competent-worker inspections, hazard correction, and records kept at the worksite.
 **System enforcement:** All inspections are stored on SAIT-controlled infrastructure. Records are retrievable on demand. Defect workflow tracks correction status.
 
 **Part 6 (Cranes), Log book rules:** Each entry in an electronic log book must identify the person doing the work.
-**System enforcement:** Every inspection record is cryptographically signed (HMAC) with the operator's authenticated session. Entries cannot be edited after submission; corrections create a new linked record.
+**System enforcement:** Every inspection record carries the operator's authenticated identity, an explicit attestation, and a server timestamp (see ADR 0007). Tamper-evidence comes from the append-only audit chain, which seals a content digest of the record (ADR 0008). Entries cannot be edited after submission; corrections create a new linked record.
 
 **CSA B167 (Overhead Cranes), CSA B335 (Forklift Operator Training):** Operator competency requirements.
 **System enforcement:** User profile stores certification expiry dates. Expired operators are blocked from submitting inspections for the class they are not currently certified for.
@@ -182,8 +182,9 @@ Equipment
   type (enum: OVERHEAD_CRANE, TRUCK, ELECTRIC_PALLET_JACK, FORKLIFT)
   make, model, serial_number
   location (string, e.g., "Bay 3")
-  status (enum: READY, AWAITING_INSPECTION, OUT_OF_SERVICE, RETIRED)
+  status (enum: OUT_OF_SERVICE, RETIRED stored; READY, AWAITING_INSPECTION computed; see ADR 0006)
   current_status_since (timestamp)
+  readiness_baseline_at (timestamp; bumped on return-to-service so a fresh inspection is required)
   manufacturer_specs_url (optional)
   created_at, updated_at
 
@@ -200,7 +201,7 @@ ChecklistTemplate
 ChecklistItem (embedded in template)
   key (string, stable)
   prompt (string)
-  type (enum: BOOLEAN, BOOLEAN_PHOTO_ON_FAIL, MEASUREMENT, TEXT, SIGNATURE)
+  type (enum: BOOLEAN, BOOLEAN_PHOTO_ON_FAIL)
   required (bool)
   fail_severity (enum: BLOCKING, WARNING)
   regulatory_reference (string, optional, e.g., "OHS Part 19 s.257")
@@ -212,10 +213,8 @@ Inspection
   template_id (uuid)
   template_version (int)
   started_at, submitted_at (timestamps)
-  shift_window_id (uuid)
-  result (enum: PASS, FAIL_WARNING, FAIL_BLOCKING)
-  signature_hmac (string)
-  device_fingerprint (string, optional)
+  result (enum: PASS, FAIL_WARNING, FAIL_BLOCKING; derived server-side, never client-sent)
+  attested_at (timestamp; operator confirmed after reviewing answers; see ADR 0007)
 
 InspectionResponse
   id (uuid)
@@ -265,8 +264,8 @@ User (identity managed by Entra ID; shadow table in core_db for joins and certif
 Database-level invariants:
 
 - An Inspection with `result = PASS` cannot exist if any of its responses has `passed = false` and `fail_severity = BLOCKING`.
-- An Equipment status of READY requires a recent passing Inspection within the shift window.
-- AuditEvent rows are insert-only; trigger blocks UPDATE and DELETE.
+- Equipment reads as READY only with a passing Inspection dated the current day (lab-local) and submitted at or after `readiness_baseline_at`, with no open blocking Defect (ADR 0006).
+- AuditEvent, Inspection, and InspectionResponse rows are insert-only; triggers block UPDATE and DELETE (ADR 0008).
 - `notes_source = VOICE_TRANSCRIBED` requires a non-null `voice_clip_id`, and the operator must have had an opportunity to edit (UI enforces this; the value `VOICE_EDITED` records that they did).
 
 ---
@@ -282,14 +281,14 @@ Database-level invariants:
 5. If operator taps dictate: app records up to 30 seconds of audio, shows a waveform, then sends the clip to AI Service via Media Service (audio is stored, transcription returned).
 6. Transcript appears in the notes field. Operator can edit. Final value plus `notes_source` (VOICE_TRANSCRIBED or VOICE_EDITED) is submitted.
 7. Failed items also prompt for photo evidence.
-8. On submit: client-side HMAC signature, submission over HTTPS, server validates, persists Inspection and Responses, writes AuditEvent, evaluates equipment status.
+8. On submit: operator confirms after reviewing a summary of their answers (the attestation). Submission over HTTPS. Server validates, derives the result from the responses and template severities, persists Inspection and Responses and an outbox row in one transaction, then the outbox delivers the AuditEvent to the audit chain (ADR 0008). Server evaluates equipment status.
 9. App displays result: green (READY) or red (OUT_OF_SERVICE with defect ID and lockout instructions).
 
 ### 7.2 Failed Inspection (Defect Path)
 
 1. Submission contains a BLOCKING failure.
 2. Core API creates Defect record, sets Equipment.status to OUT_OF_SERVICE.
-3. Email sent to all Supervisors; push notification to on-shift Supervisors.
+3. Email and a Microsoft Teams message sent to all active Supervisors; the failure is added to the persistent dashboard unresolved-failure queue (ADR 0013, superseding ADR 0010).
 4. Audit Service writes EQUIPMENT_STATUS_CHANGED and DEFECT_OPENED events.
 5. PWA displays a digital lockout tag.
 6. Supervisor reviews defect, assigns to qualified person for repair.
@@ -439,16 +438,16 @@ Controls:
 
 ### 8.8 Threat Model Highlights
 
-| Threat                                                        | Likelihood | Impact | Mitigation                                                                                                                                |
-| ------------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Operator forges a signature to bypass inspection              | Low        | High   | Server-side HMAC validation; session keys short-lived                                                                                     |
-| Manager edits an inspection after the fact                    | Low        | High   | Inspections immutable; corrections are new linked records                                                                                 |
-| QR code is replaced with a malicious one                      | Medium     | Medium | QR contains only non-secret asset_tag; server validates against registry; suspicious scan patterns alert Admin                            |
-| Stolen JWT used from another device                           | Low        | Medium | Short token lifetime, device fingerprint logged                                                                                           |
-| Database backup leaked                                        | Low        | High   | Backups encrypted at rest, transferred over SSH only                                                                                      |
-| Voice clip leak                                               | Low        | High   | Encrypted at rest, 90-day retention, access logged                                                                                        |
-| Supply chain (npm or pip package) compromise                  | Medium     | High   | Lockfile pinning, Trivy, audits                                                                                                           |
-| AI transcript hallucinates a "pass" that masks a real failure | Low        | High   | Operator confirms transcript; transcripts are notes only, never drive pass/fail decisions; pass/fail driven by structured checklist items |
+| Threat                                                        | Likelihood | Impact | Mitigation                                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Operator submits under another identity                       | Low        | High   | Identity is taken from the validated Entra ID token, not the request body; short token lifetime (ADR 0007)                                                                                                                               |
+| Manager edits an inspection after the fact                    | Low        | High   | Inspections immutable (UPDATE/DELETE-blocking trigger); audit chain seals a content digest, so any post-hoc edit is detectable (ADR 0008)                                                                                                |
+| QR code is replaced with a malicious one                      | Medium     | Medium | QR contains only non-secret asset_tag; server validates against registry; suspicious scan patterns alert Admin                                                                                                                           |
+| Stolen JWT used from another device                           | Low        | Medium | Short token lifetime; identity is taken from the validated token (ADR 0007); request IP and User-Agent are captured in ephemeral Azure Monitor access logs for forensics (ADR 0003), never on the immutable Inspection record (ADR 0011) |
+| Database backup leaked                                        | Low        | High   | Backups encrypted at rest, transferred over SSH only                                                                                                                                                                                     |
+| Voice clip leak                                               | Low        | High   | Encrypted at rest, 90-day retention, access logged                                                                                                                                                                                       |
+| Supply chain (npm or pip package) compromise                  | Medium     | High   | Lockfile pinning, Trivy, audits                                                                                                                                                                                                          |
+| AI transcript hallucinates a "pass" that masks a real failure | Low        | High   | Operator confirms transcript; transcripts are notes only, never drive pass/fail decisions; pass/fail driven by structured checklist items                                                                                                |
 
 ---
 
@@ -705,7 +704,7 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 
 - Daily integration testing of merged code
 - Sponsor demos at end of each sprint (Sprint 0 through Sprint 4)
-- The team's "Stephen-is-not-available" recovery drill (Sprint 2)
+- The team's "Stephen-is-not-available" recovery drill (Sprint 2): rebuild the stack on another host, hand over Tailscale tailnet admin, and confirm the second Azure tenant admin can change the Entra app registration
 - Whisper model performance baseline measurements
 
 **What this environment is NOT used for:**
@@ -737,6 +736,7 @@ To accelerate development and avoid waiting on campus IT to provision dev hardwa
 - `.env` files distributed directly between team members (in person or via secure message). Never committed. Gitleaks pre-commit hook prevents accidental commits.
 - On the M5 dev staging host, the `.env` file sits in the project directory, readable only by the deploy user.
 - Entra ID credentials (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`) come from the team-owned personal Azure tenant app registration.
+- The team Azure tenant has at least two administrators (Application Administrator or higher), and the Tailscale tailnet has a second admin, so app-registration changes (API scope, role assignment, secret rotation) and tailnet management survive the owner being unavailable. Rebuilding from Git recovers the host, not these account permissions.
 
 **Backups during dev staging phase:**
 
@@ -821,8 +821,7 @@ CODEOWNERS enforces two-reviewer requirement on:
 
 - `services/audit/`
 - `services/core-api/src/middleware/auth.ts`
-- `services/core-api/src/lib/hmac.ts`
-- `services/core-api/src/domain/inspection.ts`
+- `services/core-api/src/domain/inspection.ts` (attestation, server-side result derivation, outbox enqueue)
 - `db/migrations/`
 
 ### 14.3 Dockerfile Rules (enforced by Hadolint)
@@ -906,12 +905,12 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 
 **Weeks 5 to 6 (June 15 to June 28)**
 
-- Inspection submission endpoint with HMAC validation.
-- Equipment status state machine.
+- Inspection submission endpoint: operator attestation, server-side result derivation (ADR 0007).
+- Equipment status state machine (computed readiness, ADR 0006).
 - Defect entity and workflow. Failed inspection auto-creates Defect and locks equipment.
 - Notifications: SMTP email for failed inspections.
 - Lockout tag screen in PWA.
-- AuditEvent writing (basic, hash chain in Sprint 4).
+- Audit chain spike (pulled forward from Sprint 4): hash chain, transactional outbox, content digest, and a 10,000-event verification test (ADR 0008). Building the hardest cryptographic code early keeps it out of the crowded Sprint 4 and gives a second owner time to learn it.
 
 **Sprint 2 demo:** End-to-end pass and fail flows. Supervisor receives email on failure.
 
@@ -920,7 +919,7 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 **Weeks 7 to 8 (June 29 to July 12)**
 
 - Manager dashboard: live compliance grid, defect inbox, filters, drilldown.
-- Media Service: photo upload and presigned URL download.
+- Media Service: photo upload and SAS URL download.
 - PWA photo capture on failed items.
 - **AI Service deployed**: faster-whisper `small.en` in a Docker container, `/api/v1/ai/transcribe` endpoint, authentication, Azure Blob Storage integration.
 - PWA voice dictation UI: tap-to-record, waveform, transcript display, edit-and-confirm flow.
@@ -930,9 +929,9 @@ Five 2-week sprints, then three 1-week sprints. Sprint demo to sponsor at each e
 
 ### Sprint 4: Audit, Reporting, Hardening, DR Rehearsal
 
-**Weeks 9 to 10 (July 13 to July 26)**
+**Weeks 9 to 10 (July 17 to July 30)**
 
-- Audit Service with hash-chained log writing; chain verification on startup.
+- Audit Service hardening: chain verification on startup and the nightly full-chain job, outbox lag monitoring, defense-in-depth CHECK constraint (the chain, outbox, and content digest themselves are built in the Sprint 2 spike).
 - PDF report generation (PDFKit). Per-inspection PDF and range exports. Signed PDFs.
 - CSV export.
 - Retention policy: 7 years for records, 90 days for raw voice audio (lifecycle job).
@@ -1024,19 +1023,20 @@ Bundled with the source code at handover.
 
 ## 18. Risks and Mitigations
 
-| Risk                                                      | Likelihood | Impact | Mitigation                                                                                                                                                        |
-| --------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sponsor checklist content not finalized in time           | High       | Medium | Lock content by end of Week 4; document explicit decision deadlines                                                                                               |
-| Entra ID personal tenant expires or is misconfigured      | Low        | Low    | Team controls the tenant; renew the M365 dev program subscription or use a personal Azure free account. App registration setup is approximately 30 minutes.       |
-| Team learning curve on MSAL / Entra ID / Docker / Whisper | High       | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration                                                                                    |
-| Real Lab Tech availability for testing                    | Medium     | High   | Schedule test sessions in advance; build a fake-equipment test rig if needed                                                                                      |
-| Scope creep from sponsor                                  | Medium     | High   | Out-of-scope document, change request process, defer to v2                                                                                                        |
-| Whisper accuracy too low to be useful in a loud shop      | Medium     | Medium | Quiet the operator (move 2 metres from equipment to dictate); fallback to typed notes is always available; document accuracy expectations in AI Model Card        |
-| AI Service slows the inspection flow                      | Low        | Medium | Transcription is non-blocking; PWA shows immediate placeholder, transcript fills in when ready; operator can still type while waiting                             |
-| One student leaves the project                            | Low        | High   | Cross-training, every feature has a backup owner                                                                                                                  |
-| Audit chain bug undermines legal value                    | Low        | High   | Code review by 2 students, integration test with 10,000 simulated events that verifies chain                                                                      |
-| Team-owned mini-PC fails or its owner becomes unavailable | Low        | Medium | Everything in Git; any teammate can rebuild the staging stack on their laptop with `docker compose up`; Sprint 2 includes a recovery drill that proves this works |
-| Real Lab Tech data written to team-owned mini-PC          | Low        | High   | No real pilot on team-owned hardware. Sprint 5 uses synthetic data only. A real pilot requires SAIT IT to provision SAIT-controlled infrastructure post-handover. |
+| Risk                                                                                                                                                                                                                          | Likelihood | Impact | Mitigation                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sponsor checklist structure not finalized in time (item severities BLOCKING vs WARNING, required flags, decomposition of vague items, regulatory clause mapping; the paper text being final does not make the template final) | High       | Medium | Build the checklist engine against placeholder templates from the photographed paper sheets so a late sponsor delays data entry, not code; get the sponsor to sign off the severity map in writing by a dated freeze (end of Week 4) with a stated consequence (unlocked items ship as v1 placeholders, changes deferred)                  |
+| Entra ID personal tenant expires or is misconfigured                                                                                                                                                                          | Low        | Low    | Team controls the tenant; renew the M365 dev program subscription or use a personal Azure free account. App registration setup is approximately 30 minutes.                                                                                                                                                                                |
+| Team learning curve on MSAL / Entra ID / Docker / Whisper                                                                                                                                                                     | High       | Medium | Two weeks of guided ramp-up in Sprint 0; pair programming on first integration                                                                                                                                                                                                                                                             |
+| Real Lab Tech availability for testing                                                                                                                                                                                        | Medium     | High   | Schedule test sessions in advance; build a fake-equipment test rig if needed                                                                                                                                                                                                                                                               |
+| Scope creep from sponsor                                                                                                                                                                                                      | Medium     | High   | Out-of-scope document, change request process, defer to v2                                                                                                                                                                                                                                                                                 |
+| Whisper accuracy too low to be useful in a loud shop                                                                                                                                                                          | Medium     | Medium | Quiet the operator (move 2 metres from equipment to dictate); fallback to typed notes is always available; document accuracy expectations in AI Model Card                                                                                                                                                                                 |
+| AI Service slows the inspection flow                                                                                                                                                                                          | Low        | Medium | Transcription is non-blocking; PWA shows immediate placeholder, transcript fills in when ready; operator can still type while waiting                                                                                                                                                                                                      |
+| One student leaves the project                                                                                                                                                                                                | Low        | High   | Cross-training, every feature has a backup owner                                                                                                                                                                                                                                                                                           |
+| Audit chain bug undermines legal value                                                                                                                                                                                        | Low        | High   | Code review by 2 students, integration test with 10,000 simulated events that verifies chain                                                                                                                                                                                                                                               |
+| Team-owned mini-PC hardware fails                                                                                                                                                                                             | Low        | Medium | Everything in Git; data backed up off-host nightly; any teammate rebuilds the staging stack with `docker compose up`; Sprint 2 recovery drill proves this                                                                                                                                                                                  |
+| Mini-PC owner (currently the sole admin) becomes unavailable                                                                                                                                                                  | Low        | Medium | A second admin on the team Azure tenant and the Tailscale tailnet; `.env` and Entra credentials held by at least two members, so app-registration changes (API scope, role assignment, secret rotation), tailnet admin, and deploys survive the owner being away; the Sprint 2 drill exercises credential custody, not just a host rebuild |
+| Real Lab Tech data written to team-owned mini-PC                                                                                                                                                                              | Low        | High   | No real pilot on team-owned hardware. Sprint 5 uses synthetic data only. A real pilot requires SAIT IT to provision SAIT-controlled infrastructure post-handover.                                                                                                                                                                          |
 
 ---
 

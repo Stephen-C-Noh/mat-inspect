@@ -11,7 +11,6 @@ WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
-COPY packages/shared-utils/package.json packages/shared-utils/
 COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
 COPY services/audit/package.json services/audit/

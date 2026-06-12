@@ -65,7 +65,6 @@ services:
       PORT: '3000'
       OTEL_SERVICE_NAME: core-api
       DATABASE_URL: ${CORE_API_DB_URL}
-      HMAC_SECRET: ${HMAC_SECRET}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
@@ -152,11 +151,13 @@ services:
   pwa:
     image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/pwa:${TAG:-latest}
     build:
-      context: ./apps/pwa
+      context: .
+      dockerfile: apps/pwa/Dockerfile
       target: runtime
     environment:
       PORT: '3000'
       APP_NAME: pwa
+      CORE_API_URL: 'http://core-api:3000'
     ports:
       - '3000:3000'
     healthcheck:

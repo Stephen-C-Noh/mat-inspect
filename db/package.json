@@ -1,7 +1,8 @@
 {
-  "name": "@mat-inspect/shared-utils",
+  "name": "@mat-inspect/db",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -14,8 +15,11 @@
     "build": "tsc",
     "type-check": "tsc --noEmit"
   },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.21.0"
+  },
   "devDependencies": {
-    "@types/node": "^25.9.1",
     "typescript": "*"
   }
 }
