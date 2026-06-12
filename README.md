@@ -17,6 +17,22 @@ docker compose up
 Open http://localhost:3000 for the operator PWA.
 Open http://localhost:3001 for the manager dashboard.
 
+### Running one app locally (without Docker)
+
+The Docker stack runs everything together. To iterate on a single app, run
+`npm run dev` from that app's folder. Local dev ports:
+
+| App       | Local dev port |
+| --------- | -------------- |
+| core-api  | 3000           |
+| dashboard | 3001           |
+| pwa       | 3002           |
+
+The PWA uses 3002 locally because core-api holds 3000 and the dashboard holds 3001. These local ports differ from the Docker host ports above, where the PWA
+is on 3000 and core-api sits behind Caddy with no host port. When the PWA gets
+MSAL login (DEV-26), add `http://localhost:3002` as a redirect URI on the app
+registration.
+
 ## New Teammate? Read These in Order
 
 1. [CONTRIBUTING.md](docs/CONTRIBUTING.md) - Git workflow
