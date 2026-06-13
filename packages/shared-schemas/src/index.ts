@@ -27,7 +27,9 @@ export const equipmentSchema = z.object({
   location: z.string().nullable(),
   status: equipmentStatusSchema,
   currentStatusSince: z.string().datetime(),
-  manufacturerSpecsUrl: z.string().url().optional().nullable(),
+  // Read-side stays lenient: the column is free text and one malformed value must not 500
+  // the whole equipment list (DEV-54). URL format is enforced on the write path (DEV-24).
+  manufacturerSpecsUrl: z.string().optional().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
