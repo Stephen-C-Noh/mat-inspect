@@ -20,14 +20,11 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, accounts, router]);
 
-  const handleSignIn = async () => {
+  async function handleSignIn(): Promise<void> {
     try {
-      const result = await instance.loginPopup(loginRequest);
-      instance.setActiveAccount(result.account);
-    } catch {
-      // User cancelled or popup blocked; stay on login page.
-    }
-  };
+      await instance.loginRedirect(loginRequest);
+    } catch {}
+  }
 
   return (
     <main
