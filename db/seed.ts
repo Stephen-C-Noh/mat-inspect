@@ -269,7 +269,7 @@ const TRUCK_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'seat_belts',
-    prompt: 'Seat belts present and functional for all seating positions in use.',
+    prompt: 'Seat belts present and functional.',
     type: 'BOOLEAN',
     required: true,
     failSeverity: 'BLOCKING',
