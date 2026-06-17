@@ -18,6 +18,9 @@ const hasRoleGuard = (preHandler: unknown): boolean => {
 // stronger than a per-request 403, which only protects routes someone remembered
 // to gate.
 export const enforceRoleGating = (
+  // any: FastifyInstance is generic over five type params (server, request, reply, logger,
+  // type provider) that vary by caller. The hook only reads routeOptions, so the concrete
+  // instance type is irrelevant here and pinning it would reject otherwise-valid callers.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   app: FastifyInstance<any, any, any, any, any>,
   opts: { publicRoutes?: Set<string> } = {},

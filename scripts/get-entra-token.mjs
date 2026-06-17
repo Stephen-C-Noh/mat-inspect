@@ -87,7 +87,10 @@ if (!token) {
 const claims = decodeJwt(token);
 console.log('\nAccess token acquired.');
 console.log('  roles:', JSON.stringify(claims.roles ?? null));
-console.log('  aud:  ', claims.aud, claims.aud === clientId ? '(matches client id)' : '(MISMATCH)');
+// Accept both audience shapes: the bare client id (v2 access tokens) and the
+// api://{clientId} App ID URI (v1 style). Either is the correct audience for this API.
+const audMatches = claims.aud === clientId || claims.aud === `api://${clientId}`;
+console.log('  aud:  ', claims.aud, audMatches ? '(matches client id)' : '(MISMATCH)');
 console.log('  iss:  ', claims.iss);
 console.log('  oid:  ', claims.oid);
 console.log('  upn:  ', claims.upn ?? claims.preferred_username);
@@ -121,7 +124,17 @@ if (callBase) {
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       ...(method === 'POST' && { body: JSON.stringify(validChecklist) }),
     });
-    const verdict = res.status === 403 ? 'DENY' : res.status === 401 ? 'UNAUTH' : 'ALLOW';
+    // 401/403 are decided in auth before the handler. 400 means validation rejected the
+    // body before the role check ran, so it is not an allow/deny signal. Anything else
+    // (2xx, or a 5xx from the handler) means the request got past authz.
+    const verdict =
+      res.status === 403
+        ? 'DENY'
+        : res.status === 401
+          ? 'UNAUTH'
+          : res.status === 400
+            ? 'BADREQ (role check not reached)'
+            : 'ALLOW';
     console.log(`  ${method} ${path} -> ${res.status} ${verdict}`);
   }
 }
