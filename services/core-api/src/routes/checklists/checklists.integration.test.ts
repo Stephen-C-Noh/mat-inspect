@@ -114,6 +114,25 @@ describe('checklist templates API', () => {
     expect(res.statusCode).toBe(403);
   });
 
+  // DEV-25 role matrix: POST /checklists is admin-only (requireRole('admin')). Every
+  // other App Role must be denied. The 403 lands in requireRole before any DB work, so
+  // these users need no row. Admin's allow path is proven by the publish tests below.
+  it.each(['operator', 'supervisor', 'manager'])(
+    'denies POST /checklists for the %s App Role with 403',
+    async (role) => {
+      const token = await makeToken(role, `${role}-no-publish-id`);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/checklists',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { equipmentType: 'FORKLIFT', items: forkliftItemsV1 },
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json().title).toBe('FORBIDDEN');
+    },
+  );
+
   it('rejects POST /checklists with no items', async () => {
     const res = await app.inject({
       method: 'POST',

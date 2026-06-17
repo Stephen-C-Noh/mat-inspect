@@ -2,6 +2,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import { HttpError } from './lib/http-error.js';
 import { logger } from './lib/logger.js';
 import { setupZodValidation } from './lib/zod-validation.js';
+import { enforceRoleGating } from './middleware/route-guard.js';
 import { listEquipmentRoute } from './routes/equipment/list.js';
 import { publishChecklistTemplateRoute } from './routes/checklists/publish.js';
 import { activeChecklistTemplateRoute } from './routes/checklists/active.js';
@@ -49,6 +50,10 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
       instance: req.url,
     });
   });
+
+  // Fail closed at boot: every route registered after this must declare a role
+  // (requireRole) or be in the public allowlist, else registration throws (ADR 0014).
+  enforceRoleGating(app);
 
   app.get('/health', async () => ({ status: 'ok', service: 'core-api' }));
 

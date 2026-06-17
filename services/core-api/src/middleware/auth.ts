@@ -55,14 +55,23 @@ export const verifyToken = async (req: FastifyRequest, _reply: FastifyReply): Pr
   }
 };
 
+// Marks a preHandler as a role guard so the boot guard (ADR 0014) can confirm,
+// at registration time, that every non-public route declares a role.
+export const ROLE_GUARD = Symbol.for('mat-inspect.roleGuard');
+
+type RoleGuard = ((req: FastifyRequest, reply: FastifyReply) => Promise<void>) & {
+  [ROLE_GUARD]: true;
+};
+
 // Returns a Fastify preHandler that first calls verifyToken, then checks the role.
 // Usage: preHandler: [requireRole('operator')]
 // Multi-role (any of): preHandler: [requireRole('operator', 'manager')]
-export const requireRole =
-  (...roles: UserRole[]) =>
-  async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+export const requireRole = (...roles: UserRole[]): RoleGuard => {
+  const guard = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await verifyToken(req, reply);
     if (!roles.some((r) => req.user.roles.includes(r))) {
       throw httpError(403, 'FORBIDDEN', `One of these roles is required: ${roles.join(', ')}`);
     }
   };
+  return Object.assign(guard, { [ROLE_GUARD]: true as const });
+};
