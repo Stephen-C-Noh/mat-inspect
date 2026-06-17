@@ -4,6 +4,10 @@ import { logger } from './lib/logger.js';
 import { setupZodValidation } from './lib/zod-validation.js';
 import { registerAuthRouteGuard } from './middleware/auth-route-guard.js';
 import { listEquipmentRoute } from './routes/equipment/list.js';
+import { getEquipmentByTagRoute } from './routes/equipment/get-by-tag.js';
+import { getEquipmentByIdRoute } from './routes/equipment/get-by-id.js';
+import { createEquipmentRoute } from './routes/equipment/create.js';
+import { updateEquipmentRoute } from './routes/equipment/update.js';
 import { publishChecklistTemplateRoute } from './routes/checklists/publish.js';
 import { activeChecklistTemplateRoute } from './routes/checklists/active.js';
 
@@ -58,6 +62,12 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   app.get('/health', async () => ({ status: 'ok', service: 'core-api' }));
 
   await app.register(listEquipmentRoute, { prefix: '/api/v1' });
+  // by-tag is registered before /:id so Fastify's radix router matches the static
+  // "by-tag" segment first and does not capture it as a UUID parameter.
+  await app.register(getEquipmentByTagRoute, { prefix: '/api/v1' });
+  await app.register(getEquipmentByIdRoute, { prefix: '/api/v1' });
+  await app.register(createEquipmentRoute, { prefix: '/api/v1' });
+  await app.register(updateEquipmentRoute, { prefix: '/api/v1' });
   await app.register(publishChecklistTemplateRoute, { prefix: '/api/v1' });
   await app.register(activeChecklistTemplateRoute, { prefix: '/api/v1' });
 

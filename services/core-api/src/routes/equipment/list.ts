@@ -14,6 +14,8 @@ export const listEquipmentRoute: FastifyPluginAsync = async (app) => {
       schema: { response: { 200: z.array(equipmentSchema) } },
     },
     async (req, reply) => {
+      // Cursor pagination is Sprint 2 (out of scope for DEV-24). The fleet is fixed at about
+      // 10 machines, so the full set is returned in one response for now.
       const rows = await db.select().from(equipment);
 
       logger.info(
