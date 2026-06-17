@@ -1,14 +1,8 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { equipment, checklistTemplates } from '@mat-inspect/db';
+import { config } from '../lib/config.js';
 
-const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
-const rawUrl =
-  process.env['DATABASE_URL'] ??
-  process.env['CORE_API_DB_URL']?.replace('@postgres:', `@${localHost}:`);
-
-if (!rawUrl) {
-  throw new Error('DATABASE_URL or CORE_API_DB_URL must be set');
-}
-
-export const db = drizzle(rawUrl);
+// Connection string is resolved and validated centrally (postgres:// shape, docker host
+// rewrite). See config.ts and ADR 0015.
+export const db = drizzle(config().databaseUrl);
 export { equipment, checklistTemplates };

@@ -1,8 +1,11 @@
 import './instrumentation.js';
 import { buildApp } from './app.js';
 import { logger } from './lib/logger.js';
+import { config } from './lib/config.js';
 
-const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
+// instrumentation.js has already validated the environment at this point; config() returns
+// the cached, validated values.
+const PORT = config().port;
 
 const app = await buildApp();
 
