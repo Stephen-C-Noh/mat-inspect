@@ -30,7 +30,8 @@ export const enforceRoleGating = (
     if (publicRoutes.has(routeOptions.url)) return;
     if (hasRoleGuard(routeOptions.preHandler)) return;
     throw new Error(
-      `Route ${routeOptions.method} ${routeOptions.url} declares no role guard and is not in the public allowlist (ADR 0014). ` +
+      `Route ${routeOptions.method} ${routeOptions.url} declares no role guard and is not ` +
+        `in the public allowlist (ADR 0014). ` +
         `Add a requireRole(...) preHandler or add the path to PUBLIC_ROUTES.`,
     );
   });
