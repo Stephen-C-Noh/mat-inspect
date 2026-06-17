@@ -48,5 +48,8 @@
   "overrides": {
     "esbuild": "^0.28.1",
     "postcss": "^8.5.15"
+  },
+  "dependencies": {
+    "html5-qrcode": "^2.3.8"
   }
 }

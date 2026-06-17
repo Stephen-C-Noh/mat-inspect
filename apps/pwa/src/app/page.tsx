@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthGuard } from '@/components/auth-guard';
+import { QrScanner } from '@/components/qr-scanner';
 import { useEquipmentList } from '../hooks/use-equipment';
 import { Card } from '../components/ui/card';
 
@@ -55,6 +56,10 @@ function EquipmentList() {
   return (
     <main className="p-6 bg-slate-50 min-h-screen flex flex-col items-center">
       <h1 className="text-3xl font-bold mb-8 text-slate-800 text-center">Equipment List</h1>
+
+      <section className="mb-8 w-full max-w-sm">
+        <QrScanner />
+      </section>
 
       <div className="flex flex-col gap-4 w-full max-w-5xl">
         {equipmentList?.map((item) => {
