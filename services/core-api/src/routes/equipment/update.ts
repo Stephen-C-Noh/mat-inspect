@@ -25,6 +25,10 @@ export const updateEquipmentRoute: FastifyPluginAsync = async (app) => {
       const { id } = paramsSchema.parse(req.params);
       const body = patchEquipmentSchema.parse(req.body);
 
+      // body holds editable fields only: patchEquipmentSchema is .strict(), so status,
+      // current_status_since, asset_tag, and type cannot reach this .set(). Status stays
+      // under the state machine, asset_tag stays stable for the QR contract (DEV-24 Threat 1).
+      //
       // Drizzle's update().returning() returns an empty array if no row matched the WHERE.
       // We surface that as a 404 rather than a silent no-op.
       const [row] = await db

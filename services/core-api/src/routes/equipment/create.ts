@@ -17,6 +17,9 @@ export const createEquipmentRoute: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const body = createEquipmentSchema.parse(req.body);
 
+      // Pre-check the asset tag so a collision returns a clean 409 problem+json instead of
+      // the 500 a raw unique-constraint violation would surface. The unique index on
+      // asset_tag is the real guard; this check only produces a friendlier error.
       const [existing] = await db
         .select({ id: equipment.id })
         .from(equipment)
@@ -47,6 +50,7 @@ export const createEquipmentRoute: FastifyPluginAsync = async (app) => {
         })
         .returning();
 
+      // insert().returning() always yields the inserted row, so the non-null assertion is safe.
       logger.info(
         { reqId: req.id, userId: req.user.id, equipmentId: row!.id, assetTag: body.assetTag },
         'equipment created',
