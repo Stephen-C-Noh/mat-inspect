@@ -6,9 +6,15 @@ import { AUTH_PREHANDLER } from './auth.js';
 export const PUBLIC_ROUTES = new Set(['/health', '/dev/jwks', '/dev/token']);
 
 const hasRoleGuard = (preHandler: unknown): boolean => {
-  const handlers = Array.isArray(preHandler) ? preHandler : preHandler ? [preHandler] : [];
+  const handlers = Array.isArray(preHandler)
+    ? preHandler
+    : preHandler
+      ? [preHandler]
+      : [];
   return handlers.some(
-    (h): boolean => typeof h === 'function' && (h as Record<symbol, unknown>)[AUTH_PREHANDLER] === true,
+    (h): boolean =>
+      typeof h === 'function' &&
+      (h as Record<symbol, unknown>)[AUTH_PREHANDLER] === true,
   );
 };
 
