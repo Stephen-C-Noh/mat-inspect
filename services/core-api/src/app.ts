@@ -3,6 +3,7 @@ import { HttpError } from './lib/http-error.js';
 import { logger } from './lib/logger.js';
 import { setupZodValidation } from './lib/zod-validation.js';
 import { registerAuthRouteGuard } from './middleware/auth-route-guard.js';
+import { enforceRoleGating } from './middleware/route-guard.js';
 import { listEquipmentRoute } from './routes/equipment/list.js';
 import { publishChecklistTemplateRoute } from './routes/checklists/publish.js';
 import { activeChecklistTemplateRoute } from './routes/checklists/active.js';

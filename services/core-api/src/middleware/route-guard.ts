@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { ROLE_GUARD } from './auth.js';
+import { AUTH_PREHANDLER } from './auth.js';
 
 // Routes that intentionally carry no role guard. /health is an unauthenticated
 // liveness probe; the /dev/* routes are only registered outside production.
@@ -8,7 +8,7 @@ export const PUBLIC_ROUTES = new Set(['/health', '/dev/jwks', '/dev/token']);
 const hasRoleGuard = (preHandler: unknown): boolean => {
   const handlers = Array.isArray(preHandler) ? preHandler : preHandler ? [preHandler] : [];
   return handlers.some(
-    (h): boolean => typeof h === 'function' && (h as Record<symbol, unknown>)[ROLE_GUARD] === true,
+    (h): boolean => typeof h === 'function' && (h as Record<symbol, unknown>)[AUTH_PREHANDLER] === true,
   );
 };
 
