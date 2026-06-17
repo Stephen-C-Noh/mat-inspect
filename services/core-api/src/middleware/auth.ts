@@ -38,6 +38,10 @@ const verifyTokenImpl = async (req: FastifyRequest, _reply: FastifyReply): Promi
   const token = header.slice(7);
 
   try {
+    // ENTRA_* are read live (not from the cached config) so tests can toggle them per case.
+    // config.ts validates them at boot: in production both are required, and a placeholder is
+    // rejected. When genuinely blank, the dev-token fallback applies (issuer/audience checks
+    // are skipped). See ADR 0015.
     const { payload } = await jwtVerify(token, getJwks(), {
       ...(process.env['ENTRA_TENANT_ID'] && {
         issuer: `https://login.microsoftonline.com/${process.env['ENTRA_TENANT_ID']}/v2.0`,
