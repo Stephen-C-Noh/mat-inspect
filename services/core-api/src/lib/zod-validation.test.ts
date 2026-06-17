@@ -50,6 +50,18 @@ describe('setupZodValidation', () => {
     expect(res.body).not.toContain('TOTALLY_NOT_A_STATUS');
   });
 
+  it('returns the list when manufacturerSpecsUrl holds a non-URL string (DEV-54)', async () => {
+    // The DB column manufacturer_specs_url is free text with no URL constraint. A single
+    // legacy or hand-entered non-URL value must not 500 the whole equipment list.
+    const legacy = { ...validEquipment, manufacturerSpecsUrl: 'see binder in Bay 4 cabinet' };
+    const app = await buildTestApp(() => [legacy]);
+
+    const res = await app.inject({ method: 'GET', url: '/equipment' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()[0].manufacturerSpecsUrl).toBe('see binder in Bay 4 cabinet');
+  });
+
   it('strips fields that are not part of the schema', async () => {
     const withExtra = { ...validEquipment, internalSecretColumn: 'do-not-leak' };
     const app = await buildTestApp(() => [withExtra]);

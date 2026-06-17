@@ -154,6 +154,9 @@ services:
       context: .
       dockerfile: apps/pwa/Dockerfile
       target: runtime
+      args:
+        NEXT_PUBLIC_AZURE_TENANT_ID: ${ENTRA_TENANT_ID}
+        NEXT_PUBLIC_AZURE_CLIENT_ID: ${ENTRA_CLIENT_ID}
     environment:
       PORT: '3000'
       APP_NAME: pwa

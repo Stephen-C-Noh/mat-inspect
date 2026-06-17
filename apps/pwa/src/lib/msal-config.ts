@@ -1,4 +1,4 @@
-import type { Configuration, PopupRequest } from '@azure/msal-browser';
+import type { Configuration } from '@azure/msal-browser';
 import type { UserRole } from '@mat-inspect/shared-types';
 
 export const msalConfig: Configuration = {
@@ -14,8 +14,9 @@ export const msalConfig: Configuration = {
   },
 };
 
-export const loginRequest: PopupRequest = {
-  scopes: ['openid', 'profile'],
+// Updated loginRequest to be fully compatible with Redirect flows
+export const loginRequest: { scopes: string[]; prompt: string } = {
+  scopes: ['openid', 'profile', `api://${process.env.NEXT_PUBLIC_AZURE_CLIENT_ID}/access_as_user`],
   prompt: 'select_account',
 };
 
@@ -23,3 +24,10 @@ export const loginRequest: PopupRequest = {
 // values, which are lowercase (see core-api requireRole and shared-types UserRole).
 export const ALLOWED_ROLES = ['operator', 'supervisor'] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
+
+// The specific scope required for the PWA to request an Access Token
+// for the Core API. The backend API must be configured to expose
+// the 'access_as_user' permission and match this Application ID URI.
+export const tokenRequest = {
+  scopes: [`api://${process.env.NEXT_PUBLIC_AZURE_CLIENT_ID}/access_as_user`],
+};

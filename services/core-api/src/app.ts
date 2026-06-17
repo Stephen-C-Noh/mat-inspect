@@ -2,7 +2,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import { HttpError } from './lib/http-error.js';
 import { logger } from './lib/logger.js';
 import { setupZodValidation } from './lib/zod-validation.js';
-import { enforceRoleGating } from './middleware/route-guard.js';
+import { registerAuthRouteGuard } from './middleware/auth-route-guard.js';
 import { listEquipmentRoute } from './routes/equipment/list.js';
 import { publishChecklistTemplateRoute } from './routes/checklists/publish.js';
 import { activeChecklistTemplateRoute } from './routes/checklists/active.js';
@@ -13,6 +13,10 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   // Routes validate requests and serialize responses through their Zod schemas (ADR-aligned:
   // shared-schemas is the single source of truth shared with clients). See DEV-27.
   setupZodValidation(app);
+
+  // Fail-closed: every route registered after this point must declare an auth preHandler
+  // or be in the public allowlist, or the boot crashes (ADR 0014, DEV-25).
+  registerAuthRouteGuard(app);
 
   app.setErrorHandler((err: FastifyError, req, reply) => {
     if (err instanceof HttpError) {

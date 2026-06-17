@@ -71,6 +71,14 @@ A competent human (Lab Tech) who performs the visual Inspection. Alberta OHS s.2
 requires the Inspection be completed by a competent human. The AI is assistive only
 and never decides pass or fail.
 
+## App Role
+
+An authorization role Entra ID issues in the access token `roles` claim. Four exist:
+Operator, Supervisor, Manager, Admin. core-api gates each endpoint on these values; a
+user may hold more than one. Auditor is not an App Role. An Auditor is a reporting
+persona who reads the PDF audit reports built from the Audit Chain; they do not call a
+role-gated endpoint. This was settled in DEV-30.
+
 ## Audit Chain
 
 The append-only, hash-linked log that is the legal record of what happened in the
