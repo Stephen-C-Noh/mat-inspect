@@ -119,12 +119,20 @@ git push origin feature/your-task-name
 
 ### PR Title Format
 
-Same as commit messages:
+Start the title with the JIRA ticket key so JIRA links the PR automatically:
 
 ```
-feat: add voice transcription endpoint to AI service
-fix: prevent duplicate inspection on retry
+DEV-12: short description of change
 ```
+
+**Examples:**
+
+```
+DEV-42: add voice transcription endpoint to AI service
+DEV-58: prevent duplicate inspection on retry
+```
+
+Every PR maps to a JIRA ticket (project `DEV`). GitHub Issues are used only for automated reports (Renovate, security scanners), so they are not referenced in PR titles. Keep the description present tense and under 72 characters.
 
 ### PR Description Template
 
@@ -135,7 +143,7 @@ Brief description of the change.
 
 ## Why is it needed?
 
-Link to FRS section, GitHub issue, or sprint goal.
+Link to FRS section, JIRA ticket, or sprint goal.
 
 ## How to test
 
