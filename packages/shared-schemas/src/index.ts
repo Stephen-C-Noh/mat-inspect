@@ -90,6 +90,51 @@ export const activeChecklistQuerySchema = z.object({
 
 export type ActiveChecklistQuery = z.infer<typeof activeChecklistQuerySchema>;
 
+// Write-side schemas for POST /equipment and PATCH /equipment/:id.
+// manufacturerSpecsUrl is enforced as a URL here (DEV-24); the read schema stays
+// lenient so a malformed value already in the DB does not break the equipment list.
+// .strict() rejects any field not listed here with a 400. status and currentStatusSince
+// are intentionally absent: a new record always starts AWAITING_INSPECTION (OHS s.257), and
+// a client that sends status is told no, loudly, rather than having it silently dropped
+// (threat model DEV-24, Threat 1).
+export const createEquipmentSchema = z
+  .object({
+    assetTag: z.string().min(1),
+    name: z.string().min(1),
+    type: equipmentTypeSchema,
+    make: z.string().min(1).nullable().optional(),
+    model: z.string().min(1).nullable().optional(),
+    serialNumber: z.string().min(1).nullable().optional(),
+    location: z.string().min(1).nullable().optional(),
+    manufacturerSpecsUrl: z.string().url().nullable().optional(),
+  })
+  .strict();
+
+export type CreateEquipment = z.infer<typeof createEquipmentSchema>;
+
+// Status transitions are excluded from PATCH; they go through the state machine (Sprint 2).
+// assetTag and type are also excluded because changing them on an existing record would
+// break the QR scan contract and violate inspection history linkage.
+// .strict() turns this into a hard allowlist: a PATCH body carrying status (or any other
+// field) is rejected with 400, so the readiness gate (OHS s.257) cannot be forced open by
+// a permissive schema (threat model DEV-24, Threat 1). .strict() runs before .refine() so
+// the field-set lock applies before the non-empty check.
+export const patchEquipmentSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    make: z.string().min(1).nullable().optional(),
+    model: z.string().min(1).nullable().optional(),
+    serialNumber: z.string().min(1).nullable().optional(),
+    location: z.string().min(1).nullable().optional(),
+    manufacturerSpecsUrl: z.string().url().nullable().optional(),
+  })
+  .strict()
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'At least one field must be provided',
+  });
+
+export type PatchEquipment = z.infer<typeof patchEquipmentSchema>;
+
 export const inspectionResponseSchema = z.object({
   itemKey: z.string(),
   value: z.unknown(),
