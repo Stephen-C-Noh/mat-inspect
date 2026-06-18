@@ -1,81 +1,86 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useEquipmentLookup } from '../hooks/use-equipment-lookup';
 
-// Component orchestrating camera-based QR detection and inspection-gate logic.
-// Follows mobile-first UI patterns for gloved-operator accessibility.
 export const QrScanner = (): React.ReactElement => {
   const [assetTag, setAssetTag] = useState<string | null>(null);
-  const { data: equipment, error, isLoading } = useEquipmentLookup(assetTag);
+  const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
-  useEffect(() => {
-    scannerRef.current = new Html5QrcodeScanner(
-      'reader',
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      false,
-    );
-    scannerRef.current.render(
-      (decodedText) => {
-        setAssetTag(decodedText);
-        scannerRef.current?.pause();
-      },
-      (_err) => {},
-    );
+  const { data: equipment, error, isLoading } = useEquipmentLookup(assetTag);
 
-    return () => {
-      scannerRef.current?.clear().catch(() => {});
-    };
-  }, []);
+  const startScanner = () => {
+    setIsScanning(true);
+    // Timeout gives the DOM time to render the 'reader' div
+    setTimeout(() => {
+      const scanner = new Html5QrcodeScanner(
+        'reader',
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        true, // Set to TRUE to keep the built-in library UI
+      );
 
-  if (isLoading) return <div className="p-8 text-center">Resolving equipment...</div>;
+      scanner.render(
+        (decodedText) => {
+          const tag = decodedText.trim().split('/').pop() ?? decodedText.trim();
+          setAssetTag(tag.toUpperCase());
+          scanner.clear();
+          setIsScanning(false);
+        },
+        () => {},
+      );
 
-  if (error) {
-    return (
-      <div className="p-6 bg-red-50 border border-red-200 rounded-lg text-center">
-        <p className="text-red-700 font-bold mb-4">
-          {error.message === 'EQUIPMENT_NOT_FOUND' ? 'Equipment not found' : 'Scan failed'}
-        </p>
+      scannerRef.current = scanner;
+    }, 100);
+  };
+
+  return (
+    <div className="flex flex-col items-center w-full max-w-sm p-4 mx-auto">
+      {!isScanning && !equipment && !isLoading && !error && (
         <button
-          onClick={() => {
-            setAssetTag(null);
-            scannerRef.current?.resume();
-          }}
-          className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold"
+          onClick={startScanner}
+          className="w-full max-w-[200px] mx-auto bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 text-lg transition-all"
         >
-          Try Again
+          SCAN QR CODE
         </button>
-      </div>
-    );
-  }
+      )}
 
-  if (equipment) {
-    const isLocked = equipment.status === 'OUT_OF_SERVICE' || equipment.status === 'RETIRED';
-    return (
-      <div className="p-6 bg-white border border-slate-200 rounded-xl shadow-lg w-full max-w-sm">
-        <h2 className="text-xl font-bold text-slate-800 mb-2">{equipment.name}</h2>
-        <p className="text-slate-500 mb-4">
-          {equipment.type} • {equipment.location}
-        </p>
-
-        <div
-          className={`p-4 rounded-lg font-bold text-center mb-6 ${isLocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}
-        >
-          Status: {equipment.status}
-        </div>
-
-        {isLocked ? (
-          <p className="text-red-600 font-bold text-center">Lockout: Cannot start inspection.</p>
-        ) : (
-          <button className="w-full bg-blue-600 text-white py-4 rounded-lg font-bold text-lg">
-            Start Checklist
+      {/* The container where the library injects its UI */}
+      {isScanning && (
+        <div className="w-full">
+          <div id="reader" className="w-full"></div>
+          <button
+            onClick={() => {
+              scannerRef.current?.clear();
+              setIsScanning(false);
+            }}
+            className="mt-4 w-full bg-slate-200 py-4 rounded-xl font-bold hover:bg-slate-300"
+          >
+            Cancel
           </button>
-        )}
-      </div>
-    );
-  }
+        </div>
+      )}
 
-  return <div id="reader" className="w-full max-w-sm"></div>;
+      {isLoading && <p>Resolving...</p>}
+
+      {equipment && (
+        <div className="mt-6 p-6 bg-white border rounded-2xl w-full">
+          <h2 className="text-xl font-bold">{equipment.name}</h2>
+          <div
+            className={`p-4 rounded-xl font-bold text-center mt-4 ${
+              equipment.status === 'AWAITING_INSPECTION'
+                ? 'bg-amber-100 text-amber-800'
+                : 'bg-green-100 text-green-800'
+            }`}
+          >
+            Status: {equipment.status.replace('_', ' ')}
+          </div>
+          <button onClick={() => setAssetTag(null)} className="mt-4 w-full underline">
+            Scan another
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
