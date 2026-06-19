@@ -184,7 +184,8 @@ const OVERHEAD_CRANE_ITEMS: ChecklistItemRecord[] = [
   // --- Operations Check ---
   {
     key: 'all_controls',
-    prompt: 'Each button on the pendant causes the crane to respond as labelled; no unexpected motion.',
+    prompt:
+      'Each button on the pendant causes the crane to respond as labelled; no unexpected motion.',
     type: 'BOOLEAN',
     required: true,
     failSeverity: 'BLOCKING',
@@ -208,7 +209,8 @@ const OVERHEAD_CRANE_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'hoist_limit_switch',
-    prompt: 'Hoist limit switch trips and stops the hoist when the hook is slowly raised to the upper limit.',
+    prompt:
+      'Hoist limit switch trips and stops the hoist when the hook is slowly raised to the upper limit.',
     type: 'BOOLEAN',
     required: true,
     failSeverity: 'BLOCKING',
@@ -238,7 +240,8 @@ const TRUCK_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'windshield_wipers_mirrors',
-    prompt: 'Windshield intact; wipers operational; rearview and exterior mirrors present, clean, and adjusted.',
+    prompt:
+      'Windshield intact; wipers operational; rearview and exterior mirrors present, clean, and adjusted.',
     type: 'BOOLEAN',
     required: true,
     failSeverity: 'WARNING',
@@ -285,7 +288,8 @@ const TRUCK_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'overall_condition',
-    prompt: 'Vehicle free of physical damage (interior and exterior) that affects safe operation; housekeeping acceptable.',
+    prompt:
+      'Vehicle free of physical damage (interior and exterior) that affects safe operation; housekeeping acceptable.',
     type: 'BOOLEAN_PHOTO_ON_FAIL',
     required: true,
     failSeverity: 'WARNING',
@@ -576,7 +580,8 @@ const FORKLIFT_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'rollover_protection',
-    prompt: 'Rollover protection surfaces (if equipped) are free of broken welds, missing bolts, or damaged areas.',
+    prompt:
+      'Rollover protection surfaces (if equipped) are free of broken welds, missing bolts, or damaged areas.',
     type: 'BOOLEAN_PHOTO_ON_FAIL',
     required: false,
     failSeverity: 'BLOCKING',
@@ -616,7 +621,8 @@ const FORKLIFT_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'lift_chain_rollers',
-    prompt: 'Lift chains and rollers are free of wear, damage, rust, or signs that lubricant is required; no unusual noises when moved.',
+    prompt:
+      'Lift chains and rollers are free of wear, damage, rust, or signs that lubricant is required; no unusual noises when moved.',
     type: 'BOOLEAN_PHOTO_ON_FAIL',
     required: true,
     failSeverity: 'BLOCKING',
@@ -624,7 +630,8 @@ const FORKLIFT_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'forks_lock_pins',
-    prompt: 'Forks are free of cracks, bends, wear, or mismatching; no excessive oil or water on blades; locking pins engage fully.',
+    prompt:
+      'Forks are free of cracks, bends, wear, or mismatching; no excessive oil or water on blades; locking pins engage fully.',
     type: 'BOOLEAN_PHOTO_ON_FAIL',
     required: true,
     failSeverity: 'BLOCKING',
@@ -632,7 +639,8 @@ const FORKLIFT_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'fork_retention',
-    prompt: 'Fork stops or load backrest extension are present and prevent forks from sliding off the fork carrier.',
+    prompt:
+      'Fork stops or load backrest extension are present and prevent forks from sliding off the fork carrier.',
     type: 'BOOLEAN',
     required: true,
     failSeverity: 'BLOCKING',
@@ -648,7 +656,8 @@ const FORKLIFT_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'battery_inspection',
-    prompt: 'Battery cell caps, connector, and terminal covers are in place; cable insulation is intact; battery is secure.',
+    prompt:
+      'Battery cell caps, connector, and terminal covers are in place; cable insulation is intact; battery is secure.',
     type: 'BOOLEAN_PHOTO_ON_FAIL',
     required: true,
     failSeverity: 'BLOCKING',
@@ -710,7 +719,8 @@ const FORKLIFT_ITEMS: ChecklistItemRecord[] = [
   },
   {
     key: 'safety_warning_devices',
-    prompt: 'Horn, backup alarm, flashers, and other installed safety/warning devices are in place and working.',
+    prompt:
+      'Horn, backup alarm, flashers, and other installed safety/warning devices are in place and working.',
     type: 'BOOLEAN',
     required: true,
     failSeverity: 'BLOCKING',

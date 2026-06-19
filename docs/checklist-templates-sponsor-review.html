@@ -1,175 +1,709 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>MAT-Inspect Checklist Templates – Sponsor Review</title>
-  <style>
-    body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; margin: 2cm; color: #000; }
-    h1 { font-size: 16pt; color: #1F3864; }
-    h2 { font-size: 13pt; color: #1F3864; margin-top: 28pt; border-bottom: 1pt solid #1F3864; padding-bottom: 4pt; }
-    h3 { font-size: 11pt; color: #2E5496; margin-top: 16pt; margin-bottom: 4pt; }
-    p { margin: 4pt 0 10pt 0; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 14pt; font-size: 10.5pt; }
-    th { background-color: #1F3864; color: #fff; padding: 5pt 8pt; text-align: left; }
-    td { border: 0.5pt solid #AAAAAA; padding: 4pt 8pt; vertical-align: top; }
-    tr:nth-child(even) td { background-color: #F2F2F2; }
-    .blocking { color: #C00000; font-weight: bold; }
-    .warning  { color: #E36C09; font-weight: bold; }
-    .note { font-size: 9.5pt; color: #595959; margin-bottom: 12pt; }
-    .legend { border: 0.5pt solid #AAAAAA; padding: 6pt 10pt; margin: 14pt 0; background: #FFF2CC; font-size: 10pt; }
-    .page-break { page-break-before: always; }
-  </style>
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>MAT-Inspect Checklist Templates – Sponsor Review</title>
+    <style>
+      body {
+        font-family: Calibri, Arial, sans-serif;
+        font-size: 11pt;
+        margin: 2cm;
+        color: #000;
+      }
+      h1 {
+        font-size: 16pt;
+        color: #1f3864;
+      }
+      h2 {
+        font-size: 13pt;
+        color: #1f3864;
+        margin-top: 28pt;
+        border-bottom: 1pt solid #1f3864;
+        padding-bottom: 4pt;
+      }
+      h3 {
+        font-size: 11pt;
+        color: #2e5496;
+        margin-top: 16pt;
+        margin-bottom: 4pt;
+      }
+      p {
+        margin: 4pt 0 10pt 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 14pt;
+        font-size: 10.5pt;
+      }
+      th {
+        background-color: #1f3864;
+        color: #fff;
+        padding: 5pt 8pt;
+        text-align: left;
+      }
+      td {
+        border: 0.5pt solid #aaaaaa;
+        padding: 4pt 8pt;
+        vertical-align: top;
+      }
+      tr:nth-child(even) td {
+        background-color: #f2f2f2;
+      }
+      .blocking {
+        color: #c00000;
+        font-weight: bold;
+      }
+      .warning {
+        color: #e36c09;
+        font-weight: bold;
+      }
+      .note {
+        font-size: 9.5pt;
+        color: #595959;
+        margin-bottom: 12pt;
+      }
+      .legend {
+        border: 0.5pt solid #aaaaaa;
+        padding: 6pt 10pt;
+        margin: 14pt 0;
+        background: #fff2cc;
+        font-size: 10pt;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>MAT-Inspect — Checklist Templates for Sponsor Review</h1>
+    <p>
+      Prepared by the MAT-Inspect capstone team for sponsor approval (DEV-14).<br />
+      Please confirm that the items below match the paper checklists used by operators, then reply
+      with approval so this can be recorded in the project ticket.
+    </p>
 
-<h1>MAT-Inspect — Checklist Templates for Sponsor Review</h1>
-<p>Prepared by the MAT-Inspect capstone team for sponsor approval (DEV-14).<br>
-Please confirm that the items below match the paper checklists used by operators, then reply with approval so this can be recorded in the project ticket.</p>
+    <div class="legend">
+      <strong>Severity key:</strong><br />
+      <span class="blocking">Blocking</span> — equipment must not be operated until the defect is
+      repaired (red status in the app).<br />
+      <span class="warning">Warning</span> — defect is noted and reported to the supervisor, but
+      equipment may continue to operate (yellow status in the app).
+    </div>
 
-<div class="legend">
-  <strong>Severity key:</strong><br>
-  <span class="blocking">Blocking</span> — equipment must not be operated until the defect is repaired (red status in the app).<br>
-  <span class="warning">Warning</span> — defect is noted and reported to the supervisor, but equipment may continue to operate (yellow status in the app).
-</div>
+    <!-- ============================================================ -->
+    <h2>1. Forklift Pre-Operation Inspection Checklist</h2>
+    <p class="note">
+      Source: SAIT Powered Mobile Equipment SOG Appendix A. Applies to all 3 Toyota Electric
+      Forklifts (2 in CB109, 1 in Clayton Carroll). IC engine and LPG items from the generic paper
+      form are excluded because all SAIT units are electric.
+    </p>
 
-<!-- ============================================================ -->
-<h2>1. Forklift Pre-Operation Inspection Checklist</h2>
-<p class="note">Source: SAIT Powered Mobile Equipment SOG Appendix A. Applies to all 3 Toyota Electric Forklifts (2 in CB109, 1 in Clayton Carroll). IC engine and LPG items from the generic paper form are excluded because all SAIT units are electric.</p>
+    <h3>Part A: Key Off (Visual)</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Question / Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>Capacity data plate</td>
+        <td>Is the plate in place and legible?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Overhead guard</td>
+        <td>Are there broken welds, missing bolts, or damaged areas?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Rollover protection surfaces (if equipped)</td>
+        <td>Are there broken welds, missing bolts, or damaged areas?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Hydraulic cylinders</td>
+        <td>Is there leakage or damage in the lift, tilt, or attachment cylinders?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Seat and seatbelt</td>
+        <td>Is the seat secure and does the seatbelt buckle and latch correctly?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Hydraulic fluid level</td>
+        <td>Is the level adequate and are there no visible leaks (if accessible)?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Mast assembly</td>
+        <td>Are there broken welds, cracked or bent areas, or worn/missing stops?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Lift chain and rollers</td>
+        <td>
+          Is there wear, damage, rust, or signs lubricant is needed? Any unusual noises when moved?
+        </td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>Forks and lock pins</td>
+        <td>
+          Are forks cracked, bent, worn, or mismatched? Excessive oil/water on blades? Do locking
+          pins engage?
+        </td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>Fork retention</td>
+        <td>Are fork stops or load backrest present to prevent forks sliding off the carrier?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td>Tires and wheels</td>
+        <td>Are tires and wheels in good condition? Are wheel nuts secure?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td>Battery inspection</td>
+        <td>
+          Are cell caps, connector, and terminal covers in place? Is cable insulation intact? Is
+          battery secure?
+        </td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>13</td>
+        <td>Fluid leaks</td>
+        <td>Are there any fluid leaks visible on the floor beneath the forklift?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>14</td>
+        <td>Cab windows</td>
+        <td>Are windshield and cab windows clean and free of damage affecting visibility?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>15</td>
+        <td>General condition</td>
+        <td>Are there any other visible signs of wear and tear requiring immediate attention?</td>
+        <td class="warning">Warning</td>
+      </tr>
+    </table>
 
-<h3>Part A: Key Off (Visual)</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Question / Criteria</th><th>Severity</th></tr>
-  <tr><td>1</td><td>Capacity data plate</td><td>Is the plate in place and legible?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>2</td><td>Overhead guard</td><td>Are there broken welds, missing bolts, or damaged areas?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>3</td><td>Rollover protection surfaces (if equipped)</td><td>Are there broken welds, missing bolts, or damaged areas?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>4</td><td>Hydraulic cylinders</td><td>Is there leakage or damage in the lift, tilt, or attachment cylinders?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>5</td><td>Seat and seatbelt</td><td>Is the seat secure and does the seatbelt buckle and latch correctly?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>6</td><td>Hydraulic fluid level</td><td>Is the level adequate and are there no visible leaks (if accessible)?</td><td class="warning">Warning</td></tr>
-  <tr><td>7</td><td>Mast assembly</td><td>Are there broken welds, cracked or bent areas, or worn/missing stops?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>8</td><td>Lift chain and rollers</td><td>Is there wear, damage, rust, or signs lubricant is needed? Any unusual noises when moved?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>9</td><td>Forks and lock pins</td><td>Are forks cracked, bent, worn, or mismatched? Excessive oil/water on blades? Do locking pins engage?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>10</td><td>Fork retention</td><td>Are fork stops or load backrest present to prevent forks sliding off the carrier?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>11</td><td>Tires and wheels</td><td>Are tires and wheels in good condition? Are wheel nuts secure?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>12</td><td>Battery inspection</td><td>Are cell caps, connector, and terminal covers in place? Is cable insulation intact? Is battery secure?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>13</td><td>Fluid leaks</td><td>Are there any fluid leaks visible on the floor beneath the forklift?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>14</td><td>Cab windows</td><td>Are windshield and cab windows clean and free of damage affecting visibility?</td><td class="warning">Warning</td></tr>
-  <tr><td>15</td><td>General condition</td><td>Are there any other visible signs of wear and tear requiring immediate attention?</td><td class="warning">Warning</td></tr>
-</table>
+    <h3>Part B: Key On (Operational)</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Question / Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>16</td>
+        <td>Gauges</td>
+        <td>Are all gauges operational and readings within normal range?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>17</td>
+        <td>Steering</td>
+        <td>Is steering operating without unusual noise or excessive free-play?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>18</td>
+        <td>Brakes</td>
+        <td>Are brakes responsive? Does forklift stop in forward and reverse?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>19</td>
+        <td>Parking brake</td>
+        <td>Does parking brake hold the forklift stationary when applied?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>20</td>
+        <td>Safety/warning devices</td>
+        <td>Are horn, backup alarm, flashers, and other safety devices in place and working?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>21</td>
+        <td>Lights (if equipped)</td>
+        <td>Are operating and warning lights functional?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>22</td>
+        <td>Mast operation</td>
+        <td>Do lift and tilt circuits operate smoothly through full range?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>23</td>
+        <td>Operator restraint (if equipped)</td>
+        <td>Is the operator restraint working correctly?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>24</td>
+        <td>Load handling attachments (if equipped)</td>
+        <td>Are attachments free of leaks and properly secured?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>25</td>
+        <td>Additional observations</td>
+        <td>Space for any other notes.</td>
+        <td>—</td>
+      </tr>
+    </table>
 
-<h3>Part B: Key On (Operational)</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Question / Criteria</th><th>Severity</th></tr>
-  <tr><td>16</td><td>Gauges</td><td>Are all gauges operational and readings within normal range?</td><td class="warning">Warning</td></tr>
-  <tr><td>17</td><td>Steering</td><td>Is steering operating without unusual noise or excessive free-play?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>18</td><td>Brakes</td><td>Are brakes responsive? Does forklift stop in forward and reverse?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>19</td><td>Parking brake</td><td>Does parking brake hold the forklift stationary when applied?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>20</td><td>Safety/warning devices</td><td>Are horn, backup alarm, flashers, and other safety devices in place and working?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>21</td><td>Lights (if equipped)</td><td>Are operating and warning lights functional?</td><td class="warning">Warning</td></tr>
-  <tr><td>22</td><td>Mast operation</td><td>Do lift and tilt circuits operate smoothly through full range?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>23</td><td>Operator restraint (if equipped)</td><td>Is the operator restraint working correctly?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>24</td><td>Load handling attachments (if equipped)</td><td>Are attachments free of leaks and properly secured?</td><td class="warning">Warning</td></tr>
-  <tr><td>25</td><td>Additional observations</td><td>Space for any other notes.</td><td>—</td></tr>
-</table>
+    <!-- ============================================================ -->
+    <h2 class="page-break">2. Electric Pallet Jack Daily Checklist</h2>
+    <p class="note">
+      Source: Toyota Electric Pallet Truck Daily Check List #041578. Applies to the 1 Toyota unit in
+      CB109.
+    </p>
 
-<!-- ============================================================ -->
-<h2 class="page-break">2. Electric Pallet Jack Daily Checklist</h2>
-<p class="note">Source: Toyota Electric Pallet Truck Daily Check List #041578. Applies to the 1 Toyota unit in CB109.</p>
+    <h3>Visual Inspection</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>Battery — water level, vent caps, cables</td>
+        <td>Are water level, vent caps, and cables in good condition?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Battery connector</td>
+        <td>Is the connector secure and undamaged?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Key switch</td>
+        <td>Is the key switch present and operational?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Capacity data plate</td>
+        <td>Is the plate present and legible?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Control handle</td>
+        <td>Is the handle undamaged and moving freely through its range?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Safety reversing switch (visual)</td>
+        <td>Is the switch present and undamaged?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Power head</td>
+        <td>Is the power head free of visible damage or fluid leaks?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Drive wheel</td>
+        <td>Is the drive wheel free of damage, flat spots, or embedded debris?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>Stabilizers</td>
+        <td>Are stabilizers present and undamaged?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>Forks (left and right)</td>
+        <td>Are forks free of cracks, bends, or visible damage?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td>Load wheels (left and right)</td>
+        <td>Are load wheels in good condition and spinning freely?</td>
+        <td class="warning">Warning</td>
+      </tr>
+    </table>
 
-<h3>Visual Inspection</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Criteria</th><th>Severity</th></tr>
-  <tr><td>1</td><td>Battery — water level, vent caps, cables</td><td>Are water level, vent caps, and cables in good condition?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>2</td><td>Battery connector</td><td>Is the connector secure and undamaged?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>3</td><td>Key switch</td><td>Is the key switch present and operational?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>4</td><td>Capacity data plate</td><td>Is the plate present and legible?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>5</td><td>Control handle</td><td>Is the handle undamaged and moving freely through its range?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>6</td><td>Safety reversing switch (visual)</td><td>Is the switch present and undamaged?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>7</td><td>Power head</td><td>Is the power head free of visible damage or fluid leaks?</td><td class="warning">Warning</td></tr>
-  <tr><td>8</td><td>Drive wheel</td><td>Is the drive wheel free of damage, flat spots, or embedded debris?</td><td class="warning">Warning</td></tr>
-  <tr><td>9</td><td>Stabilizers</td><td>Are stabilizers present and undamaged?</td><td class="warning">Warning</td></tr>
-  <tr><td>10</td><td>Forks (left and right)</td><td>Are forks free of cracks, bends, or visible damage?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>11</td><td>Load wheels (left and right)</td><td>Are load wheels in good condition and spinning freely?</td><td class="warning">Warning</td></tr>
-</table>
+    <h3>Operational Inspection</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>A</td>
+        <td>Horn</td>
+        <td>Does horn sound when activated?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>B</td>
+        <td>Gauges</td>
+        <td>Are all gauges operational?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>C</td>
+        <td>Lights (if equipped)</td>
+        <td>Are lights functional?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>D</td>
+        <td>Lift/lowering control</td>
+        <td>Does control respond correctly and forks move smoothly?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>E</td>
+        <td>Forward drive and braking</td>
+        <td>Does forward drive engage and brakes stop the unit correctly?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>F</td>
+        <td>Reverse drive and braking</td>
+        <td>Does reverse drive engage and brakes stop the unit correctly?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>G</td>
+        <td>Safety reversing switch (operational)</td>
+        <td>Does switch stop travel immediately when activated?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>H</td>
+        <td>Oil spots on floor</td>
+        <td>Are there oil or fluid spots on the floor beneath the unit after operation?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>I</td>
+        <td>Listen for unusual noise</td>
+        <td>Are there any unusual noises detected during operation?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>K</td>
+        <td>Additional observations</td>
+        <td>Space for any other notes.</td>
+        <td>—</td>
+      </tr>
+    </table>
 
-<h3>Operational Inspection</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Criteria</th><th>Severity</th></tr>
-  <tr><td>A</td><td>Horn</td><td>Does horn sound when activated?</td><td class="warning">Warning</td></tr>
-  <tr><td>B</td><td>Gauges</td><td>Are all gauges operational?</td><td class="warning">Warning</td></tr>
-  <tr><td>C</td><td>Lights (if equipped)</td><td>Are lights functional?</td><td class="warning">Warning</td></tr>
-  <tr><td>D</td><td>Lift/lowering control</td><td>Does control respond correctly and forks move smoothly?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>E</td><td>Forward drive and braking</td><td>Does forward drive engage and brakes stop the unit correctly?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>F</td><td>Reverse drive and braking</td><td>Does reverse drive engage and brakes stop the unit correctly?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>G</td><td>Safety reversing switch (operational)</td><td>Does switch stop travel immediately when activated?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>H</td><td>Oil spots on floor</td><td>Are there oil or fluid spots on the floor beneath the unit after operation?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>I</td><td>Listen for unusual noise</td><td>Are there any unusual noises detected during operation?</td><td class="warning">Warning</td></tr>
-  <tr><td>K</td><td>Additional observations</td><td>Space for any other notes.</td><td>—</td></tr>
-</table>
+    <!-- ============================================================ -->
+    <h2 class="page-break">3. Truck Daily Vehicle Checklist</h2>
+    <p class="note">
+      Source: SAIT Daily Vehicle Checklist. Applies to both the Chevrolet and Ford trucks.
+    </p>
 
-<!-- ============================================================ -->
-<h2 class="page-break">3. Truck Daily Vehicle Checklist</h2>
-<p class="note">Source: SAIT Daily Vehicle Checklist. Applies to both the Chevrolet and Ford trucks.</p>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>Engine oil and coolant levels</td>
+        <td>Are levels within acceptable range? No leaks visible?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Windshield, wipers, and mirrors</td>
+        <td>
+          Is windshield intact? Are wipers operational? Are rearview and exterior mirrors present,
+          clean, and adjusted?
+        </td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Doors and windows</td>
+        <td>Do doors and windows open, close, and seal correctly?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Emergency brake</td>
+        <td>Does the emergency/parking brake hold the vehicle stationary?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Tires including spare</td>
+        <td>Are all tires (including spare) in good condition? Is wear and pressure acceptable?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Seat belts</td>
+        <td>Are seat belts present and functional?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Fluid leaks</td>
+        <td>Does a visual check under the vehicle show no fluid leaks?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Overall condition</td>
+        <td>
+          Is the vehicle free of physical damage affecting safe operation? Is housekeeping
+          acceptable?
+        </td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>Fuel level, gauges, and dash warning lights</td>
+        <td>
+          Is fuel level adequate? Are gauges functional? Are there any active dash warning lights?
+        </td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>Horn</td>
+        <td>Does horn function when activated?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td>Lights</td>
+        <td>Are headlights, tail lights, turn signals, flashers, and warning lights functional?</td>
+        <td class="warning">Warning</td>
+      </tr>
+    </table>
 
-<table>
-  <tr><th>#</th><th>Item</th><th>Criteria</th><th>Severity</th></tr>
-  <tr><td>1</td><td>Engine oil and coolant levels</td><td>Are levels within acceptable range? No leaks visible?</td><td class="warning">Warning</td></tr>
-  <tr><td>2</td><td>Windshield, wipers, and mirrors</td><td>Is windshield intact? Are wipers operational? Are rearview and exterior mirrors present, clean, and adjusted?</td><td class="warning">Warning</td></tr>
-  <tr><td>3</td><td>Doors and windows</td><td>Do doors and windows open, close, and seal correctly?</td><td class="warning">Warning</td></tr>
-  <tr><td>4</td><td>Emergency brake</td><td>Does the emergency/parking brake hold the vehicle stationary?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>5</td><td>Tires including spare</td><td>Are all tires (including spare) in good condition? Is wear and pressure acceptable?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>6</td><td>Seat belts</td><td>Are seat belts present and functional?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>7</td><td>Fluid leaks</td><td>Does a visual check under the vehicle show no fluid leaks?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>8</td><td>Overall condition</td><td>Is the vehicle free of physical damage affecting safe operation? Is housekeeping acceptable?</td><td class="warning">Warning</td></tr>
-  <tr><td>9</td><td>Fuel level, gauges, and dash warning lights</td><td>Is fuel level adequate? Are gauges functional? Are there any active dash warning lights?</td><td class="warning">Warning</td></tr>
-  <tr><td>10</td><td>Horn</td><td>Does horn function when activated?</td><td class="warning">Warning</td></tr>
-  <tr><td>11</td><td>Lights</td><td>Are headlights, tail lights, turn signals, flashers, and warning lights functional?</td><td class="warning">Warning</td></tr>
-</table>
+    <h3>Emergency Equipment</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>a</td>
+        <td>First aid kit</td>
+        <td>Is first aid kit present and stocked?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>b</td>
+        <td>Fire extinguisher</td>
+        <td>Is fire extinguisher present, pin intact, and within service date?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>c</td>
+        <td>Warning reflectors and flares</td>
+        <td>Are warning reflectors and flares present?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>d</td>
+        <td>Flashlight</td>
+        <td>Is flashlight present and functional?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>e</td>
+        <td>Jack, lug wrench, and spare tire</td>
+        <td>Are jack, lug wrench, and spare tire present and usable?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>f</td>
+        <td>Communication device</td>
+        <td>Is a phone or radio present and charged?</td>
+        <td class="warning">Warning</td>
+      </tr>
+    </table>
 
-<h3>Emergency Equipment</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Criteria</th><th>Severity</th></tr>
-  <tr><td>a</td><td>First aid kit</td><td>Is first aid kit present and stocked?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>b</td><td>Fire extinguisher</td><td>Is fire extinguisher present, pin intact, and within service date?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>c</td><td>Warning reflectors and flares</td><td>Are warning reflectors and flares present?</td><td class="warning">Warning</td></tr>
-  <tr><td>d</td><td>Flashlight</td><td>Is flashlight present and functional?</td><td class="warning">Warning</td></tr>
-  <tr><td>e</td><td>Jack, lug wrench, and spare tire</td><td>Are jack, lug wrench, and spare tire present and usable?</td><td class="warning">Warning</td></tr>
-  <tr><td>f</td><td>Communication device</td><td>Is a phone or radio present and charged?</td><td class="warning">Warning</td></tr>
-</table>
+    <h3>Documentation</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>a</td>
+        <td>Insurance card</td>
+        <td>Is insurance card present and valid?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>b</td>
+        <td>Registration and license plate</td>
+        <td>Is registration present? Is license plate intact and clearly visible?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>—</td>
+        <td>Additional observations</td>
+        <td>Space for any other notes.</td>
+        <td>—</td>
+      </tr>
+    </table>
 
-<h3>Documentation</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Criteria</th><th>Severity</th></tr>
-  <tr><td>a</td><td>Insurance card</td><td>Is insurance card present and valid?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>b</td><td>Registration and license plate</td><td>Is registration present? Is license plate intact and clearly visible?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>—</td><td>Additional observations</td><td>Space for any other notes.</td><td>—</td></tr>
-</table>
+    <!-- ============================================================ -->
+    <h2 class="page-break">4. Overhead Crane Pre-Use Checklist</h2>
+    <p class="note">
+      Source: Jenner's Overhead Crane Checklist. Applies to all 4 overhead cranes: TD102 (6 ton,
+      Tappenden/Munck), TD104 (Tappenden/Munck), TD106 (Tappenden/Munck), TF121 (Semi Gantry,
+      R&amp;M Materials).
+    </p>
 
-<!-- ============================================================ -->
-<h2 class="page-break">4. Overhead Crane Pre-Use Checklist</h2>
-<p class="note">Source: Jenner's Overhead Crane Checklist. Applies to all 4 overhead cranes: TD102 (6 ton, Tappenden/Munck), TD104 (Tappenden/Munck), TD106 (Tappenden/Munck), TF121 (Semi Gantry, R&amp;M Materials).</p>
+    <h3>Visual Check</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>Travel areas</td>
+        <td>Are travel areas free and clear of obstructions?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Wheels and trolley rollers</td>
+        <td>Are wheels and trolley rollers properly seated on the rails/beams?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Conductors and collectors</td>
+        <td>Are conductors and collectors free of debris?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Festooned cables</td>
+        <td>Are festooned cables running free and not tangled or damaged?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Wire rope</td>
+        <td>Is wire rope neatly spooled on the drum? Are there no oil leaks or loose parts?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Hook and safety clip</td>
+        <td>Is the hook not sprung and is the safety clip in place?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Control pendant</td>
+        <td>Is the control pendant free of any damage?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Main power shut-off switch</td>
+        <td>Is the main power shut-off switch accessible and turned on?</td>
+        <td class="blocking">Blocking</td>
+      </tr>
+    </table>
 
-<h3>Visual Check</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Criteria</th><th>Severity</th></tr>
-  <tr><td>1</td><td>Travel areas</td><td>Are travel areas free and clear of obstructions?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>2</td><td>Wheels and trolley rollers</td><td>Are wheels and trolley rollers properly seated on the rails/beams?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>3</td><td>Conductors and collectors</td><td>Are conductors and collectors free of debris?</td><td class="warning">Warning</td></tr>
-  <tr><td>4</td><td>Festooned cables</td><td>Are festooned cables running free and not tangled or damaged?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>5</td><td>Wire rope</td><td>Is wire rope neatly spooled on the drum? Are there no oil leaks or loose parts?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>6</td><td>Hook and safety clip</td><td>Is the hook not sprung and is the safety clip in place?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>7</td><td>Control pendant</td><td>Is the control pendant free of any damage?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>8</td><td>Main power shut-off switch</td><td>Is the main power shut-off switch accessible and turned on?</td><td class="blocking">Blocking</td></tr>
-</table>
-
-<h3>Operations Check</h3>
-<table>
-  <tr><th>#</th><th>Item</th><th>Criteria</th><th>Severity</th></tr>
-  <tr><td>1</td><td>All controls</td><td>Does each pendant button cause the crane to respond as labelled with no unexpected motion?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>2</td><td>Signal lights, horn, and proximity sensors</td><td>Are signal lights, horn, and proximity sensors working correctly?</td><td class="warning">Warning</td></tr>
-  <tr><td>3</td><td>Brakes</td><td>Does crane stop smoothly when travel button is released without coasting excessively?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>4</td><td>Hoist limit switch</td><td>Does hoist limit switch trip and stop the hoist when hook is slowly raised to the upper limit?</td><td class="blocking">Blocking</td></tr>
-  <tr><td>—</td><td>Additional observations</td><td>Space for any other notes.</td><td>—</td></tr>
-</table>
-
-</body>
+    <h3>Operations Check</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>Criteria</th>
+        <th>Severity</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>All controls</td>
+        <td>
+          Does each pendant button cause the crane to respond as labelled with no unexpected motion?
+        </td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Signal lights, horn, and proximity sensors</td>
+        <td>Are signal lights, horn, and proximity sensors working correctly?</td>
+        <td class="warning">Warning</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Brakes</td>
+        <td>
+          Does crane stop smoothly when travel button is released without coasting excessively?
+        </td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Hoist limit switch</td>
+        <td>
+          Does hoist limit switch trip and stop the hoist when hook is slowly raised to the upper
+          limit?
+        </td>
+        <td class="blocking">Blocking</td>
+      </tr>
+      <tr>
+        <td>—</td>
+        <td>Additional observations</td>
+        <td>Space for any other notes.</td>
+        <td>—</td>
+      </tr>
+    </table>
+  </body>
 </html>
