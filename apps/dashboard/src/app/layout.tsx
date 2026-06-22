@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { MsalProviderWrapper } from '@/components/msal-provider-wrapper';
+import '@mat-inspect/design-tokens/tokens.css';
 import './globals.css';
 
 export const metadata: Metadata = {

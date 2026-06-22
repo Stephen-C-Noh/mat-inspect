@@ -9,6 +9,7 @@ ARG NODE_VERSION=22
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
+COPY packages/design-tokens/package.json packages/design-tokens/
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-auth/package.json packages/shared-auth/

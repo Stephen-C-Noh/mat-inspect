@@ -20,6 +20,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@mat-inspect/design-tokens/preset": ["../../packages/design-tokens/src/preset"],
       "@mat-inspect/shared-auth": ["../../packages/shared-auth/src"],
       "@mat-inspect/shared-schemas": ["../../packages/shared-schemas/src"],
       "@mat-inspect/shared-types": ["../../packages/shared-types/src"]

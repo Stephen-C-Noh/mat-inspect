@@ -16,6 +16,7 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
+      "@mat-inspect/design-tokens/preset": ["../../packages/design-tokens/src/preset"],
       // Resolve the shared packages from source, not their built dist. The image
       // copies packages/*/src but .dockerignore excludes dist, and the build
       // never runs the package build step (npm ci --ignore-scripts). Without
