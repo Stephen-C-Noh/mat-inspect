@@ -208,6 +208,29 @@ describe('equipment API', () => {
     expect(res.json().title).toBe('EQUIPMENT_ASSET_TAG_CONFLICT');
   });
 
+  // Concurrency: the pre-check select cannot serialize simultaneous creates, so the unique
+  // index is the real guard. Firing the same new tag in parallel must yield exactly one 201
+  // and the rest 409 (never a 500). This exercises the unique-violation catch in create.ts.
+  it('POST /equipment under concurrency returns one 201 and the rest 409, never 500', async () => {
+    const payload = { assetTag: 'MAT-PJ-001', name: 'Pallet Jack 1', type: 'ELECTRIC_PALLET_JACK' };
+
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        app.inject({
+          method: 'POST',
+          url: '/api/v1/equipment',
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload,
+        }),
+      ),
+    );
+
+    const codes = results.map((r) => r.statusCode);
+    expect(codes.filter((c) => c === 201)).toHaveLength(1);
+    expect(codes.filter((c) => c === 409)).toHaveLength(4);
+    expect(codes).not.toContain(500);
+  });
+
   it('POST /equipment rejects a body that fails Zod validation', async () => {
     const res = await app.inject({
       method: 'POST',

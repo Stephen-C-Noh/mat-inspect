@@ -3,6 +3,15 @@
 import { useState, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useEquipmentLookup } from '../hooks/use-equipment-lookup';
+import type { Equipment } from '@mat-inspect/shared-schemas';
+
+// Matches the status palette on the equipment list page: READY green, awaiting yellow,
+// out-of-service red. A binary green/amber split hid OUT_OF_SERVICE behind a green badge.
+const STATUS_THEME: Record<Equipment['status'], string> = {
+  READY: 'bg-green-100 text-green-800',
+  AWAITING_INSPECTION: 'bg-amber-100 text-amber-800',
+  OUT_OF_SERVICE: 'bg-red-100 text-red-800',
+};
 
 export const QrScanner = (): React.ReactElement => {
   const [assetTag, setAssetTag] = useState<string | null>(null);
@@ -68,13 +77,9 @@ export const QrScanner = (): React.ReactElement => {
         <div className="mt-6 p-6 bg-white border rounded-2xl w-full">
           <h2 className="text-xl font-bold">{equipment.name}</h2>
           <div
-            className={`p-4 rounded-xl font-bold text-center mt-4 ${
-              equipment.status === 'AWAITING_INSPECTION'
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-green-100 text-green-800'
-            }`}
+            className={`p-4 rounded-xl font-bold text-center mt-4 ${STATUS_THEME[equipment.status]}`}
           >
-            Status: {equipment.status.replace('_', ' ')}
+            Status: {equipment.status.replaceAll('_', ' ')}
           </div>
           <button onClick={() => setAssetTag(null)} className="mt-4 w-full underline">
             Scan another

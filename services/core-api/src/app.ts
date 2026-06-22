@@ -62,8 +62,11 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   app.get('/health', async () => ({ status: 'ok', service: 'core-api' }));
 
   await app.register(listEquipmentRoute, { prefix: '/api/v1' });
-  // by-tag is registered before /:id so Fastify's radix router matches the static
-  // "by-tag" segment first and does not capture it as a UUID parameter.
+  // Tag lookup lives at /equipment/by-tag/:assetTag. "by-tag" is a static path segment, so
+  // Fastify's radix router prefers it over the /equipment/:id parameter regardless of
+  // registration order; there is no collision to guard against. (Ticket DEV-24 originally
+  // specified /equipment/:asset_tag; the by-tag path avoids the :id vs :asset_tag same-segment
+  // ambiguity. DEV-15 PWA QR scan must resolve against this path.)
   await app.register(getEquipmentByTagRoute, { prefix: '/api/v1' });
   await app.register(getEquipmentByIdRoute, { prefix: '/api/v1' });
   await app.register(createEquipmentRoute, { prefix: '/api/v1' });
