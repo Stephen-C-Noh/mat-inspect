@@ -11,6 +11,7 @@ const STATUS_THEME: Record<Equipment['status'], string> = {
   READY: 'bg-green-100 text-green-800',
   AWAITING_INSPECTION: 'bg-amber-100 text-amber-800',
   OUT_OF_SERVICE: 'bg-red-100 text-red-800',
+  RETIRED: 'bg-slate-200 text-slate-700',
 };
 
 export const QrScanner = (): React.ReactElement => {
