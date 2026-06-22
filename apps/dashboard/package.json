@@ -12,6 +12,7 @@
   "dependencies": {
     "@azure/msal-browser": "^3.28.0",
     "@azure/msal-react": "^2.2.0",
+    "@mat-inspect/design-tokens": "^0.0.0",
     "@mat-inspect/shared-auth": "^0.0.0",
     "@mat-inspect/shared-types": "^0.0.0",
     "next": "^15.3.3",

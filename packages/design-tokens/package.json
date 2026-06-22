@@ -1,0 +1,10 @@
+{
+  "name": "@mat-inspect/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./preset": "./src/preset.ts",
+    "./tokens.css": "./src/tokens.css"
+  }
+}

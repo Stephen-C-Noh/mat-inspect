@@ -1,0 +1,46 @@
+/*
+ * MAT-Inspect design tokens.
+ *
+ * Single source of truth for color, radius, shadow, and type primitives.
+ * Values come from the Figma design system (file 6Mn2bNg04bElelCLE69ilK).
+ * Tailwind reads these through @mat-inspect/design-tokens/preset.
+ *
+ * Colors are stored as HSL channel values without the hsl() wrapper. The
+ * preset wraps them as hsl(var(--token) / <alpha-value>) so opacity modifiers
+ * like bg-primary/50 work.
+ */
+:root {
+  color-scheme: light;
+
+  /* Brand */
+  --primary: 206 100% 26%; /* #004D87  headers, primary buttons */
+  --primary-foreground: 0 0% 100%;
+  --accent: 206 100% 38%; /* #006FC3  secondary action (QR scan) */
+  --accent-foreground: 0 0% 100%;
+
+  /* Status (inspection outcomes) */
+  --success: 108 44% 43%; /* #529E3E  pass / compliant */
+  --success-foreground: 0 0% 100%;
+  --success-border: 108 35% 49%; /* #64AA52  pass-card outline */
+  --destructive: 0 67% 48%; /* #CC2929  fail / blocking */
+  --destructive-foreground: 0 0% 100%;
+  --warning: 32 93% 49%; /* #F28509  override / warning */
+  --warning-foreground: 0 0% 100%;
+
+  /* Surfaces */
+  --background: 0 0% 100%; /* white page/card surface */
+  --foreground: 0 0% 0%; /* primary text */
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 0%;
+  --muted: 240 24% 96%; /* #F2F2F7  grouped/input background */
+  --muted-foreground: 0 0% 46%; /* #767676  placeholder / secondary text */
+  --border: 0 0% 85%; /* #D9D9D9 */
+  --input: 0 0% 85%;
+  --ring: 206 100% 38%; /* focus ring = action blue */
+
+  /* Radius: cards 2px (sm), buttons/pills 6px (lg) */
+  --radius: 6px;
+
+  /* Elevation */
+  --shadow-card: 0 4px 4px 0 rgb(0 0 0 / 0.25);
+}
