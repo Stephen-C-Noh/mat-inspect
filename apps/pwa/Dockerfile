@@ -23,6 +23,10 @@ ARG NEXT_PUBLIC_AZURE_TENANT_ID
 ARG NEXT_PUBLIC_AZURE_CLIENT_ID
 ENV NEXT_PUBLIC_AZURE_TENANT_ID=$NEXT_PUBLIC_AZURE_TENANT_ID
 ENV NEXT_PUBLIC_AZURE_CLIENT_ID=$NEXT_PUBLIC_AZURE_CLIENT_ID
+# next.config rewrites() bakes the /api/v1 proxy destination into routes-manifest.json
+# at build time, so CORE_API_URL must be present here, not just at runtime.
+ARG CORE_API_URL
+ENV CORE_API_URL=$CORE_API_URL
 RUN npm run build --workspace=@mat-inspect/pwa
 
 FROM node:${NODE_VERSION}-alpine AS runtime
