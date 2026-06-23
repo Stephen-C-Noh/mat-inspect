@@ -94,6 +94,14 @@ export const QrScanScreen = ({ onResolved }: Props): React.ReactElement => {
     if (tag) setAssetTag(tag);
   };
 
+  // Restart the live feed after a scan that did not resolve (or a denied prompt).
+  // Clear the prior tag so the stale not-found message goes away and re-scanning the
+  // same tag re-triggers the lookup.
+  const rescan = useCallback(() => {
+    setAssetTag(null);
+    void startCamera();
+  }, [startCamera]);
+
   const notFound = error?.message === 'EQUIPMENT_NOT_FOUND';
 
   return (
@@ -129,7 +137,7 @@ export const QrScanScreen = ({ onResolved }: Props): React.ReactElement => {
             </p>
             <button
               type="button"
-              onClick={() => void startCamera()}
+              onClick={rescan}
               className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-semibold text-accent-foreground hover:opacity-90"
             >
               <RefreshIcon className="size-[18px]" />
@@ -141,6 +149,23 @@ export const QrScanScreen = ({ onResolved }: Props): React.ReactElement => {
         {cameraState === 'starting' && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-white/70">
             Starting camera...
+          </div>
+        )}
+
+        {/* Camera stops on a successful scan; a resolved tag navigates away. If the tag
+            did not resolve (unknown/misscan), the feed is paused with no live view, so
+            offer a restart instead of stranding the operator on manual entry. */}
+        {cameraState === 'idle' && assetTag !== null && !equipment && !isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center text-white">
+            <p className="text-sm">Camera paused.</p>
+            <button
+              type="button"
+              onClick={rescan}
+              className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-semibold text-accent-foreground hover:opacity-90"
+            >
+              <RefreshIcon className="size-[18px]" />
+              Scan Again
+            </button>
           </div>
         )}
       </section>
@@ -185,7 +210,7 @@ export const QrScanScreen = ({ onResolved }: Props): React.ReactElement => {
             id="manual-tag"
             value={manual}
             onChange={(e) => setManual(e.target.value)}
-            placeholder="e.g. SAIT-FL-03"
+            placeholder="e.g. MAT-FL-001"
             autoCapitalize="characters"
             className="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />

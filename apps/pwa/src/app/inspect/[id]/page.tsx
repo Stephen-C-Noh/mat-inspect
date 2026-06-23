@@ -88,6 +88,6 @@ const Detail = ({
 }): React.ReactElement => (
   <div className="flex flex-col">
     <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
-    <dd className="font-medium text-foreground">{value ?? '—'}</dd>
+    <dd className="font-medium text-foreground">{value ?? '-'}</dd>
   </div>
 );
