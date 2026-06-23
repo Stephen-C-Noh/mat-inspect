@@ -11,7 +11,7 @@ export const TopBar = function (): ReactElement | null {
   if (!activeAccount) return null;
 
   return (
-    // This now matches your Figma blue theme
+    // updated header to match the figma ui design
     <header className="bg-[#004C8A] text-white p-4 flex items-center justify-between w-full">
       <div className="flex items-center gap-3">
         <div className="bg-white p-1 rounded font-bold text-[#004C8A] text-xs text-center">
