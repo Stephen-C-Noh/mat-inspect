@@ -2,37 +2,28 @@
 
 import { useMsal } from '@azure/msal-react';
 import type { ReactElement } from 'react';
+import { Bell, User } from 'lucide-react';
 
 export const TopBar = function (): ReactElement | null {
-  const { instance, accounts } = useMsal();
+  const { accounts } = useMsal();
   const activeAccount = accounts[0];
 
-  const handleSignOut = async function (): Promise<void> {
-    try {
-      await instance.logoutRedirect();
-    } catch {
-      // Swallowed error to satisfy lint rules
-    }
-  };
-
-  // No session means the login screen (or pre-redirect flash on a guarded route),
-  // where app chrome and a Sign Out button do not belong. /unauthorized still has
-  // an account, so the bar stays and the user can sign out from there.
   if (!activeAccount) return null;
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
-      <div className="font-bold text-gray-900">MAT-Inspect</div>
-      <div className="flex items-center gap-4">
-        <div className="text-right">
-          <p className="text-sm font-medium text-gray-900">{activeAccount.name}</p>
+    // This now matches your Figma blue theme
+    <header className="bg-[#004C8A] text-white p-4 flex items-center justify-between w-full">
+      <div className="flex items-center gap-3">
+        <div className="bg-white p-1 rounded font-bold text-[#004C8A] text-xs text-center">
+          <span className="block text-[10px] text-red-600">SAIT</span>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="rounded bg-red-50 px-3 py-1 text-sm text-red-600 hover:bg-red-100"
-        >
-          Sign Out
-        </button>
+        <h1 className="font-bold text-lg tracking-wide">MAT SCHOOL</h1>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <span className="text-sm font-medium">{activeAccount.name}</span>
+        <Bell className="w-5 h-5 cursor-pointer" />
+        <User className="w-6 h-6 bg-[#003865] p-1 rounded-full cursor-pointer" />
       </div>
     </header>
   );

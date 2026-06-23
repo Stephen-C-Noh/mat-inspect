@@ -1,109 +1,172 @@
 'use client';
 
+import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { AuthGuard } from '@/components/auth-guard';
-import { QrScanner } from '@/components/qr-scanner';
 import { useEquipmentList } from '../hooks/use-equipment';
-import { Card } from '../components/ui/card';
+import {
+  Search,
+  ChevronRight,
+  LayoutDashboard,
+  History,
+  Settings,
+  HelpCircle,
+  QrCode,
+  Forklift,
+  Truck,
+  Construction,
+  Package,
+  LucideIcon,
+  Wrench,
+} from 'lucide-react';
 
-// Maps equipment status to a color theme so the operator can read equipment state at a glance.
-const getThemeByStatus = (status: string) => {
-  switch (status) {
-    case 'READY':
-      return {
-        card: 'bg-green-50 border-green-200',
-        badge: 'bg-green-200 text-green-900 border-green-300 shadow-sm',
-      };
-    case 'AWAITING_INSPECTION':
-      return {
-        card: 'bg-yellow-50 border-yellow-200',
-        badge: 'bg-yellow-200 text-yellow-900 border-yellow-300 shadow-sm',
-      };
-    case 'OUT_OF_SERVICE':
-      return {
-        card: 'bg-red-50 border-red-200',
-        badge: 'bg-red-200 text-red-900 border-red-300 shadow-sm',
-      };
-    case 'RETIRED':
-      return {
-        card: 'bg-slate-50 border-slate-200',
-        badge: 'bg-slate-200 text-slate-800 border-slate-300 shadow-sm',
-      };
-    default:
-      return {
-        card: 'bg-white border-slate-200',
-        badge: 'bg-slate-100 text-slate-600 border-slate-200',
-      };
-  }
-};
+// Helper to pick the right icon based on what the equipment is called
+function EquipmentIcon({ name }: { name: string }) {
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('forklift')) return <Forklift className="w-6 h-6 text-blue-600" />;
+  if (lowerName.includes('truck')) return <Truck className="w-6 h-6 text-blue-600" />;
+  if (lowerName.includes('crane')) return <Construction className="w-6 h-6 text-blue-600" />;
+  if (lowerName.includes('pallet')) return <Package className="w-6 h-6 text-blue-600" />;
+  return <Wrench className="w-6 h-6 text-blue-600" />; // Default icon for everything else
+}
 
-function InfoItem({ label, value }: { label: string; value: string | null | undefined }) {
+function LandingPageContent() {
+  const { data: equipmentList, isLoading } = useEquipmentList();
+  const [searchTerm, setSearchTerm] = useState(''); // Keeps track of what the user is typing
+  const [showAll, setShowAll] = useState(false); // Toggles between "top 3" and "full list"
+
+  // This part filters the list while the user types, then sorts by newest first
+  const filteredAndSorted = useMemo(() => {
+    if (!equipmentList) return [];
+
+    return (
+      equipmentList
+        .filter(
+          (item) =>
+            item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.assetTag?.toLowerCase().includes(searchTerm.toLowerCase()),
+        )
+        // Sorts by 'updatedAt' so the most recently changed equipment is always at the top
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    );
+  }, [equipmentList, searchTerm]);
+
+  // Only show 3 items by default, or all of them if the user clicks "View All"
+  const displayedEquipment = showAll ? filteredAndSorted : filteredAndSorted.slice(0, 3);
+
   return (
-    <div className="flex flex-col">
-      <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold">{label}</span>
-      <span className="text-sm font-semibold text-slate-700 truncate">{value ?? '—'}</span>
-    </div>
+    <main className="min-h-screen bg-gray-50 flex justify-center py-6 px-4 md:py-10">
+      <div className="w-full max-w-lg space-y-8">
+        {/* Top greeting and instructions */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-extrabold text-gray-900">Site Inspection</h2>
+          <p className="text-base text-gray-500 mt-2">Select equipment to begin a new check</p>
+        </div>
+
+        {/* Scan QR code button */}
+        <div className="mt-6">
+          <Link href="/scan" className="w-full">
+            <button className="w-full bg-[#0066CC] hover:bg-[#0052a3] text-white py-4 px-4 rounded-xl shadow-sm border border-blue-700 flex items-center justify-center gap-2 transition-all">
+              <div className="bg-white/20 p-1.5 rounded-md">
+                <QrCode className="w-5 h-5 text-white" />
+              </div>
+              <span className="font-bold text-sm tracking-wide">SCAN QR CODE</span>
+            </button>
+          </Link>
+        </div>
+
+        {/* Input box for finding specific equipment */}
+        <div className="relative mt-8">
+          <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by Equipment ID, Name or Tag"
+            className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-200 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-base"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        {/* The main list container */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="font-semibold text-gray-700 text-sm">RECENTLY INSPECTED</h3>
+            {filteredAndSorted.length > 3 && (
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className="text-sm font-bold text-blue-600 hover:text-blue-800"
+              >
+                {showAll ? 'Show Less' : 'View All'}
+              </button>
+            )}
+          </div>
+
+          {/* Show a message if we are still waiting for the list to load */}
+          {isLoading && <p className="p-8 text-center text-sm">Loading...</p>}
+
+          {/* message if the user types something that doesn't exist */}
+          {!isLoading && filteredAndSorted.length === 0 && (
+            <div className="p-8 text-center">
+              <p className="text-gray-500 text-sm">No equipment found matching "{searchTerm}"</p>
+              <button
+                onClick={() => setSearchTerm('')}
+                className="mt-2 text-blue-600 text-xs font-bold underline"
+              >
+                Clear search
+              </button>
+            </div>
+          )}
+
+          {/* Mapping through the filtered list to show each item */}
+          <div className="divide-y divide-gray-100">
+            {displayedEquipment.map((item) => (
+              <div
+                key={item.id}
+                className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="bg-blue-50 w-12 h-12 rounded-lg flex items-center justify-center">
+                    <EquipmentIcon name={item.name} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-base text-gray-900">{item.name}</h4>
+                    <p className="text-sm text-gray-500">
+                      {item.location} • {item.assetTag}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer menu for navigation */}
+        <div className="grid grid-cols-2 gap-4">
+          <NavButton icon={LayoutDashboard} label="Dashboard" />
+          <NavButton icon={History} label="History" />
+          <NavButton icon={Settings} label="Settings" />
+          <NavButton icon={HelpCircle} label="Help Center" />
+        </div>
+      </div>
+    </main>
   );
 }
 
-// Data fetching lives here so the equipment query only fires once AuthGuard has
-// confirmed the operator is authenticated and authorized.
-function EquipmentList() {
-  const { data: equipmentList, isLoading, error } = useEquipmentList();
-
-  if (isLoading) return <div className="p-8 text-center">Loading equipment list...</div>;
-  if (error) return <div className="p-8 text-red-600 text-center">Error loading data.</div>;
-
+// Simple button component for the bottom nav
+function NavButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
-    <main className="p-6 bg-slate-50 min-h-screen flex flex-col items-center">
-      <h1 className="text-3xl font-bold mb-8 text-slate-800 text-center">Equipment List</h1>
-
-      <section className="mb-8 w-full max-w-sm">
-        <QrScanner />
-      </section>
-
-      <div className="flex flex-col gap-4 w-full max-w-5xl">
-        {equipmentList?.map((item) => {
-          const theme = getThemeByStatus(item.status);
-
-          return (
-            <Card
-              key={item.id}
-              className={`w-full flex flex-col md:flex-row items-center justify-between p-4 transition-all
-                  border-2 shadow-sm hover:shadow-md ${theme.card}`}
-            >
-              <div className="w-full md:w-1/4 mb-3 md:mb-0">
-                <h2 className="text-lg font-bold text-slate-900 leading-tight">{item.name}</h2>
-                <span className="text-xs font-mono bg-white/50 text-slate-500 px-1.5 py-0.5 rounded border border-black/5">
-                  {item.assetTag}
-                </span>
-              </div>
-
-              <div className="w-full md:w-2/4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <InfoItem label="Type" value={item.type} />
-                <InfoItem label="Make" value={item.make} />
-                <InfoItem label="Model" value={item.model} />
-                <InfoItem label="Loc" value={item.location} />
-              </div>
-
-              <div className="w-full md:w-1/4 mt-4 md:mt-0 flex justify-end">
-                <span
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide border ${theme.badge}`}
-                >
-                  {item.status}
-                </span>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-    </main>
+    <button className="flex items-center justify-center gap-2 bg-white py-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all font-semibold text-sm">
+      <Icon className="w-5 h-5 text-blue-600" /> {label}
+    </button>
   );
 }
 
 export default function EquipmentPage() {
   return (
     <AuthGuard>
-      <EquipmentList />
+      <LandingPageContent />
     </AuthGuard>
   );
 }
