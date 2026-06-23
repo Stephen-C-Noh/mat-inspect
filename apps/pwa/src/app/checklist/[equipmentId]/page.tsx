@@ -1,0 +1,105 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import { useMemo, useState, type ReactElement } from 'react';
+import { AuthGuard } from '@/components/auth-guard';
+import { useEquipmentList } from '@/hooks/use-equipment';
+import { useActiveChecklist } from '@/hooks/use-active-checklist';
+import { ChecklistItemCard } from '@/components/checklist/checklist-item-card';
+import { InspectionProgressCard } from '@/components/checklist/inspection-progress-card';
+import {
+  requiredItemsAnswered,
+  answeredCount,
+  type ChecklistAnswer,
+} from '@/lib/checklist-answers';
+
+function ChecklistView(): ReactElement {
+  const params = useParams<{ equipmentId: string }>();
+
+  const {
+    data: equipmentList,
+    isLoading: equipmentLoading,
+    error: equipmentError,
+  } = useEquipmentList();
+
+  const equipment = useMemo(
+    () => equipmentList?.find((candidate) => candidate.id === params.equipmentId),
+    [equipmentList, params.equipmentId],
+  );
+
+  const {
+    data: template,
+    isLoading: checklistLoading,
+    error: checklistError,
+  } = useActiveChecklist(equipment?.type);
+
+  const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  if (equipmentLoading) return <div className="p-8 text-center">Loading equipment...</div>;
+  if (equipmentError)
+    return <div className="p-8 text-center text-red-600">Error loading equipment.</div>;
+  if (!equipment) return <div className="p-8 text-center text-red-600">Equipment not found.</div>;
+
+  if (checklistLoading) return <div className="p-8 text-center">Loading checklist...</div>;
+  if (checklistError)
+    return (
+      <div className="p-8 text-center text-red-600">
+        No active checklist for this equipment type.
+      </div>
+    );
+  if (!template) return <></>;
+
+  const canSubmit = requiredItemsAnswered(template.items, answers);
+  const answered = answeredCount(template.items, answers);
+
+  return (
+    <main className="min-h-screen bg-slate-50 p-4 pb-28">
+      <div className="mx-auto flex max-w-xl flex-col gap-4">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <h1 className="text-2xl font-extrabold text-slate-900">{equipment.name} Inspection</h1>
+            <span className="rounded-full border border-green-300 bg-green-100 px-3 py-1 text-xs font-bold text-green-800">
+              {template.isActive ? 'ACTIVE' : 'INACTIVE'}
+            </span>
+          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            Safety Compliance Log
+          </p>
+        </div>
+
+        <InspectionProgressCard answered={answered} total={template.items.length} />
+
+        {template.items.map((item) => (
+          <ChecklistItemCard
+            key={item.key}
+            item={item}
+            answer={answers[item.key]}
+            notes={notes[item.key] ?? ''}
+            onAnswerChange={(answer) => setAnswers((prev) => ({ ...prev, [item.key]: answer }))}
+            onNotesChange={(value) => setNotes((prev) => ({ ...prev, [item.key]: value }))}
+          />
+        ))}
+
+        <button
+          type="button"
+          disabled={!canSubmit}
+          title={canSubmit ? undefined : 'Answer all required items to submit'}
+          className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-2xl py-4 text-base font-bold text-white shadow-lg ${
+            canSubmit ? 'bg-blue-600' : 'cursor-not-allowed bg-slate-300'
+          }`}
+        >
+          Submit Inspection
+        </button>
+      </div>
+    </main>
+  );
+}
+
+export default function ChecklistPage(): ReactElement {
+  return (
+    <AuthGuard>
+      <ChecklistView />
+    </AuthGuard>
+  );
+}

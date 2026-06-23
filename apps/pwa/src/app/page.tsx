@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { AuthGuard } from '@/components/auth-guard';
 import { QrScanner } from '@/components/qr-scanner';
 import { useEquipmentList } from '../hooks/use-equipment';
@@ -85,12 +86,18 @@ function EquipmentList() {
                 <InfoItem label="Loc" value={item.location} />
               </div>
 
-              <div className="w-full md:w-1/4 mt-4 md:mt-0 flex justify-end">
+              <div className="w-full md:w-1/4 mt-4 md:mt-0 flex justify-end items-center gap-3">
                 <span
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide border ${theme.badge}`}
                 >
                   {item.status}
                 </span>
+                <Link
+                  href={`/checklist/${item.id}`}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white"
+                >
+                  Inspect
+                </Link>
               </div>
             </Card>
           );
