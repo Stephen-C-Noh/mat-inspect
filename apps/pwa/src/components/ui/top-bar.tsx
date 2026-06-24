@@ -11,10 +11,9 @@ export const TopBar = function (): ReactElement | null {
   if (!activeAccount) return null;
 
   return (
-    // This now matches your Figma blue theme
-    <header className="bg-[#004C8A] text-white p-4 flex items-center justify-between w-full">
+    <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
       <div className="flex items-center gap-3">
-        <div className="bg-white p-1 rounded font-bold text-[#004C8A] text-xs text-center">
+        <div className="bg-card p-1 rounded font-bold text-primary text-xs text-center">
           <span className="block text-[10px] text-red-600">SAIT</span>
         </div>
         <h1 className="font-bold text-lg tracking-wide">MAT SCHOOL</h1>
@@ -22,8 +21,9 @@ export const TopBar = function (): ReactElement | null {
 
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium">{activeAccount.name}</span>
-        <Bell className="w-5 h-5 cursor-pointer" />
-        <User className="w-6 h-6 bg-[#003865] p-1 rounded-full cursor-pointer" />
+        <Bell className="size-6 cursor-pointer" />
+        {/* TODO: Flagged - Replace with 'darker-primary' token once defined */}
+        <User className="size-6 bg-muted-foreground p-1 rounded-full cursor-pointer" />
       </div>
     </header>
   );
