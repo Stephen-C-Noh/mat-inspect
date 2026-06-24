@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { AuthGuard } from '@/components/auth-guard';
-import { QrScanner } from '@/components/qr-scanner';
 import { useEquipmentList } from '../hooks/use-equipment';
 import { Card } from '../components/ui/card';
+import { QrCodeIcon } from '../components/ui/icons';
 
 // Maps equipment status to a color theme so the operator can read equipment state at a glance.
 const getThemeByStatus = (status: string) => {
@@ -59,7 +59,13 @@ function EquipmentList() {
       <h1 className="text-3xl font-bold mb-8 text-slate-800 text-center">Equipment List</h1>
 
       <section className="mb-8 w-full max-w-sm">
-        <QrScanner />
+        <Link
+          href="/scan"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-4 text-lg font-semibold text-accent-foreground shadow-sm hover:opacity-90"
+        >
+          <QrCodeIcon className="size-6" />
+          Scan Equipment QR Code
+        </Link>
       </section>
 
       <div className="flex flex-col gap-4 w-full max-w-5xl">
