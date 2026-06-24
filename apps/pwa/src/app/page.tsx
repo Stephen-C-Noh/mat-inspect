@@ -94,7 +94,7 @@ function EquipmentList() {
                 </span>
                 <Link
                   href={`/checklist/${item.id}`}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white"
+                  className="rounded-lg bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-accent-foreground"
                 >
                   Inspect
                 </Link>

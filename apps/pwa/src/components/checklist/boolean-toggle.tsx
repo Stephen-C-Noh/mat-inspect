@@ -16,8 +16,10 @@ export const BooleanToggle = ({ passed, onChange }: Props): ReactElement => (
       type="button"
       onClick={() => onChange(false)}
       aria-pressed={passed === false}
-      className={`rounded-xl py-4 text-base font-bold transition-colors ${
-        passed === false ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'
+      className={`rounded-lg py-4 text-base font-bold transition-colors ${
+        passed === false
+          ? 'bg-destructive text-destructive-foreground'
+          : 'bg-muted text-muted-foreground'
       }`}
     >
       Fail
@@ -26,8 +28,8 @@ export const BooleanToggle = ({ passed, onChange }: Props): ReactElement => (
       type="button"
       onClick={() => onChange(true)}
       aria-pressed={passed === true}
-      className={`rounded-xl py-4 text-base font-bold transition-colors ${
-        passed === true ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-500'
+      className={`rounded-lg py-4 text-base font-bold transition-colors ${
+        passed === true ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground'
       }`}
     >
       Pass

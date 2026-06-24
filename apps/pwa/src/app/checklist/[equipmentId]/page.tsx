@@ -39,13 +39,14 @@ function ChecklistView(): ReactElement {
 
   if (equipmentLoading) return <div className="p-8 text-center">Loading equipment...</div>;
   if (equipmentError)
-    return <div className="p-8 text-center text-red-600">Error loading equipment.</div>;
-  if (!equipment) return <div className="p-8 text-center text-red-600">Equipment not found.</div>;
+    return <div className="p-8 text-center text-destructive">Error loading equipment.</div>;
+  if (!equipment)
+    return <div className="p-8 text-center text-destructive">Equipment not found.</div>;
 
   if (checklistLoading) return <div className="p-8 text-center">Loading checklist...</div>;
   if (checklistError)
     return (
-      <div className="p-8 text-center text-red-600">
+      <div className="p-8 text-center text-destructive">
         No active checklist for this equipment type.
       </div>
     );
@@ -62,11 +63,11 @@ function ChecklistView(): ReactElement {
     failures > 0
       ? `Proceed with (${failures}) Failure${failures === 1 ? '' : 's'}`
       : 'Submit Inspection';
-  const submitColor = failures > 0 ? 'bg-amber-500' : 'bg-blue-600';
+  const submitColor = failures > 0 ? 'bg-warning' : 'bg-primary';
 
   return (
-    <main className="min-h-screen bg-slate-50 pb-28">
-      <header className="flex items-center justify-between bg-[#003a70] px-4 py-3 text-white">
+    <main className="min-h-screen bg-muted pb-28">
+      <header className="flex items-center justify-between bg-primary px-4 py-3 text-primary-foreground">
         <span className="text-sm font-extrabold uppercase tracking-wide">SAIT MAT School</span>
         <span className="text-xs font-semibold opacity-80">{equipment.assetTag}</span>
       </header>
@@ -74,12 +75,12 @@ function ChecklistView(): ReactElement {
       <div className="mx-auto flex max-w-xl flex-col gap-4 p-4">
         <div>
           <div className="flex items-start justify-between gap-2">
-            <h1 className="text-2xl font-extrabold text-slate-900">{equipment.name} Inspection</h1>
-            <span className="rounded-full border border-green-300 bg-green-100 px-3 py-1 text-xs font-bold text-green-800">
+            <h1 className="text-2xl font-extrabold text-foreground">{equipment.name} Inspection</h1>
+            <span className="rounded-lg bg-success px-3 py-1 text-xs font-bold text-success-foreground">
               {template.isActive ? 'ACTIVE' : 'INACTIVE'}
             </span>
           </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Safety Compliance Log
           </p>
         </div>
@@ -101,8 +102,8 @@ function ChecklistView(): ReactElement {
           type="button"
           disabled={!canSubmit}
           title={canSubmit ? undefined : 'Answer all required items to submit'}
-          className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-2xl py-4 text-base font-bold text-white shadow-lg ${
-            canSubmit ? submitColor : 'cursor-not-allowed bg-slate-300'
+          className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-lg py-4 text-base font-bold text-primary-foreground shadow-card ${
+            canSubmit ? submitColor : 'cursor-not-allowed bg-muted text-muted-foreground'
           }`}
         >
           {submitLabel}

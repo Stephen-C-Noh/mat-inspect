@@ -9,7 +9,7 @@ type Props = { severity: FailSeverity };
 export const SeverityTag = ({ severity }: Props): ReactElement => {
   if (severity === 'BLOCKING') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 text-xs font-bold text-white">
+      <span className="inline-flex items-center gap-1 rounded-lg bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground">
         <span aria-hidden>⛔</span>
         BLOCKING
       </span>
@@ -17,7 +17,7 @@ export const SeverityTag = ({ severity }: Props): ReactElement => {
   }
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+    <span className="inline-flex items-center gap-1 rounded-lg bg-warning px-2.5 py-1 text-xs font-bold text-warning-foreground">
       <span aria-hidden>⚠</span>
       WARNING
     </span>

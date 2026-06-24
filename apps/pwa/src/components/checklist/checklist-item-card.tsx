@@ -22,9 +22,10 @@ const isBooleanType = (item: ChecklistItem): boolean =>
   item.type === 'BOOLEAN' || item.type === 'BOOLEAN_PHOTO_ON_FAIL';
 
 const borderColorFor = (item: ChecklistItem, answer: ChecklistAnswer | undefined): string => {
-  if (!isItemAnswered(item, answer)) return 'border-l-slate-300';
-  if (answer?.kind === 'BOOLEAN') return answer.passed ? 'border-l-green-500' : 'border-l-red-500';
-  return 'border-l-green-500';
+  if (!isItemAnswered(item, answer)) return 'border-l-border';
+  if (answer?.kind === 'BOOLEAN')
+    return answer.passed ? 'border-l-success' : 'border-l-destructive';
+  return 'border-l-success';
 };
 
 export const ChecklistItemCard = ({
@@ -52,18 +53,20 @@ export const ChecklistItemCard = ({
       <button
         type="button"
         onClick={() => setCollapsed(false)}
-        className="flex w-full items-center justify-between rounded-2xl border-l-4 border-l-green-500 bg-white p-4 text-left shadow-sm"
+        className="flex w-full items-center justify-between rounded-sm border-l-4 border-l-success bg-card p-4 text-left shadow-card"
       >
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Status</span>
-            <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Status
+            </span>
+            <span className="rounded-lg bg-success px-3 py-1 text-xs font-bold text-success-foreground">
               Pass
             </span>
           </div>
-          <p className="mt-1 text-sm font-bold text-slate-700">{item.prompt}</p>
+          <p className="mt-1 text-sm font-bold text-foreground">{item.prompt}</p>
         </div>
-        <span aria-hidden className="text-slate-400">
+        <span aria-hidden className="text-muted-foreground">
           ⌄
         </span>
       </button>
@@ -72,13 +75,13 @@ export const ChecklistItemCard = ({
 
   return (
     <div
-      className={`rounded-2xl border-l-4 bg-white p-4 shadow-sm ${borderColorFor(item, answer)}`}
+      className={`rounded-sm border-l-4 bg-card p-4 shadow-card ${borderColorFor(item, answer)}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-base font-bold text-slate-900">
+        <h3 className="text-base font-bold text-foreground">
           {item.prompt}
           {item.required && (
-            <span className="ml-1 text-red-600" aria-label="Required">
+            <span className="ml-1 text-destructive" aria-label="Required">
               *
             </span>
           )}
@@ -93,7 +96,9 @@ export const ChecklistItemCard = ({
       <div className="mt-4">
         {isBooleanType(item) && (
           <>
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Status</span>
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Status
+            </span>
             <div className="mt-1">
               <BooleanToggle
                 passed={answer?.kind === 'BOOLEAN' ? answer.passed : undefined}
@@ -119,13 +124,15 @@ export const ChecklistItemCard = ({
 
       {item.type !== 'TEXT' && (
         <div className="mt-4">
-          <label className="text-xs font-bold uppercase tracking-wide text-slate-400">Notes</label>
+          <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Notes
+          </label>
           <textarea
             value={notes}
             onChange={(event) => onNotesChange(event.target.value)}
             placeholder="Add any observations or comments..."
             rows={2}
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="mt-1 w-full rounded-lg border border-input bg-muted px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
           />
         </div>
       )}
@@ -134,7 +141,7 @@ export const ChecklistItemCard = ({
         type="button"
         disabled
         title="Voice notes are coming in a later sprint"
-        className="mt-3 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-slate-200 py-3 text-sm font-bold text-slate-400"
+        className="mt-3 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-muted py-3 text-sm font-bold text-muted-foreground"
       >
         <span aria-hidden>🎤</span>
         Add Voice Note
