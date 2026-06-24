@@ -4,3 +4,6 @@
 export * from './schema/equipment.js';
 export * from './schema/users.js';
 export * from './schema/checklist-templates.js';
+export * from './schema/inspections.js';
+export * from './schema/outbox.js';
+export * from './schema/idempotency-keys.js';
