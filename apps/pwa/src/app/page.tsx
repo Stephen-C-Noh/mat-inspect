@@ -62,7 +62,7 @@ function LandingPageContent() {
         <div className="mt-6">
           <Link href="/scan" className="w-full">
             <button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-4 px-4 rounded-lg shadow-card border border-accent flex items-center justify-center gap-2 transition-all">
-              <div className="bg-white/20 p-1.5 rounded-md">
+              <div className="bg-accent-foreground/20 p-1.5 rounded-md">
                 <QrCode className="size-6 text-accent-foreground" />
               </div>
               <span className="font-bold text-sm tracking-wide">SCAN QR CODE</span>
@@ -75,7 +75,7 @@ function LandingPageContent() {
           <input
             type="text"
             placeholder="Search by Equipment ID, Name or Tag"
-            className="w-full pl-12 pr-4 py-4 rounded-lg border border-border shadow-sm focus:ring-2 focus:ring-ring outline-none text-base bg-card"
+            className="w-full pl-12 pr-4 py-4 rounded-lg border border-border shadow-card focus:ring-2 focus:ring-ring outline-none text-base bg-card"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -146,7 +146,7 @@ function LandingPageContent() {
 
 function NavButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
-    <button className="flex items-center justify-center gap-2 bg-card py-4 rounded-lg border border-border shadow-card hover:shadow-md transition-all font-semibold text-sm">
+    <button className="flex items-center justify-center gap-2 bg-card py-4 rounded-lg border border-border shadow-card transition-all font-semibold text-sm">
       <Icon className="size-5 text-accent" /> {label}
     </button>
   );
