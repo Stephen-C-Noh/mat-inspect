@@ -102,8 +102,10 @@ function ChecklistView(): ReactElement {
           type="button"
           disabled={!canSubmit}
           title={canSubmit ? undefined : 'Answer all required items to submit'}
-          className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-lg py-4 text-base font-bold text-primary-foreground shadow-card ${
-            canSubmit ? submitColor : 'cursor-not-allowed bg-muted text-muted-foreground'
+          className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-lg py-4 text-base font-bold shadow-card ${
+            canSubmit
+              ? `${submitColor} text-primary-foreground`
+              : 'cursor-not-allowed bg-muted-foreground text-background'
           }`}
         >
           {submitLabel}
