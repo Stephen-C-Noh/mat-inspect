@@ -99,7 +99,7 @@ function EquipmentList() {
                   {item.status}
                 </span>
                 <Link
-                  href={`/checklist/${item.id}`}
+                  href={`/inspect/${item.id}`}
                   className="rounded-lg bg-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-accent-foreground"
                 >
                   Inspect
