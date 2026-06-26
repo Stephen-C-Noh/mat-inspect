@@ -114,6 +114,40 @@ describe('loadConfig', () => {
     expect(cfg.telemetryEnabled).toBe(true);
   });
 
+  it('leaves smtp undefined when SMTP_HOST is not set', () => {
+    expect(loadConfig(fullDev()).smtp).toBeUndefined();
+  });
+
+  it('resolves smtp config with a default port and STARTTLS when SMTP_HOST is set', () => {
+    const cfg = loadConfig(
+      fullDev({
+        SMTP_HOST: 'smtp.example.test',
+        SMTP_USER: 'test-user',
+        SMTP_PASS: 'test-password',
+      }),
+    );
+    expect(cfg.smtp).toEqual({
+      host: 'smtp.example.test',
+      port: 587,
+      user: 'test-user',
+      pass: 'test-password',
+      secure: false,
+    });
+  });
+
+  it('marks smtp secure on the implicit-TLS port 465', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PORT: '465' }));
+    expect(cfg.smtp?.port).toBe(465);
+    expect(cfg.smtp?.secure).toBe(true);
+  });
+
+  it('rejects a placeholder SMTP_PASS instead of failing on the first send', () => {
+    expectProblem(
+      fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PASS: 'REPLACE_ME' }),
+      /SMTP_PASS is an unfilled placeholder/,
+    );
+  });
+
   it('reports every problem at once', () => {
     const env: NodeJS.ProcessEnv = {
       NODE_ENV: 'production',
