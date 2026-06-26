@@ -112,8 +112,12 @@ function LandingPageContent() {
 
           <div className="divide-y divide-border">
             {displayedEquipment.map((item) => (
-              <div
+              // Row navigates to the canonical inspection route (DEV-62). The row was
+              // styled as clickable (cursor-pointer, chevron) but not wired; this is the
+              // home-list entry point DEV-16 requires.
+              <Link
                 key={item.id}
+                href={`/inspect/${item.id}`}
                 className="p-4 flex items-center justify-between hover:bg-muted transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-4">
@@ -128,7 +132,7 @@ function LandingPageContent() {
                   </div>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
-              </div>
+              </Link>
             ))}
           </div>
         </div>

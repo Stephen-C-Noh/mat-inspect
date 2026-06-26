@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../../'),
 
+  // Hide the Next.js dev indicator (the "N" overlay button) so it does not cover the
+  // fixed submit button during local checklist review. Dev-only; no effect on builds.
+  devIndicators: false,
+
   // Proxy API requests to the core-api service to avoid CORS issue and allow local development against the backend services. Destination is configurable via CORE_API_URL so compose can inject the in-cluster address.
   async rewrites() {
     const rewrites = [
