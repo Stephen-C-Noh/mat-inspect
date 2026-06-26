@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { submitInspectionSchema, inspectionSchema } from '@mat-inspect/shared-schemas';
 import {
   db,
+  equipment,
   checklistTemplates,
   inspections,
   inspectionResponses,
@@ -70,6 +71,18 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
         return reply.code(cached.status).send(cached.body);
       }
 
+      // Load the equipment first: equipment_id is a foreign key, so a well-formed but
+      // unknown id would otherwise surface as an unhandled 500 on insert instead of a 404.
+      const [equipmentRow] = await db
+        .select()
+        .from(equipment)
+        .where(eq(equipment.id, body.equipmentId))
+        .limit(1);
+
+      if (!equipmentRow) {
+        throw httpError(404, 'EQUIPMENT_NOT_FOUND', `Equipment ${body.equipmentId} not found`);
+      }
+
       const [template] = await db
         .select()
         .from(checklistTemplates)
@@ -81,6 +94,26 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
           404,
           'CHECKLIST_TEMPLATE_NOT_FOUND',
           `Checklist template ${body.templateId} not found`,
+        );
+      }
+
+      // The template must belong to this equipment's type, otherwise an operator could grade
+      // a forklift against a crane checklist (or any template) to manufacture a result.
+      if (template.equipmentType !== equipmentRow.type) {
+        throw httpError(
+          400,
+          'INSPECTION_TEMPLATE_MISMATCH',
+          `Template ${body.templateId} is for ${template.equipmentType}, not equipment type ${equipmentRow.type}`,
+        );
+      }
+
+      // Inspections are graded against the currently active checklist only. A stale or draft
+      // version (often one with fewer BLOCKING items) cannot be used to pass equipment.
+      if (!template.isActive) {
+        throw httpError(
+          409,
+          'INSPECTION_TEMPLATE_INACTIVE',
+          `Template ${body.templateId} is not the active checklist for ${equipmentRow.type}`,
         );
       }
 

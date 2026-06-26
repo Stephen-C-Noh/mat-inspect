@@ -52,6 +52,8 @@ describe('inspections API', () => {
   let managerToken: string;
   let equipmentId: string;
   let templateId: string;
+  let inactiveTemplateId: string;
+  let truckTemplateId: string;
 
   beforeAll(async () => {
     delete process.env['ENTRA_TENANT_ID'];
@@ -94,6 +96,34 @@ describe('inspections API', () => {
       })
       .returning();
     templateId = templateRow!.id;
+
+    // A superseded forklift template (not active) to assert submits are graded against the
+    // active checklist only.
+    const [inactiveTemplateRow] = await migrationDb
+      .insert(checklistTemplates)
+      .values({
+        equipmentType: 'FORKLIFT',
+        version: 2,
+        isActive: false,
+        items: forkliftItems,
+        createdBy: ADMIN_ID,
+      })
+      .returning();
+    inactiveTemplateId = inactiveTemplateRow!.id;
+
+    // A template for a different equipment type, to assert the template must match the
+    // equipment under inspection.
+    const [truckTemplateRow] = await migrationDb
+      .insert(checklistTemplates)
+      .values({
+        equipmentType: 'TRUCK',
+        version: 1,
+        isActive: true,
+        items: forkliftItems,
+        createdBy: ADMIN_ID,
+      })
+      .returning();
+    truckTemplateId = truckTemplateRow!.id;
 
     await migrationPool.end();
 
@@ -194,7 +224,10 @@ describe('inspections API', () => {
       templateId,
       operatorId: MANAGER_ID,
       result: 'PASS',
-      responses: [{ itemKey: 'forks-condition', value: false, passed: false }],
+      responses: [
+        { itemKey: 'forks-condition', value: false, passed: false },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
       attested: true,
     });
     expect(res.statusCode).toBe(201);
@@ -237,7 +270,10 @@ describe('inspections API', () => {
     const res = await submit({
       equipmentId,
       templateId,
-      responses: [{ itemKey: 'forks-condition', value: true, passed: true }],
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
       attested: true,
     });
     const inspectionId = res.json().id;
@@ -255,7 +291,10 @@ describe('inspections API', () => {
     const res = await submit({
       equipmentId,
       templateId,
-      responses: [{ itemKey: 'forks-condition', value: true, passed: true }],
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
       attested: true,
     });
     const inspectionId = res.json().id;
@@ -280,7 +319,10 @@ describe('inspections API', () => {
     const payload = {
       equipmentId,
       templateId,
-      responses: [{ itemKey: 'forks-condition', value: true, passed: true }],
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
       attested: true,
     };
 
@@ -303,7 +345,10 @@ describe('inspections API', () => {
       {
         equipmentId,
         templateId,
-        responses: [{ itemKey: 'forks-condition', value: true, passed: true }],
+        responses: [
+          { itemKey: 'forks-condition', value: true, passed: true },
+          { itemKey: 'horn', value: true, passed: true },
+        ],
         attested: true,
       },
       { idempotencyKey: key },
@@ -314,12 +359,74 @@ describe('inspections API', () => {
       {
         equipmentId,
         templateId,
-        responses: [{ itemKey: 'horn', value: true, passed: true }],
+        responses: [
+          { itemKey: 'forks-condition', value: true, passed: true },
+          { itemKey: 'horn', value: false, passed: false },
+        ],
         attested: true,
       },
       { idempotencyKey: key },
     );
     expect(second.statusCode).toBe(409);
     expect(second.json().title).toBe('IDEMPOTENCY_MISMATCH');
+  });
+
+  it('rejects a submit that omits a required checklist item with 400', async () => {
+    const res = await submit({
+      equipmentId,
+      templateId,
+      responses: [{ itemKey: 'forks-condition', value: true, passed: true }],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().title).toBe('INSPECTION_MISSING_REQUIRED_ITEM');
+  });
+
+  it('does not derive PASS from an empty responses array when items are required', async () => {
+    const res = await submit({ equipmentId, templateId, responses: [], attested: true });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().title).toBe('INSPECTION_MISSING_REQUIRED_ITEM');
+  });
+
+  it('returns 404 for a well-formed but unknown equipmentId', async () => {
+    const res = await submit({
+      equipmentId: randomUUID(),
+      templateId,
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().title).toBe('EQUIPMENT_NOT_FOUND');
+  });
+
+  it('rejects a template whose equipment type does not match the equipment with 400', async () => {
+    const res = await submit({
+      equipmentId,
+      templateId: truckTemplateId,
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().title).toBe('INSPECTION_TEMPLATE_MISMATCH');
+  });
+
+  it('rejects a submit against an inactive template with 409', async () => {
+    const res = await submit({
+      equipmentId,
+      templateId: inactiveTemplateId,
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().title).toBe('INSPECTION_TEMPLATE_INACTIVE');
   });
 });
