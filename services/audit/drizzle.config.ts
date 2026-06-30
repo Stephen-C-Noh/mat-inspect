@@ -15,4 +15,7 @@ export default defineConfig({
   schema: './db/schema/*.ts',
   out: './db/migrations',
   dbCredentials: { url: dbUrl },
+  // Keep drizzle's migration journal in the public schema so audit_migrator doesn't need
+  // database-level CREATE privilege (it only owns the public schema, not the whole DB).
+  migrations: { schema: 'public' },
 });
