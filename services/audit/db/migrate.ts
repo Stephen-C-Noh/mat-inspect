@@ -1,4 +1,3 @@
-import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import path from 'path';
@@ -8,6 +7,10 @@ import { fileURLToPath } from 'url';
 // infra/docker/postgres-init.sh), a deliberately separate role from the audit_writer connection
 // the running service uses (ARCHITECTURE.md 8.4 rule 8: schema changes and operational writes
 // never share a role).
+//
+// Passes the connection string directly to drizzle() rather than constructing a pg.Pool, which
+// avoids a @types/pg version conflict between drizzle-orm's own nested @types/pg and the
+// workspace root's @types/pg when building inside Docker.
 const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
 const rawUrl = process.env['AUDIT_MIGRATOR_DB_URL']?.replace('@postgres:', `@${localHost}:`);
 
@@ -16,9 +19,7 @@ if (!rawUrl) {
   process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString: rawUrl });
-const db = drizzle(pool);
-
+const db = drizzle(rawUrl);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 try {
@@ -28,5 +29,5 @@ try {
   process.stderr.write(`Migration failed: ${String(err)}\n`);
   process.exitCode = 1;
 } finally {
-  await pool.end();
+  process.exit(process.exitCode ?? 0);
 }
