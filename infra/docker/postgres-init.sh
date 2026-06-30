@@ -30,4 +30,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname audit_db <<-SQL
   GRANT CONNECT ON DATABASE audit_db TO audit_writer;
   ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public
     GRANT SELECT, INSERT ON TABLES TO audit_writer;
+  -- bigserial columns create sequences; audit_writer needs USAGE to call nextval() on INSERT.
+  ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO audit_writer;
 SQL

@@ -21,3 +21,5 @@ CREATE TABLE "audit_events" (
 -- that didn't pre-seed default privileges (e.g. testcontainers, which bootstraps roles itself).
 -- INSERT + SELECT only; UPDATE and DELETE are never granted (DEV-23 acceptance criteria).
 GRANT SELECT, INSERT ON "audit_events" TO audit_writer;
+-- bigserial creates an underlying sequence; audit_writer needs USAGE to call nextval() on INSERT.
+GRANT USAGE, SELECT ON SEQUENCE "audit_events_seq_seq" TO audit_writer;
