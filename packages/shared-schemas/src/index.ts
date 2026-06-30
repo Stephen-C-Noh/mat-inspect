@@ -155,3 +155,19 @@ export const submitInspectionSchema = z.object({
 
 export type InspectionResponse = z.infer<typeof inspectionResponseSchema>;
 export type SubmitInspection = z.infer<typeof submitInspectionSchema>;
+
+export const inspectionResultSchema = z.enum(['PASS', 'FAIL_WARNING', 'FAIL_BLOCKING']);
+
+// Response for POST /api/v1/inspections. Server-derived fields only: result and
+// templateVersion are never accepted from the client (ADR 0007, ADR 0008).
+export const inspectionSchema = z.object({
+  id: uuidSchema,
+  equipmentId: uuidSchema,
+  operatorId: uuidSchema,
+  templateId: uuidSchema,
+  templateVersion: z.number().int().positive(),
+  result: inspectionResultSchema,
+  submittedAt: z.string().datetime(),
+});
+
+export type Inspection = z.infer<typeof inspectionSchema>;
