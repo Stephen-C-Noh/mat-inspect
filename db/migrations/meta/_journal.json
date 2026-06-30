@@ -22,6 +22,20 @@
       "when": 1781279741058,
       "tag": "0002_real_skin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782272131530,
+      "tag": "0003_clammy_raza",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782272164016,
+      "tag": "0004_inspection_immutability_triggers",
+      "breakpoints": true
     }
   ]
 }
