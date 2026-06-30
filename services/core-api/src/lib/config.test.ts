@@ -13,6 +13,8 @@ const fullDev = (overrides: Record<string, string | undefined> = {}): NodeJS.Pro
   ENTRA_TENANT_ID: '22222222-2222-2222-2222-222222222222',
   ENTRA_CLIENT_ID: '11111111-1111-1111-1111-111111111111',
   APPLICATIONINSIGHTS_CONNECTION_STRING: VALID_CONN,
+  AUDIT_SERVICE_URL: 'http://audit:3000',
+  AUDIT_INGEST_TOKEN: 'a-real-shared-secret',
   ...overrides,
 });
 
@@ -109,9 +111,50 @@ describe('loadConfig', () => {
       ENTRA_TENANT_ID: '22222222-2222-2222-2222-222222222222',
       ENTRA_CLIENT_ID: '11111111-1111-1111-1111-111111111111',
       APPLICATIONINSIGHTS_CONNECTION_STRING: VALID_CONN,
+      AUDIT_SERVICE_URL: 'http://audit:3000',
+      AUDIT_INGEST_TOKEN: 'a-real-shared-secret',
     });
     expect(cfg.nodeEnv).toBe('production');
     expect(cfg.telemetryEnabled).toBe(true);
+    expect(cfg.auditServiceUrl).toBe('http://audit:3000');
+  });
+
+  it('requires AUDIT_SERVICE_URL and AUDIT_INGEST_TOKEN in development', () => {
+    const env = fullDev();
+    delete env['AUDIT_SERVICE_URL'];
+    delete env['AUDIT_INGEST_TOKEN'];
+    try {
+      loadConfig(env);
+      throw new Error('expected loadConfig to throw');
+    } catch (err) {
+      const problems = (err as EnvValidationError).problems.join('\n');
+      expect(problems).toMatch(/AUDIT_SERVICE_URL is required/);
+      expect(problems).toMatch(/AUDIT_INGEST_TOKEN is required/);
+    }
+  });
+
+  it('rejects a non-http(s) AUDIT_SERVICE_URL', () => {
+    expectProblem(fullDev({ AUDIT_SERVICE_URL: 'audit:3000' }), /must be an http\(s\):\/\/ URL/);
+  });
+
+  it('rejects a placeholder AUDIT_INGEST_TOKEN', () => {
+    expectProblem(
+      fullDev({ AUDIT_INGEST_TOKEN: 'REPLACE_ME' }),
+      /AUDIT_INGEST_TOKEN is an unfilled placeholder/,
+    );
+  });
+
+  it('defaults OUTBOX_POLL_INTERVAL_MS to 2000', () => {
+    expect(loadConfig(fullDev()).outboxPollIntervalMs).toBe(2000);
+  });
+
+  it('exempts NODE_ENV=test from requiring audit delivery config', () => {
+    const cfg = loadConfig({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgres://app:secret@localhost:5432/mat',
+    });
+    expect(cfg.auditServiceUrl).toBeUndefined();
+    expect(cfg.auditIngestToken).toBeUndefined();
   });
 
   it('reports every problem at once', () => {

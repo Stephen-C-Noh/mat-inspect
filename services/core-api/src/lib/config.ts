@@ -26,6 +26,9 @@ const rawSchema = z.object({
   ENTRA_TENANT_ID: z.string().trim().optional(),
   ENTRA_CLIENT_ID: z.string().trim().optional(),
   APPLICATIONINSIGHTS_CONNECTION_STRING: z.string().trim().optional(),
+  AUDIT_SERVICE_URL: z.string().trim().optional(),
+  AUDIT_INGEST_TOKEN: z.string().trim().optional(),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
 });
 
 export type AppConfig = {
@@ -37,6 +40,9 @@ export type AppConfig = {
   entraClientId: string | undefined;
   applicationInsightsConnectionString: string | undefined;
   telemetryEnabled: boolean;
+  auditServiceUrl: string | undefined;
+  auditIngestToken: string | undefined;
+  outboxPollIntervalMs: number;
 };
 
 export class EnvValidationError extends Error {
@@ -73,6 +79,8 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   const entraTenantId = orUndefined(env.ENTRA_TENANT_ID);
   const entraClientId = orUndefined(env.ENTRA_CLIENT_ID);
   const appInsights = orUndefined(env.APPLICATIONINSIGHTS_CONNECTION_STRING);
+  const auditServiceUrl = orUndefined(env.AUDIT_SERVICE_URL);
+  const auditIngestToken = orUndefined(env.AUDIT_INGEST_TOKEN);
 
   // Reject placeholders for every secret. A half-filled .env (the value copied from
   // .env.example) fails at boot with a clear message, not later with an opaque client error.
@@ -80,6 +88,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     ['ENTRA_TENANT_ID', entraTenantId],
     ['ENTRA_CLIENT_ID', entraClientId],
     ['APPLICATIONINSIGHTS_CONNECTION_STRING', appInsights],
+    ['AUDIT_INGEST_TOKEN', auditIngestToken],
   ] as const) {
     if (value && isPlaceholder(value)) {
       problems.push(`${name} is an unfilled placeholder; replace it with the real value`);
@@ -125,6 +134,19 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     problems.push('ENTRA_CLIENT_ID is required (only NODE_ENV=test may omit it)');
   }
 
+  // The outbox poller delivers to the Audit Service over HTTP (DEV-23 / ADR 0008); without it,
+  // Inspections commit with no path to ever reach the audit chain. Required outside tests for the
+  // same reason Entra and Application Insights are: a blank value is a setup mistake, not a valid
+  // "off" mode.
+  if (requireAzure && !auditServiceUrl) {
+    problems.push('AUDIT_SERVICE_URL is required (only NODE_ENV=test may omit it)');
+  } else if (auditServiceUrl && !/^https?:\/\//.test(auditServiceUrl)) {
+    problems.push('AUDIT_SERVICE_URL must be an http(s):// URL');
+  }
+  if (requireAzure && !auditIngestToken) {
+    problems.push('AUDIT_INGEST_TOKEN is required (only NODE_ENV=test may omit it)');
+  }
+
   if (problems.length > 0) {
     throw new EnvValidationError(problems);
   }
@@ -138,6 +160,9 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     entraClientId,
     applicationInsightsConnectionString: appInsights,
     telemetryEnabled: appInsights !== undefined,
+    auditServiceUrl,
+    auditIngestToken,
+    outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
   };
 };
 
