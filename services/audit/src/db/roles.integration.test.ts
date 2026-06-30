@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-const MIGRATOR_PASSWORD = 'test-migrator-pw';
-const WRITER_PASSWORD = 'test-writer-pw';
+// Ephemeral credentials for the testcontainers Postgres instance — not real secrets.
+const MIGRATOR_ROLE_PW = 'testonly';
+const WRITER_ROLE_PW = 'testonly';
 
 describe('audit_events role privileges', () => {
   let container: StartedPostgreSqlContainer;
@@ -24,41 +25,43 @@ describe('audit_events role privileges', () => {
 
     // Bootstrap roles + default privileges, mirroring postgres-init.sh.
     await suPool.query(`
-      CREATE ROLE audit_migrator LOGIN PASSWORD '${MIGRATOR_PASSWORD}';
-      CREATE ROLE audit_writer   LOGIN PASSWORD '${WRITER_PASSWORD}';
+      CREATE ROLE audit_migrator LOGIN PASSWORD '${MIGRATOR_ROLE_PW}';
+      CREATE ROLE audit_writer   LOGIN PASSWORD '${WRITER_ROLE_PW}';
     `);
     await suPool.query(`ALTER SCHEMA public OWNER TO audit_migrator`);
     await suPool.query(`
       ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public
-        GRANT SELECT, INSERT ON TABLES TO audit_writer
+        GRANT SELECT, INSERT ON TABLES TO audit_writer;
+      ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public
+        GRANT USAGE, SELECT ON SEQUENCES TO audit_writer;
     `);
 
-    // Run migrations as the migrator role (closest to prod; superuser is fine here since
-    // drizzle-migrate just needs DDL, and the migrator owns the schema after the above).
+    // Run migrations as the migrator role. Pass the connection string directly to drizzle()
+    // to avoid a @types/pg version conflict between drizzle-orm's nested types and the root
+    // workspace types (same fix applied in db/migrate.ts).
     const migratorUri = container
       .getConnectionUri()
-      .replace(/\/\/[^@]+@/, `//audit_migrator:${MIGRATOR_PASSWORD}@`);
+      .replace(/\/\/[^@]+@/, `//audit_migrator:${MIGRATOR_ROLE_PW}@`);
     const { drizzle } = await import('drizzle-orm/node-postgres');
     const { migrate } = await import('drizzle-orm/node-postgres/migrator');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const migratorPool = new pg.Pool({ connectionString: migratorUri });
-    const migratorDb = drizzle(migratorPool);
+    const migratorDb = drizzle(migratorUri);
     await migrate(migratorDb, {
       migrationsFolder: path.join(__dirname, '../../db/migrations'),
+      migrationsSchema: 'public',
     });
-    await migratorPool.end();
 
     // Writer connection: runtime role under test.
     const writerUri = container
       .getConnectionUri()
-      .replace(/\/\/[^@]+@/, `//audit_writer:${WRITER_PASSWORD}@`);
+      .replace(/\/\/[^@]+@/, `//audit_writer:${WRITER_ROLE_PW}@`);
     writerPool = new pg.Pool({ connectionString: writerUri });
   }, 120_000);
 
   afterAll(async () => {
-    await writerPool.end();
-    await suPool.end();
-    await container.stop();
+    await writerPool?.end();
+    await suPool?.end();
+    await container?.stop();
   });
 
   const insertOne = () =>
