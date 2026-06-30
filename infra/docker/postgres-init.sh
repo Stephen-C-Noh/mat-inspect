@@ -24,6 +24,9 @@ SQL
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname audit_db <<-SQL
   ALTER SCHEMA public OWNER TO audit_migrator;
+  -- CREATE ON DATABASE lets audit_migrator create schemas (drizzle's migrate() does
+  -- CREATE SCHEMA IF NOT EXISTS for its journal table, even when schema already exists).
+  GRANT CREATE ON DATABASE audit_db TO audit_migrator;
   GRANT CONNECT ON DATABASE audit_db TO audit_writer;
   ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public
     GRANT SELECT, INSERT ON TABLES TO audit_writer;
