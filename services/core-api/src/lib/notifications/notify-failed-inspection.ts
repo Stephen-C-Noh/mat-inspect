@@ -6,6 +6,13 @@ import {
 } from './failed-inspection-email.js';
 import { defaultFromAddress, getMailSender, type MailMessage, type MailSender } from './mailer.js';
 
+// Orchestrates the failed-inspection email alert (DEV-21). It decides whether to send (only a
+// FAIL_BLOCKING result), builds the message from the content layer, and hands it to the SMTP
+// transport with retry. The whole thing is fire-and-forget: it never rejects, so the future
+// inspection-submit route can call it off the request path without its HTTP response depending on
+// mail outcome. Email is the minimum guaranteed channel; Teams (DEV-39) and the dashboard queue
+// (DEV-36) are the other two channels (ADR 0013).
+
 export type FailedInspectionAlert = FailedInspectionEmailInput & {
   // Server-derived inspection result. Only FAIL_BLOCKING triggers the email (PRD Section 9).
   result: InspectionResult;

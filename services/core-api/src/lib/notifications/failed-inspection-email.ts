@@ -1,5 +1,10 @@
 import type { MailMessage } from './mailer.js';
 
+// Content layer for the failed-inspection email alert (DEV-21). Pure: given the inspection facts
+// it returns the subject, plain text, and HTML, with no transport or I/O. The subject carries no
+// PII (FRS AC-8.1.3); the body identifies the operator (OHS Part 6 log book rule) and HTML-escapes
+// every interpolated value. The orchestrator (notify-failed-inspection.ts) adds from/to and sends.
+
 // The lab is at SAIT Main Campus (Calgary), so "lab-local" time is Mountain Time. The timestamp
 // in the email is rendered in this zone so a supervisor reads the wall-clock time of submission.
 const LAB_TIME_ZONE = 'America/Edmonton';

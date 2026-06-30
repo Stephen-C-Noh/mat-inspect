@@ -1,6 +1,11 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config.js';
 
+// SMTP transport for the failed-inspection email alert (DEV-21). This module owns the nodemailer
+// relay connection and the system From address, and nothing else: it knows nothing about
+// inspections or when to send. The orchestrator (notify-failed-inspection.ts) calls
+// getMailSender() to obtain a sender. Email is the minimum guaranteed alert channel (ADR 0013).
+
 // A mail message the notifier hands to the relay. Structurally a subset of nodemailer's
 // Mail.Options, kept narrow so callers (and tests) do not depend on the nodemailer type.
 export type MailMessage = {
