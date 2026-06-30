@@ -23,7 +23,12 @@ const db = drizzle(rawUrl);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 try {
-  await migrate(db, { migrationsFolder: path.join(__dirname, 'migrations') });
+  // migrationsSchema: 'public' keeps drizzle's journal table in the public schema so
+  // audit_migrator doesn't need database-level CREATE privilege to make a new schema.
+  await migrate(db, {
+    migrationsFolder: path.join(__dirname, 'migrations'),
+    migrationsSchema: 'public',
+  });
   process.stdout.write('Migrations applied\n');
 } catch (err) {
   process.stderr.write(`Migration failed: ${String(err)}\n`);
