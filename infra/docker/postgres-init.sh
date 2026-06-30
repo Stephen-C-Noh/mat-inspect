@@ -15,7 +15,7 @@ set -euo pipefail
 #                     audit_events) is covered automatically, with no per-migration grant to
 #                     remember.
 
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-SQL
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<-SQL
   CREATE DATABASE core_db;
   CREATE DATABASE audit_db;
   CREATE ROLE audit_migrator LOGIN PASSWORD '$AUDIT_MIGRATOR_DB_PASSWORD';
