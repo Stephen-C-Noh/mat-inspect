@@ -32,7 +32,9 @@ export const getMailSender = (): MailSender | null => {
     host: smtp.host,
     port: smtp.port,
     secure: smtp.secure,
-    // Omit auth entirely for relays that accept unauthenticated submission from the app host.
+    // config validates that SMTP_USER and SMTP_PASS are set together, so a present user implies a
+    // present pass; this never builds a half-filled auth object. Omit auth entirely for a relay
+    // that accepts unauthenticated submission from the app host (neither set).
     auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
   });
   cachedSender = (message) => transport.sendMail(message);

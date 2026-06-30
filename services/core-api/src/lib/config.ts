@@ -27,7 +27,13 @@ const rawSchema = z.object({
   ENTRA_CLIENT_ID: z.string().trim().optional(),
   APPLICATIONINSIGHTS_CONNECTION_STRING: z.string().trim().optional(),
   SMTP_HOST: z.string().trim().optional(),
-  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  // Treat a blank SMTP_PORT the same as unset, matching how orUndefined handles the other SMTP
+  // vars. Without the preprocess, z.coerce turns '' into 0, which fails .positive() with a raw
+  // Zod message when someone blanks the whole SMTP block uniformly.
+  SMTP_PORT: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().positive().optional(),
+  ),
   SMTP_USER: z.string().trim().optional(),
   SMTP_PASS: z.string().trim().optional(),
 });
@@ -166,6 +172,17 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     if (value && isPlaceholder(value)) {
       problems.push(`${name} is an unfilled placeholder; replace it with the real value`);
     }
+  }
+
+  // SMTP auth is all-or-nothing: a relay needs both a username and a password, or neither (an
+  // unauthenticated relay that accepts submission from the app host). Exactly one is always a
+  // misconfiguration. Catch it at boot for the same reason the rest of this file exists: a
+  // half-filled auth lets boot succeed, then every send fails authentication, retries, and is
+  // swallowed into a single warn, so supervisors silently receive no failed-inspection alerts.
+  if (smtpHost && Boolean(smtpUser) !== Boolean(smtpPass)) {
+    problems.push(
+      'SMTP_USER and SMTP_PASS must be set together (or both left blank for an unauthenticated relay)',
+    );
   }
 
   if (problems.length > 0) {

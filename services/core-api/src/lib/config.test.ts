@@ -148,6 +148,39 @@ describe('loadConfig', () => {
     );
   });
 
+  it('rejects SMTP_USER without SMTP_PASS (half-filled auth would silently fail every send)', () => {
+    expectProblem(
+      fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_USER: 'test-user' }),
+      /SMTP_USER and SMTP_PASS must be set together/,
+    );
+  });
+
+  it('rejects SMTP_PASS without SMTP_USER', () => {
+    expectProblem(
+      fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PASS: 'test-password' }),
+      /SMTP_USER and SMTP_PASS must be set together/,
+    );
+  });
+
+  it('allows an unauthenticated relay (host set, neither user nor pass)', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: 'smtp.example.test' }));
+    expect(cfg.smtp).toMatchObject({
+      host: 'smtp.example.test',
+      user: undefined,
+      pass: undefined,
+    });
+  });
+
+  it('treats a blank SMTP_PORT as unset and applies the default port', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PORT: '' }));
+    expect(cfg.smtp?.port).toBe(587);
+  });
+
+  it('treats a uniformly blank SMTP block as disabled', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: '', SMTP_PORT: '', SMTP_USER: '', SMTP_PASS: '' }));
+    expect(cfg.smtp).toBeUndefined();
+  });
+
   it('reports every problem at once', () => {
     const env: NodeJS.ProcessEnv = {
       NODE_ENV: 'production',
