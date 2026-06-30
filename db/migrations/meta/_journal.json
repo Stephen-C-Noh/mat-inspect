@@ -36,6 +36,13 @@
       "when": 1782272164016,
       "tag": "0004_inspection_immutability_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782836430922,
+      "tag": "0005_marvelous_machine_man",
+      "breakpoints": true
     }
   ]
 }

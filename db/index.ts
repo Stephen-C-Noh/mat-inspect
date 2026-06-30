@@ -7,3 +7,4 @@ export * from './schema/checklist-templates.js';
 export * from './schema/inspections.js';
 export * from './schema/outbox.js';
 export * from './schema/idempotency-keys.js';
+export * from './schema/defects.js';
