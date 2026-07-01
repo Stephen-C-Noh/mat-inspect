@@ -3,7 +3,6 @@ import http from 'node:http';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
 // Must be at module top level so vitest hoisting picks it up (not inside describe).
@@ -57,12 +56,11 @@ describe('outbox poller', () => {
     const { drizzle } = await import('drizzle-orm/node-postgres');
     const { migrate } = await import('drizzle-orm/node-postgres/migrator');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const migrationPool = new pg.Pool({ connectionString: container.getConnectionUri() });
-    const migrationDb = drizzle(migrationPool);
+    const migrationDb = drizzle(container.getConnectionUri());
     await migrate(migrationDb, {
       migrationsFolder: path.join(__dirname, '../../../../db/migrations'),
     });
-    await migrationPool.end();
+    await migrationDb.$client.end();
 
     const { resetConfigForTest } = await import('../lib/config.js');
     resetConfigForTest();
@@ -70,6 +68,8 @@ describe('outbox poller', () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve) => stubServer.close(() => resolve()));
+    const { db } = await import('../db/index.js');
+    await db.$client.end();
     await container.stop();
   });
 
