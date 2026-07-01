@@ -72,9 +72,9 @@ describe('audit_events role privileges', () => {
       `INSERT INTO audit_events
          (id, source_event_id, prev_hash, this_hash, occurred_at, actor_id, action,
           resource_type, resource_id, payload_summary)
-       VALUES ($1, $2, ${'0'.repeat(64)}, ${'a'.repeat(64)}, now(),
-               $3, 'INSPECTION_SUBMITTED', 'INSPECTION', $4, '{}')`,
-      [randomUUID(), randomUUID(), randomUUID(), randomUUID()],
+       VALUES ($1, $2, $3, $4, now(),
+               $5, 'INSPECTION_SUBMITTED', 'INSPECTION', $6, '{}')`,
+      [randomUUID(), randomUUID(), '0'.repeat(64), 'a'.repeat(64), randomUUID(), randomUUID()],
     );
 
   it('audit_writer can INSERT into audit_events', async () => {

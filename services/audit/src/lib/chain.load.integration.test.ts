@@ -61,6 +61,7 @@ describe('chain integrity at scale (10,000 events)', () => {
 
     for (let i = 0; i < TOTAL; i += 1) {
       const id = randomUUID();
+      const resourceId = randomUUID();
       const occurredAt = new Date();
       const payloadSummary = { idx: String(i) };
       const thisHash = sha256Hex(
@@ -70,7 +71,7 @@ describe('chain integrity at scale (10,000 events)', () => {
           actorId: ACTOR_ID,
           action: 'INSPECTION_SUBMITTED',
           resourceType: 'INSPECTION',
-          resourceId: randomUUID(),
+          resourceId,
           payloadSummary,
           prevHash,
         }),
@@ -84,7 +85,7 @@ describe('chain integrity at scale (10,000 events)', () => {
         actorId: ACTOR_ID,
         action: 'INSPECTION_SUBMITTED',
         resourceType: 'INSPECTION',
-        resourceId: randomUUID(),
+        resourceId,
         payloadSummary,
       });
       prevHash = thisHash;
