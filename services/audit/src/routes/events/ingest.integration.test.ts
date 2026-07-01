@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
 const ACTOR_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -34,12 +33,10 @@ describe('POST /api/v1/events', () => {
     const { drizzle } = await import('drizzle-orm/node-postgres');
     const { migrate } = await import('drizzle-orm/node-postgres/migrator');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const migrationPool = new pg.Pool({ connectionString: container.getConnectionUri() });
-    const migrationDb = drizzle(migrationPool);
+    const migrationDb = drizzle(container.getConnectionUri());
     await migrate(migrationDb, {
-      migrationsFolder: path.join(__dirname, '../../../../db/migrations'),
+      migrationsFolder: path.join(__dirname, '../../../db/migrations'),
     });
-    await migrationPool.end();
 
     const { resetConfigForTest } = await import('../../lib/config.js');
     resetConfigForTest();

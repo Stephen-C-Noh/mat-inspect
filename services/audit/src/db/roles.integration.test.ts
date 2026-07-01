@@ -29,6 +29,9 @@ describe('audit_events role privileges', () => {
       CREATE ROLE audit_writer   LOGIN PASSWORD '${WRITER_ROLE_PW}';
     `);
     await suPool.query(`ALTER SCHEMA public OWNER TO audit_migrator`);
+    // drizzle's migrate() runs CREATE SCHEMA IF NOT EXISTS even when migrationsSchema is set,
+    // which requires db-level CREATE. Mirror the GRANT from infra/docker/postgres-init.sh.
+    await suPool.query(`GRANT CREATE ON DATABASE "${container.getDatabase()}" TO audit_migrator`);
     await suPool.query(`
       ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public
         GRANT SELECT, INSERT ON TABLES TO audit_writer;
