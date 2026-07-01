@@ -31,17 +31,16 @@ describe('hash chain integration', () => {
 
     const { drizzle } = await import('drizzle-orm/node-postgres');
     const { migrate } = await import('drizzle-orm/node-postgres/migrator');
+    const { sql } = await import('drizzle-orm');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const migrationDb = drizzle(container.getConnectionUri());
+    // The migration GRANTs to audit_writer; the role must exist or Postgres throws.
+    // In these tests we connect as superuser so we don't need the role for actual
+    // data access — roles.integration.test.ts is the privilege-boundary test.
+    await migrationDb.execute(sql`CREATE ROLE audit_writer`);
     await migrate(migrationDb, {
       migrationsFolder: path.join(__dirname, '../../db/migrations'),
     });
-
-    // Seed the audit_writer role so the GRANT in the migration doesn't fail on a vanilla
-    // testcontainers Postgres (it either has the role already from a prior test in the same
-    // suite, or it's missing and the GRANT is a no-op since audit_writer doesn't connect in
-    // these tests — we connect via the superuser which has full INSERT rights).
-    // The roles.integration.test.ts creates the role explicitly and tests the privilege boundary.
 
     const { resetConfigForTest } = await import('../lib/config.js');
     resetConfigForTest();

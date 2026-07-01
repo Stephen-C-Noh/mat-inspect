@@ -27,8 +27,11 @@ describe('chain integrity at scale (10,000 events)', () => {
 
     const { drizzle } = await import('drizzle-orm/node-postgres');
     const { migrate } = await import('drizzle-orm/node-postgres/migrator');
+    const { sql } = await import('drizzle-orm');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const migrationDb = drizzle(container.getConnectionUri());
+    // The migration GRANTs to audit_writer; the role must exist or Postgres throws.
+    await migrationDb.execute(sql`CREATE ROLE audit_writer`);
     await migrate(migrationDb, {
       migrationsFolder: path.join(__dirname, '../../db/migrations'),
     });
