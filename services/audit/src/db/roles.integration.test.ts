@@ -53,6 +53,7 @@ describe('audit_events role privileges', () => {
       migrationsFolder: path.join(__dirname, '../../db/migrations'),
       migrationsSchema: 'public',
     });
+    await migratorDb.$client.end();
 
     // Writer connection: runtime role under test.
     const writerUri = container
