@@ -22,8 +22,10 @@ export type MailSender = (message: MailMessage) => Promise<unknown>;
 let cachedSender: MailSender | null | undefined;
 
 // Returns a sender bound to the configured SMTP relay, or null when SMTP is not configured.
-// The transport holds a connection pool, so it is created once and cached. A null result means
-// "email is disabled"; the notifier logs and skips rather than failing the inspection submit.
+// The transport is created once and cached so each send reuses the same instance instead of
+// rebuilding it. nodemailer opens a fresh connection per send (pool is off by default), which is
+// fine for the low volume of blocking-failure alerts. A null result means "email is disabled";
+// the notifier logs and skips rather than failing the inspection submit.
 export const getMailSender = (): MailSender | null => {
   if (cachedSender !== undefined) return cachedSender;
 

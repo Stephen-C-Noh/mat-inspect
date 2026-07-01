@@ -31,10 +31,17 @@ const escapeHtml = (value: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// Explicit component options with a pinned 12-hour clock, so the rendered time does not depend on
+// the host ICU build (a timeStyle 'short' renders en-CA as 24-hour on some builds). Fixed shape:
+// "Jun 26, 2026, 2:30 p.m." in lab-local time.
 const formatLabLocal = (date: Date): string =>
   new Intl.DateTimeFormat('en-CA', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
     timeZone: LAB_TIME_ZONE,
   }).format(date);
 
