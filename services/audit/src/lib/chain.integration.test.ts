@@ -41,12 +41,15 @@ describe('hash chain integration', () => {
     await migrate(migrationDb, {
       migrationsFolder: path.join(__dirname, '../../db/migrations'),
     });
+    await migrationDb.$client.end();
 
     const { resetConfigForTest } = await import('../lib/config.js');
     resetConfigForTest();
   }, 120_000);
 
   afterAll(async () => {
+    const { db } = await import('../db/index.js');
+    await db.$client.end();
     await container.stop();
   });
 

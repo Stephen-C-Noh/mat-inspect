@@ -40,6 +40,7 @@ describe('POST /api/v1/events', () => {
     await migrate(migrationDb, {
       migrationsFolder: path.join(__dirname, '../../../db/migrations'),
     });
+    await migrationDb.$client.end();
 
     const { resetConfigForTest } = await import('../../lib/config.js');
     resetConfigForTest();
@@ -50,6 +51,8 @@ describe('POST /api/v1/events', () => {
 
   afterAll(async () => {
     await app?.close();
+    const { db } = await import('../../db/index.js');
+    await db.$client.end();
     await container?.stop();
   });
 
