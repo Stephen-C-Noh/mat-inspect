@@ -114,6 +114,44 @@ describe('loadConfig', () => {
     expect(cfg.telemetryEnabled).toBe(true);
   });
 
+  it('leaves the Teams webhook and dashboard base url undefined when unset', () => {
+    const cfg = loadConfig(fullDev());
+    expect(cfg.teamsWebhookUrl).toBeUndefined();
+    expect(cfg.dashboardBaseUrl).toBeUndefined();
+  });
+
+  it('accepts a valid https Teams webhook url and dashboard base url', () => {
+    const cfg = loadConfig(
+      fullDev({
+        TEAMS_WEBHOOK_URL: 'https://prod-00.westus.logic.azure.com/workflows/abc/triggers/manual',
+        DASHBOARD_BASE_URL: 'https://dashboard.mat-inspect.sait.ca',
+      }),
+    );
+    expect(cfg.teamsWebhookUrl).toContain('logic.azure.com');
+    expect(cfg.dashboardBaseUrl).toBe('https://dashboard.mat-inspect.sait.ca');
+  });
+
+  it('rejects a REPLACE_ME placeholder Teams webhook url', () => {
+    expectProblem(
+      fullDev({ TEAMS_WEBHOOK_URL: 'REPLACE_ME' }),
+      /TEAMS_WEBHOOK_URL is an unfilled placeholder/,
+    );
+  });
+
+  it('rejects a Teams webhook url that is not https', () => {
+    expectProblem(
+      fullDev({ TEAMS_WEBHOOK_URL: 'http://flow.example/webhook' }),
+      /TEAMS_WEBHOOK_URL is set but is not a valid https URL/,
+    );
+  });
+
+  it('rejects a malformed dashboard base url', () => {
+    expectProblem(
+      fullDev({ DASHBOARD_BASE_URL: 'not-a-url' }),
+      /DASHBOARD_BASE_URL is set but is not a valid http\(s\) URL/,
+    );
+  });
+
   it('reports every problem at once', () => {
     const env: NodeJS.ProcessEnv = {
       NODE_ENV: 'production',
