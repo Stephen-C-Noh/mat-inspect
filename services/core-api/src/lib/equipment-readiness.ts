@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { EquipmentStatus } from '@mat-inspect/shared-types';
 import { db, equipment, inspections, defects } from '../db/index.js';
 
@@ -8,7 +8,8 @@ const LAB_TIMEZONE = 'America/Edmonton';
 
 type EquipmentRow = typeof equipment.$inferSelect;
 
-const DEFECT_STATUSES_THAT_DO_NOT_BLOCK: ('RESOLVED' | 'REJECTED')[] = ['RESOLVED', 'REJECTED'];
+// Positive list avoids notInArray on a pgEnum column, which Drizzle does not cast reliably.
+const BLOCKING_DEFECT_STATUSES = ['OPEN', 'ACKNOWLEDGED', 'IN_REPAIR'] as const;
 
 // Computes the read-time status for each row per ADR 0006: OUT_OF_SERVICE and RETIRED are
 // stored, sticky overrides; everything else is READY only if a passing Inspection exists for
@@ -54,7 +55,7 @@ export const computeReadiness = async (
       and(
         inArray(defects.equipmentId, candidateIds),
         eq(defects.severity, 'BLOCKING'),
-        notInArray(defects.status, DEFECT_STATUSES_THAT_DO_NOT_BLOCK),
+        inArray(defects.status, [...BLOCKING_DEFECT_STATUSES]),
       ),
     )
     .groupBy(defects.equipmentId);
