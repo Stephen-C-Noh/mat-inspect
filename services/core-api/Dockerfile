@@ -11,6 +11,7 @@ WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
+COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
 COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
@@ -37,6 +38,7 @@ WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
+COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
 COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
@@ -55,6 +57,8 @@ COPY --from=build /repo/packages/shared-types/package.json packages/shared-types
 COPY --from=build /repo/packages/shared-types/dist packages/shared-types/dist
 COPY --from=build /repo/packages/shared-schemas/package.json packages/shared-schemas/
 COPY --from=build /repo/packages/shared-schemas/dist packages/shared-schemas/dist
+COPY --from=build /repo/packages/shared-crypto/package.json packages/shared-crypto/
+COPY --from=build /repo/packages/shared-crypto/dist packages/shared-crypto/dist
 COPY --from=build /repo/services/core-api/package.json services/core-api/
 COPY --from=build /repo/services/core-api/dist services/core-api/dist
 # fastify-type-provider-zod pins a peer range that blocks npm from hoisting it to

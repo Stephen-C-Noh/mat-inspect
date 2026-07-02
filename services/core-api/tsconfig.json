@@ -11,6 +11,7 @@
   "references": [
     { "path": "../../packages/shared-types" },
     { "path": "../../packages/shared-schemas" },
+    { "path": "../../packages/shared-crypto" },
     { "path": "../../db" }
   ]
 }

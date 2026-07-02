@@ -18,6 +18,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@mat-inspect/shared-auth': fromHere('packages/shared-auth/src/index.ts'),
+      '@mat-inspect/shared-crypto': fromHere('packages/shared-crypto/src/index.ts'),
       '@mat-inspect/shared-schemas': fromHere('packages/shared-schemas/src/index.ts'),
       '@mat-inspect/shared-types': fromHere('packages/shared-types/src/index.ts'),
     },
