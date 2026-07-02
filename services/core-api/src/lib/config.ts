@@ -175,6 +175,8 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   }
   if (requireAzure && !auditIngestToken) {
     problems.push('AUDIT_INGEST_TOKEN is required (only NODE_ENV=test may omit it)');
+  }
+
   // SMTP for the failed-inspection email alert. Optional: a missing relay does not abort boot
   // (unlike Azure config), because email is a fire-and-forget side channel, not a request-path
   // dependency. When SMTP_HOST is set, reject placeholder credentials so a half-filled .env
