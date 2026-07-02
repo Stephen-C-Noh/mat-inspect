@@ -8,7 +8,9 @@ const LAB_TIMEZONE = 'America/Edmonton';
 
 type EquipmentRow = typeof equipment.$inferSelect;
 
-const DEFECT_STATUSES_THAT_DO_NOT_BLOCK: ('RESOLVED' | 'REJECTED')[] = ['RESOLVED', 'REJECTED'];
+// Defect statuses that do not block computed READY (ADR 0006). RESOLVED and REJECTED mean
+// the defect has been closed; the remaining statuses are open-blocking.
+const NON_BLOCKING_DEFECT_STATUSES = ['RESOLVED', 'REJECTED'] as const;
 
 // Computes the read-time status for each row per ADR 0006: OUT_OF_SERVICE and RETIRED are
 // stored, sticky overrides; everything else is READY only if a passing Inspection exists for
@@ -54,7 +56,7 @@ export const computeReadiness = async (
       and(
         inArray(defects.equipmentId, candidateIds),
         eq(defects.severity, 'BLOCKING'),
-        notInArray(defects.status, DEFECT_STATUSES_THAT_DO_NOT_BLOCK),
+        notInArray(defects.status, [...NON_BLOCKING_DEFECT_STATUSES]),
       ),
     )
     .groupBy(defects.equipmentId);

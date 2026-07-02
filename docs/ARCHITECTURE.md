@@ -242,10 +242,18 @@ Defect
   return_to_service_approved_by (user_id, optional)
 
 AuditEvent (audit_db, append-only)
-  id (uuid, monotonic)
+  -- Three identity columns (DEV-23 implementation note): the conceptual "id (uuid, monotonic)"
+  -- below can't be a single column because the redelivery dedup key comes from core_db's
+  -- outbox.id (gen_random_uuid(), not sortable). The actual schema uses:
+  --   seq (bigserial): internal insertion order; used for chain tail lookups and walks.
+  --   id (uuid): the event's own identity; part of the hash input.
+  --   source_event_id (uuid): the outbox row's id; the at-least-once dedup key.
+  id (uuid)
+  seq (bigserial, primary key, insertion order)
+  source_event_id (uuid, unique, redelivery dedup key)
   prev_hash (string, sha256 of previous record)
   this_hash (string, sha256 of this record + prev_hash)
-  timestamp (timestamptz)
+  occurred_at (timestamptz, stored as timestamptz; hashed as toCanonicalTimestamp)
   actor_id (uuid)
   action (enum: INSPECTION_SUBMITTED, DEFECT_OPENED, DEFECT_RESOLVED,
                 EQUIPMENT_STATUS_CHANGED, CHECKLIST_PUBLISHED, USER_CREATED,
@@ -361,7 +369,7 @@ The audit log is the legal record. Naive hash-chain implementations have five co
 
 1. **Single writer.** Only the Audit Service has INSERT privilege on `audit_events`. Every other service emits an event over the bus or HTTP; Audit Service persists. No other path exists.
 
-2. **Canonical JSON.** Hash inputs are serialized via RFC 8785 JSON Canonicalization Scheme (npm: `jcs`). Fixed key order, fixed number formatting, no whitespace. The same logical record always produces the same byte sequence.
+2. **Canonical JSON.** Hash inputs are serialized via RFC 8785 JSON Canonicalization Scheme (npm: `canonicalize` by Erdtman, v3.0.0 — the `jcs` name used in earlier drafts refers to the RFC acronym, not the npm package; `jcs` on npm is unrelated and unmaintained). Fixed key order, fixed number formatting, no whitespace. The same logical record always produces the same byte sequence.
 
 3. **Immutable hash inputs only.** The hash input is exactly: `id`, `timestamp`, `actor_id`, `action`, `resource_type`, `resource_id`, `payload_summary`, `prev_hash`. Nothing else. No `updated_at`, no derived fields, no fields the database can change after insert.
 
@@ -384,7 +392,7 @@ The audit log is the legal record. Naive hash-chain implementations have five co
 
    The advisory lock serializes the _chain extension_, not the whole table; the lock is released at COMMIT. Concurrent writers queue behind each other rather than racing.
 
-6. **Defense-in-depth CHECK constraint.** A Postgres function `verify_audit_hash(event_row, prev_hash)` recomputes the hash from canonical JSON and the supplied `prev_hash`; a CHECK constraint on the table calls this function. Even if application code has a bug, the database rejects malformed entries.
+6. **Defense-in-depth CHECK constraint.** A Postgres function `verify_audit_hash(event_row, prev_hash)` recomputes the hash from canonical JSON and the supplied `prev_hash`; a CHECK constraint on the table calls this function. Even if application code has a bug, the database rejects malformed entries. **Implementation note (DEV-23):** A faithful RFC 8785 reimplementation in PL/pgSQL is deferred. A PL/pgSQL canonicalizer that diverges from the Node-side `canonicalize` library would silently reject every valid insert or provide false assurance; the risk exceeds the benefit for capstone scope. Startup chain verification (rule 7 below) achieves the same "detect app bug" goal in Node, where the real canonicalizer runs. This constraint is a stated gap, not a hidden one (see ADR 0007 for the precedent of documenting residual risks explicitly).
 
 7. **Chain verification.** On startup, Audit Service verifies the last 1000 events. A nightly job verifies the full chain. Any break triggers a CRITICAL alert to Admin and freezes new writes until manual review.
 

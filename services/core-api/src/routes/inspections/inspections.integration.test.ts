@@ -249,7 +249,8 @@ describe('inspections API', () => {
     expect(res.statusCode).toBe(201);
     const inspectionId = res.json().id;
 
-    const { db, inspectionResponses, outbox } = await import('../../db/index.js');
+    const { db, inspections, inspectionResponses, outbox } = await import('../../db/index.js');
+    const [inspRow] = await db.select().from(inspections).where(eq(inspections.id, inspectionId));
     const responseRows = await db
       .select()
       .from(inspectionResponses)
@@ -264,6 +265,32 @@ describe('inspections API', () => {
       (row) => (row.payload as { inspectionId?: string }).inspectionId === inspectionId,
     );
     expect(matching).toHaveLength(1);
+
+    // ADR 0008: outbox payload must carry a content_hash sealing inspection + responses + result.
+    const payload = matching[0]!.payload as Record<string, unknown>;
+    expect(typeof payload['contentHash']).toBe('string');
+    expect(payload['contentHash'] as string).toHaveLength(64); // sha256 hex
+
+    // Recompute from the actually-persisted rows to prove a later verifier can reproduce the
+    // same hash from core_db — the whole mechanism for detecting a post-hoc edit (ADR 0008).
+    const { computeInspectionContentHash } = await import('../../lib/content-hash.js');
+    const recomputed = computeInspectionContentHash({
+      inspectionId: inspRow!.id,
+      equipmentId: inspRow!.equipmentId,
+      operatorId: inspRow!.operatorId,
+      templateId: inspRow!.templateId,
+      templateVersion: inspRow!.templateVersion,
+      result: inspRow!.result,
+      submittedAt: inspRow!.submittedAt.toISOString(),
+      responses: responseRows.map((r) => ({
+        itemKey: r.itemKey,
+        value: r.value,
+        passed: r.passed,
+        notes: r.notes ?? null,
+        notesSource: r.notesSource ?? null,
+      })),
+    });
+    expect(recomputed).toBe(payload['contentHash']);
   });
 
   it('rejects UPDATE and DELETE on inspections via trigger', async () => {

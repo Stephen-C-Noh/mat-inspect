@@ -2,16 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "declaration": true,
     "composite": true
   },
-  "include": ["src"],
+  "include": ["src", "db"],
   "exclude": ["**/*.test.ts"],
   "references": [
-    { "path": "../../packages/shared-types" },
     { "path": "../../packages/shared-schemas" },
-    { "path": "../../packages/shared-crypto" },
-    { "path": "../../db" }
+    { "path": "../../packages/shared-crypto" }
   ]
 }

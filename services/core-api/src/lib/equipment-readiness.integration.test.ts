@@ -68,12 +68,19 @@ describe('computeReadiness (ADR 0006)', () => {
   });
 
   // Inserts one piece of equipment for an isolated scenario; each test gets its own row so
-  // assertions cannot bleed across cases.
+  // assertions cannot bleed across cases. readinessBaselineAt is set 90 seconds in the past so
+  // inspections inserted with new Date() are always after the baseline regardless of any
+  // sub-millisecond clock skew between the Node.js runner and the PostgreSQL container.
   const makeEquipment = async (assetTag: string) => {
     const { db, equipment } = await import('../db/index.js');
     const [row] = await db
       .insert(equipment)
-      .values({ assetTag, name: assetTag, type: 'FORKLIFT' })
+      .values({
+        assetTag,
+        name: assetTag,
+        type: 'FORKLIFT',
+        readinessBaselineAt: new Date(Date.now() - 90_000),
+      })
       .returning();
     return row!;
   };
