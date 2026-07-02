@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { equipmentSchema, uuidSchema } from '@mat-inspect/shared-schemas';
 import { db, equipment, defects, outbox } from '../../db/index.js';
 import { computeReadiness } from '../../lib/equipment-readiness.js';
@@ -82,14 +82,17 @@ export const returnToServiceRoute: FastifyPluginAsync = async (app) => {
           .set({ returnToServiceApprovedBy: req.user.id })
           .where(eq(defects.id, approvedDefect!.id));
 
-        const now = new Date();
+        // Set the watermark from Postgres now() (the transaction timestamp), not a JS Date.
+        // readiness_baseline_at is compared against inspection submitted_at, which is also a
+        // Postgres timestamp, so both must come from the same clock. Mixing a JS millisecond
+        // value with a Postgres microsecond value can order two near-simultaneous events wrong.
         const [updated] = await tx
           .update(equipment)
           .set({
             status: 'AWAITING_INSPECTION',
-            readinessBaselineAt: now,
-            currentStatusSince: now,
-            updatedAt: now,
+            readinessBaselineAt: sql`now()`,
+            currentStatusSince: sql`now()`,
+            updatedAt: sql`now()`,
           })
           .where(eq(equipment.id, id))
           .returning();
