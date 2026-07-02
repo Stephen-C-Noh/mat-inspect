@@ -9,6 +9,7 @@ import {
   inspectionResponses,
   outbox,
   idempotencyKeys,
+  defects,
 } from '../../db/index.js';
 import { httpError } from '../../lib/http-error.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
@@ -16,6 +17,7 @@ import { requestDigest } from '../../lib/request-digest.js';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';
+import { buildBlockingDefect } from './blocking-defect.js';
 import { serializeInspection } from './serialize.js';
 
 // Looks up the cached idempotency record for (operatorId, key). Returns the stored response
@@ -156,6 +158,72 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
               result,
             },
           });
+
+          // Defect lifecycle entry point (DEV-20, ADR 0006). A BLOCKING failure opens exactly
+          // one Defect and makes OUT_OF_SERVICE sticky, in the same transaction as the
+          // inspection so the record and the lockout either both commit or neither does.
+          if (result === 'FAIL_BLOCKING') {
+            const blockingDefect = buildBlockingDefect(template.items, body.responses);
+            // result === 'FAIL_BLOCKING' already implies a failed BLOCKING item, so this is
+            // never null here; the guard narrows the type and stays correct if the two
+            // derivations ever drift apart.
+            if (blockingDefect) {
+              const [defect] = await tx
+                .insert(defects)
+                .values({
+                  inspectionId: inspection!.id,
+                  equipmentId: body.equipmentId,
+                  itemKey: blockingDefect.itemKey,
+                  severity: blockingDefect.severity,
+                  description: blockingDefect.description,
+                })
+                .returning();
+
+              await tx.insert(outbox).values({
+                eventType: 'DEFECT_OPENED',
+                payload: {
+                  defectId: defect!.id,
+                  inspectionId: inspection!.id,
+                  equipmentId: body.equipmentId,
+                  operatorId: req.user.id,
+                  itemKey: blockingDefect.itemKey,
+                  severity: blockingDefect.severity,
+                },
+              });
+
+              // Lock the equipment row so concurrent submits serialize on the status write.
+              // RETIRED is terminal and OUT_OF_SERVICE is already the target, so neither is
+              // re-stamped and no spurious EQUIPMENT_STATUS_CHANGED is emitted for them.
+              const [locked] = await tx
+                .select({ status: equipment.status })
+                .from(equipment)
+                .where(eq(equipment.id, body.equipmentId))
+                .for('update')
+                .limit(1);
+              const previousStatus = locked!.status;
+
+              if (previousStatus !== 'OUT_OF_SERVICE' && previousStatus !== 'RETIRED') {
+                const now = new Date();
+                await tx
+                  .update(equipment)
+                  .set({ status: 'OUT_OF_SERVICE', currentStatusSince: now, updatedAt: now })
+                  .where(eq(equipment.id, body.equipmentId));
+
+                await tx.insert(outbox).values({
+                  eventType: 'EQUIPMENT_STATUS_CHANGED',
+                  payload: {
+                    equipmentId: body.equipmentId,
+                    from: previousStatus,
+                    to: 'OUT_OF_SERVICE',
+                    reason: 'BLOCKING_INSPECTION_FAILURE',
+                    defectId: defect!.id,
+                    inspectionId: inspection!.id,
+                    operatorId: req.user.id,
+                  },
+                });
+              }
+            }
+          }
 
           const serialized = serializeInspection(inspection!);
 
