@@ -26,6 +26,8 @@ const rawSchema = z.object({
   ENTRA_TENANT_ID: z.string().trim().optional(),
   ENTRA_CLIENT_ID: z.string().trim().optional(),
   APPLICATIONINSIGHTS_CONNECTION_STRING: z.string().trim().optional(),
+  TEAMS_WEBHOOK_URL: z.string().trim().optional(),
+  DASHBOARD_BASE_URL: z.string().trim().optional(),
   AUDIT_SERVICE_URL: z.string().trim().optional(),
   AUDIT_INGEST_TOKEN: z.string().trim().optional(),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
@@ -40,6 +42,19 @@ const rawSchema = z.object({
   SMTP_USER: z.string().trim().optional(),
   SMTP_PASS: z.string().trim().optional(),
 });
+
+// Validates a value parses as an http(s) URL. Used for the Teams webhook and dashboard base URL,
+// where a malformed value would fail late (at first post) rather than at boot.
+const isHttpUrl = (value: string, requireHttps: boolean): boolean => {
+  try {
+    const url = new URL(value);
+    return requireHttps
+      ? url.protocol === 'https:'
+      : url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 // SMTP relay used for the failed-inspection email alert (ADR 0013: email is the minimum
 // guaranteed notification channel). Resolved as a unit: present only when SMTP_HOST is set.
@@ -61,6 +76,13 @@ export type AppConfig = {
   entraClientId: string | undefined;
   applicationInsightsConnectionString: string | undefined;
   telemetryEnabled: boolean;
+  // undefined when the Teams webhook is not configured. The notifier treats this as "skip and
+  // warn", not a boot failure: Teams is a best-effort fast nudge with no delivery guarantee, and
+  // the post is fire-and-forget off the request path (ADR 0013, DEV-39).
+  teamsWebhookUrl: string | undefined;
+  // Dashboard origin used to build the Teams card deep link. undefined when unset; the card then
+  // posts without a deep-link button.
+  dashboardBaseUrl: string | undefined;
   auditServiceUrl: string | undefined;
   auditIngestToken: string | undefined;
   outboxPollIntervalMs: number;
@@ -164,6 +186,13 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     problems.push('ENTRA_CLIENT_ID is required (only NODE_ENV=test may omit it)');
   }
 
+  // Microsoft Teams alert channel (ADR 0013). Optional: a missing webhook does not abort boot,
+  // because Teams is a best-effort fast nudge, not a request-path dependency, and the dashboard
+  // queue is the not-missed backstop. When set, reject placeholders and require a valid https
+  // URL so a half-filled .env surfaces here rather than failing on the first post.
+  const teamsWebhookUrl = orUndefined(env.TEAMS_WEBHOOK_URL);
+  const dashboardBaseUrl = orUndefined(env.DASHBOARD_BASE_URL);
+
   // The outbox poller delivers to the Audit Service over HTTP (DEV-23 / ADR 0008); without it,
   // Inspections commit with no path to ever reach the audit chain. Required outside tests for the
   // same reason Entra and Application Insights are: a blank value is a setup mistake, not a valid
@@ -187,6 +216,8 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   const smtpUser = orUndefined(env.SMTP_USER);
   const smtpPass = orUndefined(env.SMTP_PASS);
   for (const [name, value] of [
+    ['TEAMS_WEBHOOK_URL', teamsWebhookUrl],
+    ['DASHBOARD_BASE_URL', dashboardBaseUrl],
     ['SMTP_HOST', smtpHost],
     ['SMTP_USER', smtpUser],
     ['SMTP_PASS', smtpPass],
@@ -194,6 +225,12 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     if (value && isPlaceholder(value)) {
       problems.push(`${name} is an unfilled placeholder; replace it with the real value`);
     }
+  }
+  if (teamsWebhookUrl && !isPlaceholder(teamsWebhookUrl) && !isHttpUrl(teamsWebhookUrl, true)) {
+    problems.push('TEAMS_WEBHOOK_URL is set but is not a valid https URL');
+  }
+  if (dashboardBaseUrl && !isPlaceholder(dashboardBaseUrl) && !isHttpUrl(dashboardBaseUrl, false)) {
+    problems.push('DASHBOARD_BASE_URL is set but is not a valid http(s) URL');
   }
 
   // SMTP auth is all-or-nothing: a relay needs both a username and a password, or neither (an
@@ -231,6 +268,8 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     entraClientId,
     applicationInsightsConnectionString: appInsights,
     telemetryEnabled: appInsights !== undefined,
+    teamsWebhookUrl,
+    dashboardBaseUrl,
     auditServiceUrl,
     auditIngestToken,
     outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,

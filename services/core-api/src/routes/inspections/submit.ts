@@ -18,6 +18,7 @@ import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';
 import { serializeInspection } from './serialize.js';
+import { notifyFailedInspectionTeams } from '../../lib/notifications/notify-failed-inspection-teams.js';
 
 // Looks up the cached idempotency record for (operatorId, key). Returns the stored response
 // when the digest matches, or throws IDEMPOTENCY_MISMATCH when it doesn't (ADR 0009).
@@ -215,6 +216,24 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
         },
         'inspection submitted',
       );
+
+      // Fire-and-forget Teams fast-nudge to the Supervisors channel on a blocking failure (ADR
+      // 0013, DEV-39). notifyFailedInspectionTeams guards on result, so PASS and FAIL_WARNING are
+      // no-ops; only FAIL_BLOCKING posts a card. It never rejects and is not awaited (`void`), so
+      // a webhook failure cannot affect this 201 response. Placed after the commit and after the
+      // idempotency replay returns above, so a retried submit replays the cached 201 without
+      // re-posting the card.
+      //
+      // defectId carries the inspection id as a stand-in: the Defect record (ARCHITECTURE.md 7.2
+      // step 2, the Defect Path) is not built yet, so no Defect.id exists. Swap to the real
+      // Defect.id once that lands. The DEV-21 email alert (notifyFailedInspection, the minimum
+      // guaranteed channel) belongs at this same point.
+      void notifyFailedInspectionTeams({
+        result,
+        assetTag: equipmentRow.assetTag,
+        defectId: responseBody.id,
+        severity: 'BLOCKING',
+      });
 
       return reply.code(201).send(responseBody);
     },
