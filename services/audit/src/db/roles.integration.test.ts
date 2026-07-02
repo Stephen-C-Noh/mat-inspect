@@ -8,9 +8,10 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-// Ephemeral credentials for the testcontainers Postgres instance — not real secrets.
-const MIGRATOR_ROLE_PW = 'testonly';
-const WRITER_ROLE_PW = 'testonly';
+// Throwaway passwords created inside the ephemeral testcontainer and dropped with it.
+// Not real credentials: the container is never reachable outside the test process.
+const MIGRATOR_ROLE_PW = 'testonly-ephemeral'; // gitleaks:allow
+const WRITER_ROLE_PW = 'testonly-ephemeral'; // gitleaks:allow
 
 describe('audit_events role privileges', () => {
   let container: StartedPostgreSqlContainer;
