@@ -1,17 +1,28 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useEquipmentById } from '@/hooks/use-equipment-by-id';
 
 function LockoutContent() {
+  const { equipmentId } = useParams<{ equipmentId: string }>();
   const searchParams = useSearchParams();
 
-  const equipmentName = searchParams.get('name') || 'Equipment Asset';
-  const assetTag = searchParams.get('tag') || 'N/A';
+  // Equipment identity comes from the server, not from URL params. This is the source of
+  // truth and stops anyone from fabricating a lockout tag for arbitrary name/tag values.
+  const { data: equipment, isPending, isError } = useEquipmentById(equipmentId);
 
-  // Repeated `defect` keys (?defect=A&defect=B) instead of one comma-joined value.
-  // Voice-transcribed defect notes can contain commas, so splitting on comma would
-  // break a single note into several entries.
+  const equipmentName = isPending
+    ? 'Loading equipment…'
+    : isError
+      ? 'Equipment (identity unavailable)'
+      : (equipment?.name ?? 'Equipment Asset');
+  const assetTag = equipment?.assetTag ?? (isPending ? '…' : 'N/A');
+
+  // Blocking defects come from the inspection that just failed. There is no endpoint to
+  // fetch them after the fact (the submit response carries no defect labels), so the submit
+  // flow passes them here as repeated `defect` keys (?defect=A&defect=B). getAll() avoids
+  // splitting a voice-transcribed note that itself contains a comma into several entries.
   const passedDefects = searchParams.getAll('defect');
   const blockingDefects =
     passedDefects.length > 0 ? passedDefects : ['Critical safety compliance violation'];
