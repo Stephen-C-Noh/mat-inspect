@@ -74,7 +74,9 @@ export const createEquipmentRoute: FastifyPluginAsync = async (app) => {
         'equipment created',
       );
 
-      return reply.code(201).send(serializeEquipment(row!));
+      // A brand new row has no Inspections or Defects yet, so its computed status is just its
+      // own stored default (AWAITING_INSPECTION); no readiness query needed.
+      return reply.code(201).send(serializeEquipment(row!, row!.status));
     },
   );
 };

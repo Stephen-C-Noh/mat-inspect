@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { equipmentSchema } from '@mat-inspect/shared-schemas';
 import { db, equipment } from '../../db/index.js';
+import { computeReadiness } from '../../lib/equipment-readiness.js';
 import { httpError } from '../../lib/http-error.js';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
@@ -33,12 +34,14 @@ export const getEquipmentByTagRoute: FastifyPluginAsync = async (app) => {
         throw httpError(404, 'EQUIPMENT_NOT_FOUND', `No equipment with asset tag ${assetTag}`);
       }
 
+      const readiness = await computeReadiness([row]);
+
       logger.info(
         { reqId: req.id, userId: req.user.id, assetTag, equipmentId: row.id },
         'equipment fetched by asset tag',
       );
 
-      return reply.code(200).send(serializeEquipment(row));
+      return reply.code(200).send(serializeEquipment(row, readiness.get(row.id)!));
     },
   );
 };

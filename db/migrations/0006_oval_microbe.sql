@@ -1,0 +1,2 @@
+CREATE INDEX "defects_equipment_severity_status_idx" ON "defects" USING btree ("equipment_id","severity","status");--> statement-breakpoint
+CREATE INDEX "inspections_equipment_result_submitted_idx" ON "inspections" USING btree ("equipment_id","result","submitted_at");

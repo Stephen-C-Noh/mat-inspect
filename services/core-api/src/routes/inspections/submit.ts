@@ -13,6 +13,7 @@ import {
 import { httpError } from '../../lib/http-error.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { requestDigest } from '../../lib/request-digest.js';
+import { computeInspectionContentHash } from '../../lib/content-hash.js';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';
@@ -134,20 +135,41 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
             })
             .returning();
 
-          if (body.responses.length > 0) {
+          // Normalized once and reused for both the insert and the content digest below, so the
+          // hash input is byte-identical to what a later reader reconstructs from the persisted
+          // rows (DEV-23 / ADR 0008).
+          const normalizedResponses = body.responses.map((response) => ({
+            itemKey: response.itemKey,
+            value: response.value,
+            passed: response.passed,
+            notes: response.notes ?? null,
+            notesSource: response.notesSource ?? null,
+          }));
+
+          if (normalizedResponses.length > 0) {
             await tx.insert(inspectionResponses).values(
-              body.responses.map((response) => ({
+              normalizedResponses.map((response) => ({
                 inspectionId: inspection!.id,
-                itemKey: response.itemKey,
-                value: response.value,
-                passed: response.passed,
-                notes: response.notes ?? null,
-                notesSource: response.notesSource ?? null,
+                ...response,
               })),
             );
           }
 
-          // Outbox row only; the poller, hash chain, and content digest are DEV-23.
+          // Seals the inspection + its responses + result into the audit chain (ADR 0008). A
+          // hash is not PII, so it is safe to carry in the outbox payload and the audit log.
+          const contentHash = computeInspectionContentHash({
+            inspectionId: inspection!.id,
+            equipmentId: body.equipmentId,
+            operatorId: req.user.id,
+            templateId: body.templateId,
+            templateVersion: template.version,
+            result,
+            submittedAt: inspection!.submittedAt.toISOString(),
+            responses: normalizedResponses,
+          });
+
+          // Outbox row; the poller (DEV-23) delivers it to the Audit Service, which seals it
+          // into the hash chain.
           await tx.insert(outbox).values({
             eventType: 'INSPECTION_SUBMITTED',
             payload: {
@@ -155,6 +177,7 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
               equipmentId: body.equipmentId,
               operatorId: req.user.id,
               result,
+              contentHash,
             },
           });
 
