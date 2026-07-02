@@ -1,19 +1,28 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function LockoutPage() {
+function LockoutContent() {
   const searchParams = useSearchParams();
 
   const equipmentName = searchParams.get('name') || 'Equipment Asset';
   const assetTag = searchParams.get('tag') || 'N/A';
 
-  // Extract and parse the passed blocking defects list
-  const rawDefects = searchParams.get('defects');
-  const blockingDefects = rawDefects
-    ? rawDefects.split(',')
-    : ['Critical safety compliance violation'];
+  // Repeated `defect` keys (?defect=A&defect=B) instead of one comma-joined value.
+  // Voice-transcribed defect notes can contain commas, so splitting on comma would
+  // break a single note into several entries.
+  const passedDefects = searchParams.getAll('defect');
+  const blockingDefects =
+    passedDefects.length > 0 ? passedDefects : ['Critical safety compliance violation'];
+
+  // Lockout time is when the inspection failed, not when this page renders. Passed as
+  // an ISO string (inspection submittedAt). If absent, show Unknown rather than
+  // fabricate a render-time value on a compliance-relevant tag.
+  const lockedAtParam = searchParams.get('lockedAt');
+  const lockedAt = lockedAtParam ? new Date(lockedAtParam) : null;
+  const lockedAtLabel =
+    lockedAt && !Number.isNaN(lockedAt.getTime()) ? lockedAt.toLocaleString() : 'Unknown';
 
   // --- HARD UI NAVIGATION LOCKOUT TRAP ---
   useEffect(() => {
@@ -59,9 +68,7 @@ export default function LockoutPage() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Lockout Timestamp
             </span>
-            <span className="text-sm font-semibold text-foreground">
-              {new Date().toLocaleString()}
-            </span>
+            <span className="text-sm font-semibold text-foreground">{lockedAtLabel}</span>
           </div>
 
           {/* Blocking Defects Display */}
@@ -94,5 +101,15 @@ export default function LockoutPage() {
         clearance log is required to reset this layout.
       </p>
     </main>
+  );
+}
+
+export default function LockoutPage() {
+  // useSearchParams() must sit under a Suspense boundary, otherwise `next build`
+  // fails prerendering this route (output: 'standalone' prerenders by default).
+  return (
+    <Suspense fallback={null}>
+      <LockoutContent />
+    </Suspense>
   );
 }
