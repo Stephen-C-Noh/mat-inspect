@@ -104,12 +104,6 @@ export const ChecklistItemCard = ({
             <SeverityTag severity={item.failSeverity} />
           </div>
 
-          {item.regulatoryReference && (
-            <div className="mb-3 hidden">
-              <RegulatoryInfo reference={item.regulatoryReference} />
-            </div>
-          )}
-
           <div>
             {isBooleanType(item) && (
               <>

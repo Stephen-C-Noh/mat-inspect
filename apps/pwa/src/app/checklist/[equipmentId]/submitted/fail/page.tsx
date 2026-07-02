@@ -94,12 +94,12 @@ function SubmittedFailContent(): ReactElement {
         {/* Icon + title */}
         <div className="flex flex-col items-center gap-3 pt-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning">
-            <CheckCircle className="size-10 text-white" strokeWidth={2.5} />
+            <CheckCircle className="size-10 text-warning-foreground" strokeWidth={2.5} />
           </div>
           <h1 className="text-center text-2xl font-extrabold text-foreground">
             Inspection{'\n'}Submitted
           </h1>
-          <span className="flex items-center gap-1.5 rounded-full bg-warning px-4 py-1.5 text-xs font-bold text-white">
+          <span className="flex items-center gap-1.5 rounded-full bg-warning px-4 py-1.5 text-xs font-bold text-warning-foreground">
             <AlertTriangle className="size-3.5" />
             CHAIR HOLDERS NOTIFIED
           </span>

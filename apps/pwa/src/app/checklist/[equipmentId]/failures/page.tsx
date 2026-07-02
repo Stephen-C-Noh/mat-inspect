@@ -169,7 +169,7 @@ function FailuresContent(): ReactElement {
         <Link href={`/checklist/${params.equipmentId}/submitted/fail`} className="block">
           <button
             type="button"
-            className="w-full rounded-sm bg-warning py-4 text-sm font-bold text-white shadow-card"
+            className="w-full rounded-sm bg-warning py-4 text-sm font-bold text-warning-foreground shadow-card"
           >
             Submit Inspection with Failures
           </button>

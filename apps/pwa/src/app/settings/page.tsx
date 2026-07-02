@@ -32,7 +32,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
       }`}
     >
       <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+        className={`inline-block h-4 w-4 transform rounded-full bg-accent-foreground shadow transition-transform ${
           checked ? 'translate-x-6' : 'translate-x-1'
         }`}
       />
