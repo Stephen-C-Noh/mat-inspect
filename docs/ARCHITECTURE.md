@@ -292,7 +292,7 @@ Database-level invariants:
 4. Audit Service writes EQUIPMENT_STATUS_CHANGED and DEFECT_OPENED events.
 5. PWA displays a digital lockout tag.
 6. Supervisor reviews defect, assigns to qualified person for repair.
-7. After repair, supervisor approves return-to-service; equipment goes back to AWAITING_INSPECTION (a fresh passing inspection still required before READY).
+7. After repair, the defect is resolved, then a supervisor approves return-to-service as a separate action. The approval clears the stored OUT_OF_SERVICE state and sets `readiness_baseline_at = now()`, so the equipment reads as AWAITING_INSPECTION and any pass from earlier the same day no longer counts. A fresh passing inspection, submitted after the approval, is required before READY (ADR 0006).
 
 ### 7.3 Manager: Compliance Dashboard
 
