@@ -138,21 +138,24 @@ function LandingPageContent() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <NavButton icon={LayoutDashboard} label="Dashboard" />
-          <NavButton icon={History} label="History" />
-          <NavButton icon={Settings} label="Settings" />
-          <NavButton icon={HelpCircle} label="Help Center" />
+          <NavButton icon={LayoutDashboard} label="Dashboard" href="/" />
+          <NavButton icon={History} label="History" href="/" />
+          <NavButton icon={Settings} label="Settings" href="/settings" />
+          <NavButton icon={HelpCircle} label="Help Center" href="/help" />
         </div>
       </div>
     </main>
   );
 }
 
-function NavButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+function NavButton({ icon: Icon, label, href }: { icon: LucideIcon; label: string; href: string }) {
   return (
-    <button className="flex items-center justify-center gap-2 bg-card py-4 rounded-lg border border-border shadow-card transition-all font-semibold text-sm">
+    <Link
+      href={href}
+      className="flex items-center justify-center gap-2 bg-card py-4 rounded-lg border border-border shadow-card transition-all font-semibold text-sm text-foreground"
+    >
       <Icon className="size-5 text-accent" /> {label}
-    </button>
+    </Link>
   );
 }
 
