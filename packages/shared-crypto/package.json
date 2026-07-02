@@ -1,0 +1,24 @@
+{
+  "name": "@mat-inspect/shared-crypto",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "canonicalize": "^3.0.0"
+  },
+  "devDependencies": {
+    "typescript": "*"
+  }
+}
