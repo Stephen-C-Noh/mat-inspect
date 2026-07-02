@@ -7,6 +7,7 @@ import {
   timestamp,
   jsonb,
   pgEnum,
+  index,
 } from 'drizzle-orm/pg-core';
 import { equipment } from './equipment.js';
 import { users } from './users.js';
@@ -27,25 +28,37 @@ export const notesSourceEnum = pgEnum('notes_source', [
 // Immutable once written: UPDATE/DELETE-blocking triggers added in the
 // inspection_immutability_triggers migration (ADR 0008). Corrections are new linked
 // inspections, not edits.
-export const inspections = pgTable('inspections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  equipmentId: uuid('equipment_id')
-    .notNull()
-    .references(() => equipment.id),
-  // Attestation is operatorId + submittedAt + the confirmed submit; no signature column
-  // (ADR 0007). operatorId always comes from the validated token, never the request body.
-  operatorId: uuid('operator_id')
-    .notNull()
-    .references(() => users.id),
-  templateId: uuid('template_id')
-    .notNull()
-    .references(() => checklistTemplates.id),
-  // Pinned at submit time so a later template republish does not change what an existing
-  // Inspection is read as having been graded against.
-  templateVersion: integer('template_version').notNull(),
-  result: inspectionResultEnum('result').notNull(),
-  submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const inspections = pgTable(
+  'inspections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    equipmentId: uuid('equipment_id')
+      .notNull()
+      .references(() => equipment.id),
+    // Attestation is operatorId + submittedAt + the confirmed submit; no signature column
+    // (ADR 0007). operatorId always comes from the validated token, never the request body.
+    operatorId: uuid('operator_id')
+      .notNull()
+      .references(() => users.id),
+    templateId: uuid('template_id')
+      .notNull()
+      .references(() => checklistTemplates.id),
+    // Pinned at submit time so a later template republish does not change what an existing
+    // Inspection is read as having been graded against.
+    templateVersion: integer('template_version').notNull(),
+    result: inspectionResultEnum('result').notNull(),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Supports the readiness passing-today query: WHERE equipment_id = ? AND result = 'PASS'
+    // AND submitted_at >= readiness_baseline_at AND submitted_at::date = today (ADR 0006).
+    index('inspections_equipment_result_submitted_idx').on(
+      table.equipmentId,
+      table.result,
+      table.submittedAt,
+    ),
+  ],
+);
 
 // Immutable once written: see inspections above.
 export const inspectionResponses = pgTable('inspection_responses', {
