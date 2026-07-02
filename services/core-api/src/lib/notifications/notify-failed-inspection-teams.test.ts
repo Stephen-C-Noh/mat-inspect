@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   notifyFailedInspectionTeams,
+  resetDashboardUrlWarningForTest,
   type FailedInspectionTeamsAlert,
 } from './notify-failed-inspection-teams.js';
 import type { TeamsWebhookPayload } from './teams-card.js';
@@ -32,6 +33,11 @@ const inspectPayload = (payload: TeamsWebhookPayload) => {
 };
 
 describe('notifyFailedInspectionTeams', () => {
+  // The missing-dashboard-url warning is deduped per process; re-arm it before each test.
+  beforeEach(() => {
+    resetDashboardUrlWarningForTest();
+  });
+
   it('does not post on PASS', async () => {
     const sender = vi.fn().mockResolvedValue(undefined);
     const log = makeLog();
@@ -83,6 +89,15 @@ describe('notifyFailedInspectionTeams', () => {
     expect(actions).toEqual([]);
     expect(log.warn).toHaveBeenCalledTimes(1);
     expect(log.warn.mock.calls[0]![1]).toMatch(/DASHBOARD_BASE_URL not set/);
+  });
+
+  it('warns about the missing dashboard url only once across repeated blocking failures', async () => {
+    const sender = vi.fn().mockResolvedValue(undefined);
+    const log = makeLog();
+    await notifyFailedInspectionTeams(makeAlert(), { sender, dashboardBaseUrl: '', log });
+    await notifyFailedInspectionTeams(makeAlert(), { sender, dashboardBaseUrl: '', log });
+    expect(sender).toHaveBeenCalledTimes(2);
+    expect(log.warn).toHaveBeenCalledTimes(1);
   });
 
   it('warns and skips when the Teams webhook is not configured', async () => {

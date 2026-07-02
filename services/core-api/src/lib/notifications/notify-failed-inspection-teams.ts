@@ -42,6 +42,15 @@ const DEFECT_DASHBOARD_PATH = '/defects';
 
 const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+// A missing DASHBOARD_BASE_URL is a persistent config state, not a per-inspection event, so warn
+// once per process rather than on every blocking failure.
+let warnedMissingDashboardUrl = false;
+
+// Test-only: re-arms the once-per-process "DASHBOARD_BASE_URL not set" warning.
+export const resetDashboardUrlWarningForTest = (): void => {
+  warnedMissingDashboardUrl = false;
+};
+
 // Composes the absolute deep link, or undefined when no dashboard base URL is configured.
 const buildDeepLink = (baseUrl: string | undefined, defectId: string): string | undefined => {
   if (!baseUrl) return undefined;
@@ -103,12 +112,13 @@ export const notifyFailedInspectionTeams = async (
     const baseUrl =
       deps.dashboardBaseUrl !== undefined ? deps.dashboardBaseUrl : config().dashboardBaseUrl;
     const deepLink = buildDeepLink(baseUrl, alert.defectId);
-    if (!deepLink) {
+    if (!deepLink && !warnedMissingDashboardUrl) {
       // A card with no deep link is still useful (asset tag and Defect ID), so post it anyway and
-      // record the missing config once.
+      // record the missing config once per process (not once per blocking failure).
+      warnedMissingDashboardUrl = true;
       log.warn(
         { assetTag: alert.assetTag },
-        'DASHBOARD_BASE_URL not set; Teams card posted without a deep link',
+        'DASHBOARD_BASE_URL not set; Teams cards posted without a deep link',
       );
     }
 
