@@ -10,6 +10,7 @@ import { createEquipmentRoute } from './routes/equipment/create.js';
 import { updateEquipmentRoute } from './routes/equipment/update.js';
 import { publishChecklistTemplateRoute } from './routes/checklists/publish.js';
 import { activeChecklistTemplateRoute } from './routes/checklists/active.js';
+import { getChecklistTemplateByIdRoute } from './routes/checklists/get-by-id.js';
 import { submitInspectionRoute } from './routes/inspections/submit.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
@@ -74,6 +75,9 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   await app.register(updateEquipmentRoute, { prefix: '/api/v1' });
   await app.register(publishChecklistTemplateRoute, { prefix: '/api/v1' });
   await app.register(activeChecklistTemplateRoute, { prefix: '/api/v1' });
+  // /checklists/active is a static segment, so Fastify's radix router prefers it over the
+  // /checklists/:id parameter regardless of registration order; no collision to guard against.
+  await app.register(getChecklistTemplateByIdRoute, { prefix: '/api/v1' });
   await app.register(submitInspectionRoute, { prefix: '/api/v1' });
 
   if (process.env['NODE_ENV'] !== 'production') {
