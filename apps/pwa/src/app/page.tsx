@@ -61,8 +61,8 @@ function LandingPageContent() {
 
         <div className="mt-6">
           <Link href="/scan" className="w-full">
-            <button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-4 px-4 rounded-lg shadow-card border border-accent flex items-center justify-center gap-2 transition-all">
-              <div className="bg-accent-foreground/20 p-1.5 rounded-md">
+            <button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-4 px-4 rounded-sm shadow-card border border-accent flex items-center justify-center gap-2 transition-all">
+              <div className="bg-accent-foreground/20 p-1.5 rounded-sm">
                 <QrCode className="size-6 text-accent-foreground" />
               </div>
               <span className="font-bold text-sm tracking-wide">SCAN QR CODE</span>
@@ -75,13 +75,13 @@ function LandingPageContent() {
           <input
             type="text"
             placeholder="Search by Equipment ID, Name or Tag"
-            className="w-full pl-12 pr-4 py-4 rounded-lg border border-border shadow-card focus:ring-2 focus:ring-ring outline-none text-base bg-card"
+            className="w-full pl-12 pr-4 py-4 rounded-sm border border-border shadow-card focus:ring-2 focus:ring-ring outline-none text-base bg-card"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div className="bg-card rounded-lg shadow-card border border-border overflow-hidden">
+        <div className="bg-card rounded-sm shadow-card border border-border overflow-hidden">
           <div className="p-4 border-b border-border flex justify-between items-center">
             <h3 className="font-semibold text-muted-foreground text-sm">RECENTLY INSPECTED</h3>
             {filteredAndSorted.length > 3 && (
@@ -121,7 +121,7 @@ function LandingPageContent() {
                 className="p-4 flex items-center justify-between hover:bg-muted transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-4">
-                  <div className="bg-muted w-12 h-12 rounded-lg flex items-center justify-center">
+                  <div className="bg-muted w-12 h-12 rounded-sm flex items-center justify-center">
                     <EquipmentIcon name={item.name} />
                   </div>
                   <div>
@@ -152,7 +152,7 @@ function NavButton({ icon: Icon, label, href }: { icon: LucideIcon; label: strin
   return (
     <Link
       href={href}
-      className="flex items-center justify-center gap-2 bg-card py-4 rounded-lg border border-border shadow-card transition-all font-semibold text-sm text-foreground"
+      className="flex items-center justify-center gap-2 bg-card py-4 rounded-sm border border-border shadow-card transition-all font-semibold text-sm text-foreground"
     >
       <Icon className="size-5 text-accent" /> {label}
     </Link>

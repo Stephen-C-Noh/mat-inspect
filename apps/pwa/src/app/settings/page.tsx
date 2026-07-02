@@ -63,7 +63,7 @@ function AccordionRow({
         className="flex w-full items-center justify-between p-4 text-left"
       >
         <div className="flex items-center gap-3">
-          <div className={`rounded-lg p-2 ${danger ? 'bg-destructive/10' : 'bg-muted'}`}>
+          <div className={`rounded-sm p-2 ${danger ? 'bg-destructive/10' : 'bg-muted'}`}>
             <Icon className={`size-5 ${danger ? 'text-destructive' : 'text-accent'}`} />
           </div>
           <div>
@@ -141,7 +141,7 @@ function SettingsContent(): ReactElement {
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-lg p-1.5 hover:bg-primary-foreground/10 transition-colors"
+          className="rounded-sm p-1.5 hover:bg-primary-foreground/10 transition-colors"
           aria-label="Go back"
         >
           <ChevronRight className="size-5 rotate-180" />
@@ -151,14 +151,14 @@ function SettingsContent(): ReactElement {
 
       <div className="mx-auto max-w-lg px-4 pb-12">
         {/* Account card */}
-        <div className="mt-6 flex items-center gap-4 rounded-lg border border-border bg-card p-4 shadow-card">
+        <div className="mt-6 flex items-center gap-4 rounded-sm border border-border bg-card p-4 shadow-card">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-xl font-extrabold text-accent-foreground">
             {account?.name?.charAt(0)?.toUpperCase() ?? 'U'}
           </div>
           <div>
             <p className="text-base font-bold text-foreground">{account?.name ?? 'Operator'}</p>
             <p className="text-sm text-muted-foreground">{account?.username ?? ''}</p>
-            <span className="mt-1 inline-block rounded-lg bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+            <span className="mt-1 inline-block rounded-sm bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
               Operator
             </span>
           </div>
@@ -166,7 +166,7 @@ function SettingsContent(): ReactElement {
 
         {/* Notifications */}
         <SectionLabel>Notifications</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card divide-y divide-border">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card divide-y divide-border">
           <AccordionRow
             icon={Bell}
             label="Inspection Alerts"
@@ -208,7 +208,7 @@ function SettingsContent(): ReactElement {
 
         {/* Preferences */}
         <SectionLabel>Preferences</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card divide-y divide-border">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card divide-y divide-border">
           <AccordionRow icon={Moon} label="Dark Mode" preview={isDark ? 'On' : 'Off'}>
             <div className="flex items-center justify-between py-2">
               <div>
@@ -244,7 +244,7 @@ function SettingsContent(): ReactElement {
 
         {/* Security */}
         <SectionLabel>Security</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card">
           <AccordionRow icon={Shield} label="Privacy Policy">
             <p className="text-sm text-muted-foreground leading-relaxed">
               MAT-Inspect collects inspection records, operator IDs, and equipment photos as
@@ -259,7 +259,7 @@ function SettingsContent(): ReactElement {
 
         {/* About */}
         <SectionLabel>About</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card divide-y divide-border">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card divide-y divide-border">
           <AccordionRow icon={Info} label="App Version" preview="1.0.0">
             <div className="space-y-1 text-sm text-muted-foreground">
               <p>
@@ -276,7 +276,7 @@ function SettingsContent(): ReactElement {
 
           <Link href="/help" className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-muted p-2">
+              <div className="rounded-sm bg-muted p-2">
                 <HelpCircle className="size-5 text-accent" />
               </div>
               <span className="text-sm font-semibold text-foreground">Help Center</span>
@@ -287,13 +287,13 @@ function SettingsContent(): ReactElement {
 
         {/* Account */}
         <SectionLabel>Account</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card">
           <button
             type="button"
             onClick={handleSignOut}
             className="flex w-full items-center gap-3 p-4 text-left"
           >
-            <div className="rounded-lg bg-destructive/10 p-2">
+            <div className="rounded-sm bg-destructive/10 p-2">
               <LogOut className="size-5 text-destructive" />
             </div>
             <span className="font-semibold text-sm text-destructive">Sign Out</span>

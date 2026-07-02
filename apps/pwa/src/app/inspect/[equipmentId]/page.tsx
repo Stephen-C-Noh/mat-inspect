@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
@@ -16,6 +16,7 @@ import {
 
 function ChecklistView(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
+  const router = useRouter();
 
   const {
     data: equipmentList,
@@ -102,6 +103,14 @@ function ChecklistView(): ReactElement {
           type="button"
           disabled={!canSubmit}
           title={canSubmit ? undefined : 'Answer all required items to submit'}
+          onClick={() => {
+            if (!canSubmit) return;
+            if (failures > 0) {
+              router.push(`/checklist/${params.equipmentId}/failures`);
+            } else {
+              router.push(`/checklist/${params.equipmentId}/submitted`);
+            }
+          }}
           className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-lg py-4 text-base font-bold shadow-card ${
             canSubmit
               ? `${submitColor} text-primary-foreground`

@@ -46,7 +46,7 @@ function ContactCard({
 }): ReactElement {
   return (
     <div className="flex items-center gap-3 p-4">
-      <div className="rounded-lg bg-muted p-2">
+      <div className="rounded-sm bg-muted p-2">
         <Icon className="size-5 text-accent" />
       </div>
       <div>
@@ -67,7 +67,7 @@ function HelpContent(): ReactElement {
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-lg p-1.5 hover:bg-primary-foreground/10 transition-colors"
+          className="rounded-sm p-1.5 hover:bg-primary-foreground/10 transition-colors"
           aria-label="Go back"
         >
           <ChevronRight className="size-5 rotate-180" />
@@ -78,7 +78,7 @@ function HelpContent(): ReactElement {
       <div className="mx-auto max-w-lg px-4 pb-12">
         {/* FAQ */}
         <SectionLabel>Frequently Asked Questions</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card">
           <FaqItem question="How do I start an inspection?">
             Scan the QR code on the equipment using the Scan tab on the home screen. The app will
             load the correct checklist for that piece of equipment automatically.
@@ -105,7 +105,7 @@ function HelpContent(): ReactElement {
 
         {/* Documentation */}
         <SectionLabel>Documentation</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card divide-y divide-border">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card divide-y divide-border">
           <button type="button" className="w-full text-left">
             <ContactCard
               icon={BookOpen}
@@ -124,7 +124,7 @@ function HelpContent(): ReactElement {
 
         {/* Contact */}
         <SectionLabel>Contact</SectionLabel>
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card divide-y divide-border">
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card divide-y divide-border">
           <button type="button" className="w-full text-left">
             <ContactCard
               icon={Mail}

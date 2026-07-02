@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { ChecklistItem } from '@mat-inspect/shared-types';
 import type { ChecklistAnswer } from '@/lib/checklist-answers';
 import { isItemAnswered } from '@/lib/checklist-answers';
@@ -28,6 +29,25 @@ const borderColorFor = (item: ChecklistItem, answer: ChecklistAnswer | undefined
   return 'border-l-success';
 };
 
+const statusLabel = (answer: ChecklistAnswer | undefined): ReactElement | null => {
+  if (!answer) return null;
+  if (answer.kind === 'BOOLEAN')
+    return answer.passed ? (
+      <span className="rounded-sm bg-success px-2 py-0.5 text-xs font-bold text-success-foreground">
+        Pass
+      </span>
+    ) : (
+      <span className="rounded-sm bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground">
+        Fail
+      </span>
+    );
+  return (
+    <span className="rounded-sm bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
+      Answered
+    </span>
+  );
+};
+
 export const ChecklistItemCard = ({
   item,
   answer,
@@ -36,11 +56,9 @@ export const ChecklistItemCard = ({
   onNotesChange,
 }: Props): ReactElement => {
   const failed = answer?.kind === 'BOOLEAN' && !answer.passed;
-  const passed = answer?.kind === 'BOOLEAN' && answer.passed;
 
-  // A passing answer needs no further input, so collapse it to a summary row to keep the
-  // list scannable (design 03). A failing answer stays expanded so the operator can
-  // document the defect in notes.
+  // Passing auto-collapses so the list stays scannable (design 03). Any item can also be
+  // manually collapsed/expanded via the chevron in the header.
   const [collapsed, setCollapsed] = useState(false);
 
   const handleBooleanChange = (nextPassed: boolean): void => {
@@ -48,104 +66,105 @@ export const ChecklistItemCard = ({
     setCollapsed(nextPassed);
   };
 
-  if (isBooleanType(item) && passed && collapsed) {
-    return (
+  return (
+    <div className={`rounded-sm border-l-4 bg-card shadow-card ${borderColorFor(item, answer)}`}>
+      {/* Header — always visible, tapping toggles the body */}
       <button
         type="button"
-        onClick={() => setCollapsed(false)}
-        className="flex w-full items-center justify-between rounded-sm border-l-4 border-l-success bg-card p-4 text-left shadow-card"
+        onClick={() => setCollapsed((v) => !v)}
+        className="flex w-full items-start justify-between gap-2 p-4 text-left"
       >
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Status
-            </span>
-            <span className="rounded-lg bg-success px-3 py-1 text-xs font-bold text-success-foreground">
-              Pass
-            </span>
-          </div>
-          <p className="mt-1 text-sm font-bold text-foreground">{item.prompt}</p>
+        <div className="flex-1">
+          <h3 className="text-base font-bold text-foreground">
+            {item.prompt}
+            {item.required && (
+              <span className="ml-1 text-destructive" aria-label="Required">
+                *
+              </span>
+            )}
+          </h3>
+          {collapsed && <div className="mt-1">{statusLabel(answer)}</div>}
         </div>
-        <span aria-hidden className="text-muted-foreground">
-          ⌄
-        </span>
-      </button>
-    );
-  }
-
-  return (
-    <div
-      className={`rounded-sm border-l-4 bg-card p-4 shadow-card ${borderColorFor(item, answer)}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-base font-bold text-foreground">
-          {item.prompt}
-          {item.required && (
-            <span className="ml-1 text-destructive" aria-label="Required">
-              *
-            </span>
+        <div className="flex shrink-0 items-center gap-2 pt-0.5">
+          {item.regulatoryReference && !collapsed && (
+            <RegulatoryInfo reference={item.regulatoryReference} />
           )}
-        </h3>
-        {item.regulatoryReference && <RegulatoryInfo reference={item.regulatoryReference} />}
-      </div>
+          <ChevronDown
+            className={`size-4 text-muted-foreground transition-transform duration-200 ${
+              collapsed ? '' : 'rotate-180'
+            }`}
+          />
+        </div>
+      </button>
 
-      <div className="mt-2">
-        <SeverityTag severity={item.failSeverity} />
-      </div>
+      {/* Body — hidden when collapsed */}
+      {!collapsed && (
+        <div className="px-4 pb-4">
+          <div className="mb-4">
+            <SeverityTag severity={item.failSeverity} />
+          </div>
 
-      <div className="mt-4">
-        {isBooleanType(item) && (
-          <>
-            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Status
-            </span>
-            <div className="mt-1">
-              <BooleanToggle
-                passed={answer?.kind === 'BOOLEAN' ? answer.passed : undefined}
-                onChange={handleBooleanChange}
+          {item.regulatoryReference && (
+            <div className="mb-3 hidden">
+              <RegulatoryInfo reference={item.regulatoryReference} />
+            </div>
+          )}
+
+          <div>
+            {isBooleanType(item) && (
+              <>
+                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Status
+                </span>
+                <div className="mt-1">
+                  <BooleanToggle
+                    passed={answer?.kind === 'BOOLEAN' ? answer.passed : undefined}
+                    onChange={handleBooleanChange}
+                  />
+                </div>
+              </>
+            )}
+
+            {item.type === 'TEXT' && (
+              <TextResponseInput
+                value={answer?.kind === 'TEXT' ? answer.value : undefined}
+                onChange={(value) => onAnswerChange({ kind: 'TEXT', value })}
+              />
+            )}
+          </div>
+
+          {item.type === 'BOOLEAN_PHOTO_ON_FAIL' && failed && (
+            <div className="mt-3">
+              <PhotoRequiredPrompt />
+            </div>
+          )}
+
+          {item.type !== 'TEXT' && (
+            <div className="mt-4">
+              <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(event) => onNotesChange(event.target.value)}
+                placeholder="Add any observations or comments..."
+                rows={2}
+                className="mt-1 w-full rounded-sm border border-input bg-muted px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
               />
             </div>
-          </>
-        )}
+          )}
 
-        {item.type === 'TEXT' && (
-          <TextResponseInput
-            value={answer?.kind === 'TEXT' ? answer.value : undefined}
-            onChange={(value) => onAnswerChange({ kind: 'TEXT', value })}
-          />
-        )}
-      </div>
-
-      {item.type === 'BOOLEAN_PHOTO_ON_FAIL' && failed && (
-        <div className="mt-3">
-          <PhotoRequiredPrompt />
+          <button
+            type="button"
+            disabled
+            title="Voice notes are coming in a later sprint"
+            className="mt-3 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-sm bg-muted py-3 text-sm font-bold text-muted-foreground"
+          >
+            <span aria-hidden>🎤</span>
+            Add Voice Note
+          </button>
         </div>
       )}
-
-      {item.type !== 'TEXT' && (
-        <div className="mt-4">
-          <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Notes
-          </label>
-          <textarea
-            value={notes}
-            onChange={(event) => onNotesChange(event.target.value)}
-            placeholder="Add any observations or comments..."
-            rows={2}
-            className="mt-1 w-full rounded-lg border border-input bg-muted px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
-          />
-        </div>
-      )}
-
-      <button
-        type="button"
-        disabled
-        title="Voice notes are coming in a later sprint"
-        className="mt-3 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-muted py-3 text-sm font-bold text-muted-foreground"
-      >
-        <span aria-hidden>🎤</span>
-        Add Voice Note
-      </button>
     </div>
   );
 };
