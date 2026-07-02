@@ -262,6 +262,22 @@ describe('loadConfig', () => {
     );
   });
 
+  it('leaves supervisorAlertEmails empty when unset', () => {
+    expect(loadConfig(fullDev()).supervisorAlertEmails).toEqual([]);
+  });
+
+  it('parses a comma-separated SUPERVISOR_ALERT_EMAILS list and trims entries', () => {
+    const cfg = loadConfig(fullDev({ SUPERVISOR_ALERT_EMAILS: 'a@sait.ca, b@sait.ca ,c@sait.ca' }));
+    expect(cfg.supervisorAlertEmails).toEqual(['a@sait.ca', 'b@sait.ca', 'c@sait.ca']);
+  });
+
+  it('rejects a SUPERVISOR_ALERT_EMAILS entry that is not an email address', () => {
+    expectProblem(
+      fullDev({ SUPERVISOR_ALERT_EMAILS: 'a@sait.ca, not-an-email' }),
+      /SUPERVISOR_ALERT_EMAILS contains an entry that is not an email address/,
+    );
+  });
+
   it('reports every problem at once', () => {
     const env: NodeJS.ProcessEnv = {
       NODE_ENV: 'production',
