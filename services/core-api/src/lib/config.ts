@@ -29,7 +29,28 @@ const rawSchema = z.object({
   AUDIT_SERVICE_URL: z.string().trim().optional(),
   AUDIT_INGEST_TOKEN: z.string().trim().optional(),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  SMTP_HOST: z.string().trim().optional(),
+  // Treat a blank SMTP_PORT the same as unset, matching how orUndefined handles the other SMTP
+  // vars. Without the preprocess, z.coerce turns '' into 0, which fails .positive() with a raw
+  // Zod message when someone blanks the whole SMTP block uniformly.
+  SMTP_PORT: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().positive().optional(),
+  ),
+  SMTP_USER: z.string().trim().optional(),
+  SMTP_PASS: z.string().trim().optional(),
 });
+
+// SMTP relay used for the failed-inspection email alert (ADR 0013: email is the minimum
+// guaranteed notification channel). Resolved as a unit: present only when SMTP_HOST is set.
+// secure is derived from the port (465 is implicit TLS; 587/25 upgrade via STARTTLS).
+export type SmtpConfig = {
+  host: string;
+  port: number;
+  user: string | undefined;
+  pass: string | undefined;
+  secure: boolean;
+};
 
 export type AppConfig = {
   nodeEnv: 'development' | 'test' | 'production';
@@ -43,7 +64,16 @@ export type AppConfig = {
   auditServiceUrl: string | undefined;
   auditIngestToken: string | undefined;
   outboxPollIntervalMs: number;
+  // undefined when SMTP is not configured. The notifier treats this as "skip and warn",
+  // not a boot failure: a missing relay must not block the service from starting, and the
+  // email channel is fire-and-forget off the request path (DEV-21).
+  smtp: SmtpConfig | undefined;
 };
+
+// Implicit-TLS SMTP submission port. Any other port (587 submission, 25 relay) negotiates
+// TLS via STARTTLS, which nodemailer does when secure is false.
+const SMTP_IMPLICIT_TLS_PORT = 465;
+const SMTP_DEFAULT_PORT = 587;
 
 export class EnvValidationError extends Error {
   constructor(public readonly problems: string[]) {
@@ -145,11 +175,50 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   }
   if (requireAzure && !auditIngestToken) {
     problems.push('AUDIT_INGEST_TOKEN is required (only NODE_ENV=test may omit it)');
+  // SMTP for the failed-inspection email alert. Optional: a missing relay does not abort boot
+  // (unlike Azure config), because email is a fire-and-forget side channel, not a request-path
+  // dependency. When SMTP_HOST is set, reject placeholder credentials so a half-filled .env
+  // surfaces here rather than failing on the first send. Email is the minimum guaranteed alert
+  // channel in production (ADR 0013); deployment must set these, but the service still starts
+  // without them so unrelated dev work is not blocked.
+  const smtpHost = orUndefined(env.SMTP_HOST);
+  const smtpUser = orUndefined(env.SMTP_USER);
+  const smtpPass = orUndefined(env.SMTP_PASS);
+  for (const [name, value] of [
+    ['SMTP_HOST', smtpHost],
+    ['SMTP_USER', smtpUser],
+    ['SMTP_PASS', smtpPass],
+  ] as const) {
+    if (value && isPlaceholder(value)) {
+      problems.push(`${name} is an unfilled placeholder; replace it with the real value`);
+    }
+  }
+
+  // SMTP auth is all-or-nothing: a relay needs both a username and a password, or neither (an
+  // unauthenticated relay that accepts submission from the app host). Exactly one is always a
+  // misconfiguration. Catch it at boot for the same reason the rest of this file exists: a
+  // half-filled auth lets boot succeed, then every send fails authentication, retries, and is
+  // swallowed into a single warn, so supervisors silently receive no failed-inspection alerts.
+  if (smtpHost && Boolean(smtpUser) !== Boolean(smtpPass)) {
+    problems.push(
+      'SMTP_USER and SMTP_PASS must be set together (or both left blank for an unauthenticated relay)',
+    );
   }
 
   if (problems.length > 0) {
     throw new EnvValidationError(problems);
   }
+
+  const smtp: SmtpConfig | undefined =
+    smtpHost && !isPlaceholder(smtpHost)
+      ? {
+          host: smtpHost,
+          port: env.SMTP_PORT ?? SMTP_DEFAULT_PORT,
+          user: smtpUser,
+          pass: smtpPass,
+          secure: (env.SMTP_PORT ?? SMTP_DEFAULT_PORT) === SMTP_IMPLICIT_TLS_PORT,
+        }
+      : undefined;
 
   return {
     nodeEnv: env.NODE_ENV,
@@ -163,6 +232,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     auditServiceUrl,
     auditIngestToken,
     outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
+    smtp,
   };
 };
 

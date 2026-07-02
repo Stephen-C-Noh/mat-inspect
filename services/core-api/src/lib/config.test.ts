@@ -157,6 +157,73 @@ describe('loadConfig', () => {
     expect(cfg.auditIngestToken).toBeUndefined();
   });
 
+  it('leaves smtp undefined when SMTP_HOST is not set', () => {
+    expect(loadConfig(fullDev()).smtp).toBeUndefined();
+  });
+
+  it('resolves smtp config with a default port and STARTTLS when SMTP_HOST is set', () => {
+    const cfg = loadConfig(
+      fullDev({
+        SMTP_HOST: 'smtp.example.test',
+        SMTP_USER: 'test-user',
+        SMTP_PASS: 'test-password',
+      }),
+    );
+    expect(cfg.smtp).toEqual({
+      host: 'smtp.example.test',
+      port: 587,
+      user: 'test-user',
+      pass: 'test-password',
+      secure: false,
+    });
+  });
+
+  it('marks smtp secure on the implicit-TLS port 465', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PORT: '465' }));
+    expect(cfg.smtp?.port).toBe(465);
+    expect(cfg.smtp?.secure).toBe(true);
+  });
+
+  it('rejects a placeholder SMTP_PASS instead of failing on the first send', () => {
+    expectProblem(
+      fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PASS: 'REPLACE_ME' }),
+      /SMTP_PASS is an unfilled placeholder/,
+    );
+  });
+
+  it('rejects SMTP_USER without SMTP_PASS (half-filled auth would silently fail every send)', () => {
+    expectProblem(
+      fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_USER: 'test-user' }),
+      /SMTP_USER and SMTP_PASS must be set together/,
+    );
+  });
+
+  it('rejects SMTP_PASS without SMTP_USER', () => {
+    expectProblem(
+      fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PASS: 'test-password' }),
+      /SMTP_USER and SMTP_PASS must be set together/,
+    );
+  });
+
+  it('allows an unauthenticated relay (host set, neither user nor pass)', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: 'smtp.example.test' }));
+    expect(cfg.smtp).toMatchObject({
+      host: 'smtp.example.test',
+      user: undefined,
+      pass: undefined,
+    });
+  });
+
+  it('treats a blank SMTP_PORT as unset and applies the default port', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: 'smtp.example.test', SMTP_PORT: '' }));
+    expect(cfg.smtp?.port).toBe(587);
+  });
+
+  it('treats a uniformly blank SMTP block as disabled', () => {
+    const cfg = loadConfig(fullDev({ SMTP_HOST: '', SMTP_PORT: '', SMTP_USER: '', SMTP_PASS: '' }));
+    expect(cfg.smtp).toBeUndefined();
+  });
+
   it('reports every problem at once', () => {
     const env: NodeJS.ProcessEnv = {
       NODE_ENV: 'production',
