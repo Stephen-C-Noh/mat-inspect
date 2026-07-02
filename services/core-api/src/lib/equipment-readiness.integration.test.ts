@@ -73,7 +73,18 @@ describe('computeReadiness (ADR 0006)', () => {
     const { db, equipment } = await import('../db/index.js');
     const [row] = await db
       .insert(equipment)
-      .values({ assetTag, name: assetTag, type: 'FORKLIFT' })
+      // readiness_baseline_at defaults to Postgres now() (microsecond precision). The passing
+      // inspections below use a JS Date (millisecond precision), so a same-millisecond insert
+      // can leave submitted_at just before the baseline and drop the READY result, a flaky
+      // failure that shows up under CI load. Pin the baseline to a JS time in the past so every
+      // same-day inspection reliably sorts at or after it. Tests that exercise the watermark
+      // override this value explicitly.
+      .values({
+        assetTag,
+        name: assetTag,
+        type: 'FORKLIFT',
+        readinessBaselineAt: new Date(Date.now() - 60_000),
+      })
       .returning();
     return row!;
   };
