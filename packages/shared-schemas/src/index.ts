@@ -171,3 +171,62 @@ export const inspectionSchema = z.object({
 });
 
 export type Inspection = z.infer<typeof inspectionSchema>;
+
+export const defectStatusSchema = z.enum([
+  'OPEN',
+  'ACKNOWLEDGED',
+  'IN_REPAIR',
+  'RESOLVED',
+  'REJECTED',
+]);
+
+export type DefectStatus = z.infer<typeof defectStatusSchema>;
+
+// Response for defect endpoints. Every lifecycle field (status, openedAt, resolvedAt,
+// resolvedBy, returnToServiceApprovedBy) is server-owned: clients move a defect only through
+// the transition endpoints, never by sending these values. Defects are a mutable workflow
+// table, so they sit outside the append-only inspection record (ADR 0007, ADR 0008); the
+// linked Inspection stays immutable.
+export const defectSchema = z.object({
+  id: uuidSchema,
+  inspectionId: uuidSchema,
+  equipmentId: uuidSchema,
+  itemKey: z.string().min(1),
+  severity: failSeveritySchema,
+  description: z.string(),
+  photoIds: z.array(uuidSchema),
+  status: defectStatusSchema,
+  openedAt: z.string().datetime(),
+  resolvedAt: z.string().datetime().nullable(),
+  resolvedBy: uuidSchema.nullable(),
+  resolutionNotes: z.string().nullable(),
+  returnToServiceApprovedBy: uuidSchema.nullable(),
+});
+
+export type Defect = z.infer<typeof defectSchema>;
+
+// Body for POST /api/v1/defects/:id/resolve. resolutionNotes is required: the log book
+// expects a record of what corrected the defect (Part 6). Only Supervisor/Manager may resolve.
+export const resolveDefectSchema = z.object({
+  resolutionNotes: z.string().min(1),
+});
+
+export type ResolveDefect = z.infer<typeof resolveDefectSchema>;
+
+// Body for POST /api/v1/defects/:id/reject. reason records why the defect was dismissed (for
+// example a misread gauge). It is stored in resolution_notes; the table has no separate reject
+// column, so reject reuses the resolved_* fields to hold who dismissed it and when.
+export const rejectDefectSchema = z.object({
+  reason: z.string().min(1),
+});
+
+export type RejectDefect = z.infer<typeof rejectDefectSchema>;
+
+// Query for GET /api/v1/defects?equipmentId=...&status=OPEN. Both filters are optional; the
+// PWA lockout tag reads by equipmentId + status=OPEN, the dashboard inbox by status.
+export const listDefectsQuerySchema = z.object({
+  equipmentId: uuidSchema.optional(),
+  status: defectStatusSchema.optional(),
+});
+
+export type ListDefectsQuery = z.infer<typeof listDefectsQuerySchema>;
