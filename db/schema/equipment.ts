@@ -30,6 +30,12 @@ export const equipment = pgTable('equipment', {
   currentStatusSince: timestamp('current_status_since', { withTimezone: true })
     .notNull()
     .defaultNow(),
+  // Watermark for computed readiness (ADR 0006). A passing Inspection only counts toward
+  // READY if submitted_at is at or after this value. Return-to-service bumps it to now() so
+  // a same-day pre-repair pass cannot restore READY without a fresh inspection.
+  readinessBaselineAt: timestamp('readiness_baseline_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   location: text('location'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
