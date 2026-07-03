@@ -12,12 +12,13 @@ import { sql } from 'drizzle-orm';
 import { equipmentTypeEnum } from './equipment.js';
 import { users } from './users.js';
 
+// Only three types render (DEV-16, DEV-75): BOOLEAN, BOOLEAN_PHOTO_ON_FAIL, and TEXT.
+// SIGNATURE is rejected by ADR 0007 (attestation is not a drawn signature) and MEASUREMENT
+// is out of scope: abnormal readings go in free-text notes, not structured numeric data (FRS).
 export const checklistItemTypeEnum = pgEnum('checklist_item_type', [
   'BOOLEAN',
   'BOOLEAN_PHOTO_ON_FAIL',
-  'MEASUREMENT',
   'TEXT',
-  'SIGNATURE',
 ]);
 
 export const failSeverityEnum = pgEnum('fail_severity', ['BLOCKING', 'WARNING']);

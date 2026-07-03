@@ -55,6 +55,27 @@ still rests on the pull-based dashboard queue, not on any transport.
    other. The guarantee that a safety alert is never lost rests on the dashboard queue. Email
    and Teams are the fast nudge; the queue is the backstop.
 
+## Addendum: email recipient resolution (DEV-81, 2026-07-01)
+
+DEV-81 wires the email channel into the inspection-submit route. "All active Supervisors" (point 1)
+cannot be resolved from core_db: supervisor roles live in the Entra ID token, not in a database
+table. Three options were considered.
+
+- **Microsoft Graph group lookup.** Query the Supervisors group members at send time. Most faithful
+  to "all active supervisors", but it needs an admin-consented application permission and cannot run
+  in local dev without that tenant setup. Deferred for the same reason Graph activity-feed
+  notifications were deferred for Teams (Decision point 3).
+- **A supervisor-email table in core_db.** Full control, but it duplicates role data whose source of
+  truth is Entra and drifts as staff change. Rejected.
+- **A configured distribution list (chosen).** `SUPERVISOR_ALERT_EMAILS` holds the supervisor
+  recipient address(es), managed alongside the Entra Supervisors group. This mirrors the Teams
+  channel: the email alert targets a designated Supervisors destination rather than enumerating
+  individuals. When the value is unset the notifier logs and skips; the dashboard queue remains the
+  not-missed backstop, so a missing list never loses a safety alert.
+
+Reconsider a Graph lookup if per-supervisor addressing (rather than a shared distribution list)
+becomes a requirement, on the same trigger as the Teams Graph reconsideration.
+
 ## Consequences
 
 Positive: the load-bearing Web Push infrastructure is dropped. No VAPID keys, no push
