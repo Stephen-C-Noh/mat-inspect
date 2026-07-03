@@ -214,7 +214,7 @@ describe('checklist templates API', () => {
     expect(rows.filter((r) => r.isActive)).toHaveLength(1);
   });
 
-  it('GET /checklists/:id returns a retired (non-active) version for a historical inspection', async () => {
+  it('GET /checklists/:id returns a retired (non-active) template version by id', async () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/checklists/${v1Id}`,
