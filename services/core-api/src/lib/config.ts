@@ -41,6 +41,7 @@ const rawSchema = z.object({
   ),
   SMTP_USER: z.string().trim().optional(),
   SMTP_PASS: z.string().trim().optional(),
+  SUPERVISOR_ALERT_EMAILS: z.string().trim().optional(),
 });
 
 // Validates a value parses as an http(s) URL. Used for the Teams webhook and dashboard base URL,
@@ -90,6 +91,10 @@ export type AppConfig = {
   // not a boot failure: a missing relay must not block the service from starting, and the
   // email channel is fire-and-forget off the request path (DEV-21).
   smtp: SmtpConfig | undefined;
+  // Recipients for the failed-inspection email alert (DEV-81). Empty when unset; the notifier then
+  // logs and skips. Supervisor roles live in the Entra token, not core_db, so this is a configured
+  // distribution list rather than a database query. See the recipient-resolution note in ADR 0013.
+  supervisorAlertEmails: string[];
 };
 
 // Implicit-TLS SMTP submission port. Any other port (587 submission, 25 relay) negotiates
@@ -244,6 +249,24 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     );
   }
 
+  // Recipients for the failed-inspection email alert (DEV-81). Supervisor roles live in the Entra
+  // token, not core_db, so "all active supervisors" cannot be queried from the database. A
+  // configured distribution list is used instead, mirroring how the Teams alert targets a
+  // designated Supervisors channel (ADR 0013 recipient-resolution note). Comma-separated; a blank
+  // or unset value means no email recipients (the notifier logs and skips, and the dashboard queue
+  // stays the not-missed backstop).
+  const supervisorAlertEmails = (orUndefined(env.SUPERVISOR_ALERT_EMAILS) ?? '')
+    .split(',')
+    .map((address) => address.trim())
+    .filter((address) => address.length > 0);
+  for (const address of supervisorAlertEmails) {
+    if (!address.includes('@')) {
+      problems.push(
+        `SUPERVISOR_ALERT_EMAILS contains an entry that is not an email address: "${address}"`,
+      );
+    }
+  }
+
   if (problems.length > 0) {
     throw new EnvValidationError(problems);
   }
@@ -274,6 +297,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     auditIngestToken,
     outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
     smtp,
+    supervisorAlertEmails,
   };
 };
 
