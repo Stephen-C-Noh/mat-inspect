@@ -213,4 +213,39 @@ describe('checklist templates API', () => {
     expect(v2Row?.isActive).toBe(true);
     expect(rows.filter((r) => r.isActive)).toHaveLength(1);
   });
+
+  it('GET /checklists/:id returns a retired (non-active) template version by id', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/checklists/${v1Id}`,
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.id).toBe(v1Id);
+    expect(body.version).toBe(1);
+    expect(body.isActive).toBe(false);
+  });
+
+  it('GET /checklists/:id returns 404 with CHECKLIST_TEMPLATE_NOT_FOUND when the id is unknown', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/checklists/00000000-0000-0000-0000-000000000000',
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().title).toBe('CHECKLIST_TEMPLATE_NOT_FOUND');
+  });
+
+  it('GET /checklists/:id returns 400 when the id is not a uuid', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/checklists/not-a-uuid',
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
 });
