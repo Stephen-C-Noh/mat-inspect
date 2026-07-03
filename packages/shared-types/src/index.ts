@@ -8,12 +8,9 @@ export type InspectionResult = 'PASS' | 'FAIL_WARNING' | 'FAIL_BLOCKING';
 
 export type NotesSource = 'TYPED' | 'VOICE_TRANSCRIBED' | 'VOICE_EDITED';
 
-export type ChecklistItemType =
-  | 'BOOLEAN'
-  | 'BOOLEAN_PHOTO_ON_FAIL'
-  | 'MEASUREMENT'
-  | 'TEXT'
-  | 'SIGNATURE';
+// Only three types render (DEV-16, DEV-75). SIGNATURE is rejected by ADR 0007 and
+// MEASUREMENT is out of scope; abnormal readings go in free-text notes (FRS).
+export type ChecklistItemType = 'BOOLEAN' | 'BOOLEAN_PHOTO_ON_FAIL' | 'TEXT';
 
 export type FailSeverity = 'BLOCKING' | 'WARNING';
 

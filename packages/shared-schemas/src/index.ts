@@ -36,13 +36,9 @@ export const equipmentSchema = z.object({
 
 export type Equipment = z.infer<typeof equipmentSchema>;
 
-export const checklistItemTypeSchema = z.enum([
-  'BOOLEAN',
-  'BOOLEAN_PHOTO_ON_FAIL',
-  'MEASUREMENT',
-  'TEXT',
-  'SIGNATURE',
-]);
+// Only three types render (DEV-16, DEV-75). SIGNATURE is rejected by ADR 0007 and
+// MEASUREMENT is out of scope; abnormal readings go in free-text notes (FRS).
+export const checklistItemTypeSchema = z.enum(['BOOLEAN', 'BOOLEAN_PHOTO_ON_FAIL', 'TEXT']);
 
 export const failSeveritySchema = z.enum(['BLOCKING', 'WARNING']);
 
