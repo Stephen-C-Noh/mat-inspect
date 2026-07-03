@@ -9,7 +9,9 @@ import {
   inspectionResponses,
   outbox,
   idempotencyKeys,
+  users,
 } from '../../db/index.js';
+import { config } from '../../lib/config.js';
 import { httpError } from '../../lib/http-error.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { requestDigest } from '../../lib/request-digest.js';
@@ -17,8 +19,46 @@ import { computeInspectionContentHash } from '../../lib/content-hash.js';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';
+import { collectBlockingDefectDescriptions } from './blocking-defects.js';
 import { serializeInspection } from './serialize.js';
 import { notifyFailedInspectionTeams } from '../../lib/notifications/notify-failed-inspection-teams.js';
+import { notifyFailedInspection } from '../../lib/notifications/notify-failed-inspection.js';
+
+// Resolves the operator display name and the configured supervisor recipients, then hands off to
+// the fire-and-forget email notifier (DEV-21, wired in DEV-81). This runs off the request path: it
+// is called with `void` and never rejects, so neither the operator lookup nor an SMTP failure can
+// turn into a 5xx. The operator name comes from the users shadow table (inspections.operator_id is
+// a FK to it, so the row always exists); it falls back to the token email if the row is somehow
+// missing. Recipients come from SUPERVISOR_ALERT_EMAILS (ADR 0013 recipient-resolution note); when
+// empty the notifier logs and skips.
+const dispatchFailedInspectionEmail = async (params: {
+  equipmentName: string;
+  assetTag: string;
+  operatorId: string;
+  operatorEmailFallback: string;
+  submittedAt: Date;
+  blockingDefects: string[];
+}): Promise<void> => {
+  try {
+    const [operator] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, params.operatorId))
+      .limit(1);
+
+    await notifyFailedInspection({
+      result: 'FAIL_BLOCKING',
+      equipmentName: params.equipmentName,
+      assetTag: params.assetTag,
+      operatorDisplayName: operator?.displayName ?? params.operatorEmailFallback,
+      submittedAt: params.submittedAt,
+      blockingDefects: params.blockingDefects,
+      supervisorEmails: config().supervisorAlertEmails,
+    });
+  } catch (err) {
+    logger.warn({ err, assetTag: params.assetTag }, 'failed-inspection email dispatch errored');
+  }
+};
 
 // Looks up the cached idempotency record for (operatorId, key). Returns the stored response
 // when the digest matches, or throws IDEMPOTENCY_MISMATCH when it doesn't (ADR 0009).
@@ -234,6 +274,25 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
         defectId: responseBody.id,
         severity: 'BLOCKING',
       });
+
+      // Fire-and-forget email alert to supervisors on a blocking failure (DEV-21 lib, wired in
+      // DEV-81). Email is the minimum guaranteed channel (ADR 0013). Gated on the result here so a
+      // PASS or FAIL_WARNING does not run the operator lookup or defect collection; the notifier
+      // also guards on result internally. Not awaited (`void`) and never rejects, so a mail failure
+      // cannot affect this 201. Placed after the idempotency replay returns above, so a retried
+      // submit replays the cached 201 without sending a second email.
+      if (result === 'FAIL_BLOCKING') {
+        void dispatchFailedInspectionEmail({
+          equipmentName: equipmentRow.name,
+          assetTag: equipmentRow.assetTag,
+          operatorId: req.user.id,
+          operatorEmailFallback: req.user.email,
+          // serializeInspection rendered submittedAt as an ISO string; parse it back to the Date
+          // the email formatter expects. Same instant, no precision loss for a second-granular ts.
+          submittedAt: new Date(responseBody.submittedAt),
+          blockingDefects: collectBlockingDefectDescriptions(template.items, body.responses),
+        });
+      }
 
       return reply.code(201).send(responseBody);
     },

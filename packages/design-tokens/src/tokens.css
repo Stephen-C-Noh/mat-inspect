@@ -44,3 +44,20 @@
   /* Elevation */
   --shadow-card: 0 4px 4px 0 rgb(0 0 0 / 0.25);
 }
+
+.dark {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --background: 222 47% 9%;
+  --foreground: 0 0% 95%;
+  --card: 222 47% 13%;
+  --card-foreground: 0 0% 95%;
+  --muted: 222 30% 16%;
+  --muted-foreground: 0 0% 60%;
+  --border: 222 30% 22%;
+  --input: 222 30% 22%;
+
+  /* Elevation (softer in dark) */
+  --shadow-card: 0 4px 4px 0 rgb(0 0 0 / 0.5);
+}
