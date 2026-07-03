@@ -271,16 +271,18 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     throw new EnvValidationError(problems);
   }
 
-  const smtp: SmtpConfig | undefined =
-    smtpHost && !isPlaceholder(smtpHost)
-      ? {
-          host: smtpHost,
-          port: env.SMTP_PORT ?? SMTP_DEFAULT_PORT,
-          user: smtpUser,
-          pass: smtpPass,
-          secure: (env.SMTP_PORT ?? SMTP_DEFAULT_PORT) === SMTP_IMPLICIT_TLS_PORT,
-        }
-      : undefined;
+  // A placeholder SMTP_HOST already pushed a problem in the loop above and threw, so here smtpHost
+  // is either unset or a real value. Compute the port once so port and secure cannot drift.
+  const smtpPort = env.SMTP_PORT ?? SMTP_DEFAULT_PORT;
+  const smtp: SmtpConfig | undefined = smtpHost
+    ? {
+        host: smtpHost,
+        port: smtpPort,
+        user: smtpUser,
+        pass: smtpPass,
+        secure: smtpPort === SMTP_IMPLICIT_TLS_PORT,
+      }
+    : undefined;
 
   return {
     nodeEnv: env.NODE_ENV,
