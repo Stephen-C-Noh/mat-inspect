@@ -163,6 +163,9 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
       const result = deriveInspectionResult(template.items, body.responses);
 
       let responseBody: ReturnType<typeof serializeInspection>;
+      // Captured from inside the transaction so the post-commit Teams alert can deep-link to the
+      // real Defect, not the inspection. Stays null for PASS and FAIL_WARNING (no defect opened).
+      let openedDefectId: string | null = null;
       try {
         responseBody = await db.transaction(async (tx) => {
           const [inspection] = await tx
@@ -241,6 +244,8 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
                   description: blockingDefect.description,
                 })
                 .returning();
+
+              openedDefectId = defect!.id;
 
               await tx.insert(outbox).values({
                 eventType: 'DEFECT_OPENED',
@@ -331,14 +336,14 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
       // idempotency replay returns above, so a retried submit replays the cached 201 without
       // re-posting the card.
       //
-      // defectId carries the inspection id as a stand-in: the Defect record (ARCHITECTURE.md 7.2
-      // step 2, the Defect Path) is not built yet, so no Defect.id exists. Swap to the real
-      // Defect.id once that lands. The DEV-21 email alert (notifyFailedInspection, the minimum
-      // guaranteed channel) belongs at this same point.
+      // defectId is the real opened Defect.id: DEV-20 built the Defect Path (ARCHITECTURE.md 7.2
+      // step 2), so the card's dashboard deep link resolves to /defects/:id. openedDefectId is set
+      // whenever result is FAIL_BLOCKING; the responseBody.id fallback only guards the unreachable
+      // FAIL_BLOCKING-with-no-defect case and is never posted (the notifier no-ops on non-blocking).
       void notifyFailedInspectionTeams({
         result,
         assetTag: equipmentRow.assetTag,
-        defectId: responseBody.id,
+        defectId: openedDefectId ?? responseBody.id,
         severity: 'BLOCKING',
       });
 
