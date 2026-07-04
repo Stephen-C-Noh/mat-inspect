@@ -328,6 +328,43 @@ describe('defect lifecycle API (DEV-20, ADR 0006)', () => {
     expect(res.json().title).toBe('NO_RESOLVED_DEFECT');
   });
 
+  it('scopes return-to-service to the current lockout: a prior cycle resolved defect does not authorize it', async () => {
+    const equipment = await makeEquipment('FORK-RTS-CYCLE');
+
+    // Cycle 1: open a blocking defect, repair it, and return the equipment to service.
+    const d1 = await openBlockingDefect(equipment.id);
+    await post(`/api/v1/defects/${d1.id}/acknowledge`, supervisorToken);
+    await post(`/api/v1/defects/${d1.id}/start-repair`, supervisorToken);
+    expect(
+      (
+        await post(`/api/v1/defects/${d1.id}/resolve`, supervisorToken, {
+          resolutionNotes: 'Replaced tine',
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (await post(`/api/v1/equipment/${equipment.id}/return-to-service`, supervisorToken))
+        .statusCode,
+    ).toBe(200);
+
+    // Cycle 2: a new blocking failure locks it out again, then is rejected as a misread. Reject
+    // does not clear OUT_OF_SERVICE, so the equipment stays locked out.
+    const d2 = await openBlockingDefect(equipment.id);
+    expect(await getStatus(equipment.id)).toBe('OUT_OF_SERVICE');
+    expect(
+      (await post(`/api/v1/defects/${d2.id}/reject`, supervisorToken, { reason: 'Misread gauge' }))
+        .statusCode,
+    ).toBe(200);
+
+    // The cycle-1 RESOLVED defect predates this lockout and must not authorize the approval; only
+    // cycle-2 defects count, and cycle 2 has none resolved. Without scoping this would wrongly
+    // succeed by re-using D1.
+    const res = await post(`/api/v1/equipment/${equipment.id}/return-to-service`, supervisorToken);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().title).toBe('NO_RESOLVED_DEFECT');
+    expect(await getStatus(equipment.id)).toBe('OUT_OF_SERVICE');
+  });
+
   it('rejects an operator approving return-to-service with 403', async () => {
     const equipment = await makeEquipment('FORK-RTS-ROLE');
     const res = await post(`/api/v1/equipment/${equipment.id}/return-to-service`, operatorToken);

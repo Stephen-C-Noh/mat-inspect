@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { equipmentSchema, uuidSchema } from '@mat-inspect/shared-schemas';
 import { db, equipment, defects, outbox } from '../../db/index.js';
 import { computeReadiness } from '../../lib/equipment-readiness.js';
@@ -50,10 +50,21 @@ export const returnToServiceRoute: FastifyPluginAsync = async (app) => {
           );
         }
 
+        // Scope to the current lockout only: a defect from a prior repair cycle (resolved and
+        // already returned to service) must not authorize this approval. currentStatusSince marks
+        // when this OUT_OF_SERVICE period began, and submit.ts writes it from the same Postgres
+        // now() as the Defect's opened_at, so opened_at >= currentStatusSince selects exactly the
+        // current cycle's defects (ADR 0006; review finding on stale RESOLVED defects).
         const blockingDefects = await tx
           .select()
           .from(defects)
-          .where(and(eq(defects.equipmentId, id), eq(defects.severity, 'BLOCKING')));
+          .where(
+            and(
+              eq(defects.equipmentId, id),
+              eq(defects.severity, 'BLOCKING'),
+              gte(defects.openedAt, locked.currentStatusSince),
+            ),
+          );
 
         const stillOpen = blockingDefects.filter((d) => NON_TERMINAL_STATUSES.has(d.status));
         if (stillOpen.length > 0) {

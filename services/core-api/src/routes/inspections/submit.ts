@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { submitInspectionSchema, inspectionSchema } from '@mat-inspect/shared-schemas';
 import {
   db,
@@ -271,10 +271,17 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
               const previousStatus = locked!.status;
 
               if (previousStatus !== 'OUT_OF_SERVICE' && previousStatus !== 'RETIRED') {
-                const now = new Date();
+                // currentStatusSince marks the start of this lockout. Written from Postgres now()
+                // (the transaction timestamp), the same clock and value as the Defect's opened_at
+                // default above, so return-to-service can scope "defects from the current lockout"
+                // as opened_at >= current_status_since without a cross-clock off-by-one.
                 await tx
                   .update(equipment)
-                  .set({ status: 'OUT_OF_SERVICE', currentStatusSince: now, updatedAt: now })
+                  .set({
+                    status: 'OUT_OF_SERVICE',
+                    currentStatusSince: sql`now()`,
+                    updatedAt: sql`now()`,
+                  })
                   .where(eq(equipment.id, body.equipmentId));
 
                 await tx.insert(outbox).values({
