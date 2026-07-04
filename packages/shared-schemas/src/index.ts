@@ -36,13 +36,9 @@ export const equipmentSchema = z.object({
 
 export type Equipment = z.infer<typeof equipmentSchema>;
 
-export const checklistItemTypeSchema = z.enum([
-  'BOOLEAN',
-  'BOOLEAN_PHOTO_ON_FAIL',
-  'MEASUREMENT',
-  'TEXT',
-  'SIGNATURE',
-]);
+// Only three types render (DEV-16, DEV-75). SIGNATURE is rejected by ADR 0007 and
+// MEASUREMENT is out of scope; abnormal readings go in free-text notes (FRS).
+export const checklistItemTypeSchema = z.enum(['BOOLEAN', 'BOOLEAN_PHOTO_ON_FAIL', 'TEXT']);
 
 export const failSeveritySchema = z.enum(['BLOCKING', 'WARNING']);
 
@@ -230,3 +226,38 @@ export const listDefectsQuerySchema = z.object({
 });
 
 export type ListDefectsQuery = z.infer<typeof listDefectsQuerySchema>;
+
+// Action types the audit chain accepts (DEV-23 / ADR 0008). Only INSPECTION_SUBMITTED has a
+// producer today (the core-api outbox poller); the other three are accepted now so the events
+// that emit them later (defect handling, the equipment status state machine) do not need an
+// audit_db migration when they land.
+export const auditActionSchema = z.enum([
+  'INSPECTION_SUBMITTED',
+  'DEFECT_OPENED',
+  'DEFECT_RESOLVED',
+  'EQUIPMENT_STATUS_CHANGED',
+]);
+
+export type AuditAction = z.infer<typeof auditActionSchema>;
+
+// Body for POST /api/v1/events on the Audit Service (internal, core-api outbox poller only).
+// payloadSummary is restricted to flat scalar values: the audit log carries ids, enums, and
+// hashes, never free text or nested structures (no PII, ADR 0008 "a hash is not PII").
+export const auditEventIngestSchema = z.object({
+  sourceEventId: uuidSchema,
+  action: auditActionSchema,
+  actorId: uuidSchema,
+  resourceType: z.string().min(1),
+  resourceId: uuidSchema,
+  occurredAt: z.string().datetime(),
+  payloadSummary: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+});
+
+export type AuditEventIngest = z.infer<typeof auditEventIngestSchema>;
+
+export const auditEventIngestResponseSchema = z.object({
+  id: uuidSchema,
+  deduped: z.boolean(),
+});
+
+export type AuditEventIngestResponse = z.infer<typeof auditEventIngestResponseSchema>;

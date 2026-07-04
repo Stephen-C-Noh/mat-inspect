@@ -1,5 +1,10 @@
 import type { MailMessage } from './mailer.js';
 
+// Content layer for the failed-inspection email alert (DEV-21). Pure: given the inspection facts
+// it returns the subject, plain text, and HTML, with no transport or I/O. The subject carries no
+// PII (FRS AC-8.1.3); the body identifies the operator (OHS Part 6 log book rule) and HTML-escapes
+// every interpolated value. The orchestrator (notify-failed-inspection.ts) adds from/to and sends.
+
 // The lab is at SAIT Main Campus (Calgary), so "lab-local" time is Mountain Time. The timestamp
 // in the email is rendered in this zone so a supervisor reads the wall-clock time of submission.
 const LAB_TIME_ZONE = 'America/Edmonton';
@@ -26,10 +31,17 @@ const escapeHtml = (value: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// Explicit component options with a pinned 12-hour clock, so the rendered time does not depend on
+// the host ICU build (a timeStyle 'short' renders en-CA as 24-hour on some builds). Fixed shape:
+// "Jun 26, 2026, 2:30 p.m." in lab-local time.
 const formatLabLocal = (date: Date): string =>
   new Intl.DateTimeFormat('en-CA', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
     timeZone: LAB_TIME_ZONE,
   }).format(date);
 

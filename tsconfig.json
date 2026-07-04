@@ -4,7 +4,9 @@
     { "path": "packages/shared-types" },
     { "path": "packages/shared-schemas" },
     { "path": "packages/shared-auth" },
+    { "path": "packages/shared-crypto" },
     { "path": "db" },
-    { "path": "services/core-api" }
+    { "path": "services/core-api" },
+    { "path": "services/audit" }
   ]
 }

@@ -11,6 +11,7 @@ import { updateEquipmentRoute } from './routes/equipment/update.js';
 import { returnToServiceRoute } from './routes/equipment/return-to-service.js';
 import { publishChecklistTemplateRoute } from './routes/checklists/publish.js';
 import { activeChecklistTemplateRoute } from './routes/checklists/active.js';
+import { getChecklistTemplateByIdRoute } from './routes/checklists/get-by-id.js';
 import { submitInspectionRoute } from './routes/inspections/submit.js';
 import { listDefectsRoute } from './routes/defects/list.js';
 import { getDefectByIdRoute } from './routes/defects/get-by-id.js';
@@ -82,6 +83,9 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   await app.register(returnToServiceRoute, { prefix: '/api/v1' });
   await app.register(publishChecklistTemplateRoute, { prefix: '/api/v1' });
   await app.register(activeChecklistTemplateRoute, { prefix: '/api/v1' });
+  // /checklists/active is a static segment, so Fastify's radix router prefers it over the
+  // /checklists/:id parameter regardless of registration order; no collision to guard against.
+  await app.register(getChecklistTemplateByIdRoute, { prefix: '/api/v1' });
   await app.register(submitInspectionRoute, { prefix: '/api/v1' });
   // Defect list is registered before the /defects/:id parameter route; Fastify's radix router
   // handles the static-vs-parameter ordering, so registration order is not load-bearing here.

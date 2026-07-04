@@ -25,7 +25,8 @@ describe('buildFailedInspectionEmail', () => {
     expect(text).toContain('Jordan Lee');
     expect(text).toContain('Hoist brake does not hold load');
     expect(text).toContain('Hook safety latch missing');
-    // Rendered in lab-local (Mountain) time: the calendar date holds and the clock shows 2:30.
+    // Rendered in lab-local (Mountain) time with a pinned 12-hour clock, so the date and the
+    // 2:30 time are stable across Node/ICU builds (20:30 UTC is 14:30 = 2:30 p.m. MDT).
     expect(text).toContain('2026');
     expect(text).toContain('2:30');
   });

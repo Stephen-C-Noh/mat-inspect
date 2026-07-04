@@ -1,2 +1,0 @@
-CREATE DATABASE core_db;
-CREATE DATABASE audit_db;

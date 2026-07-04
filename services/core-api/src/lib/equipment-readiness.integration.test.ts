@@ -68,22 +68,18 @@ describe('computeReadiness (ADR 0006)', () => {
   });
 
   // Inserts one piece of equipment for an isolated scenario; each test gets its own row so
-  // assertions cannot bleed across cases.
+  // assertions cannot bleed across cases. readinessBaselineAt is set 90 seconds in the past so
+  // inspections inserted with new Date() are always after the baseline regardless of any
+  // sub-millisecond clock skew between the Node.js runner and the PostgreSQL container.
   const makeEquipment = async (assetTag: string) => {
     const { db, equipment } = await import('../db/index.js');
     const [row] = await db
       .insert(equipment)
-      // readiness_baseline_at defaults to Postgres now() (microsecond precision). The passing
-      // inspections below use a JS Date (millisecond precision), so a same-millisecond insert
-      // can leave submitted_at just before the baseline and drop the READY result, a flaky
-      // failure that shows up under CI load. Pin the baseline to a JS time in the past so every
-      // same-day inspection reliably sorts at or after it. Tests that exercise the watermark
-      // override this value explicitly.
       .values({
         assetTag,
         name: assetTag,
         type: 'FORKLIFT',
-        readinessBaselineAt: new Date(Date.now() - 60_000),
+        readinessBaselineAt: new Date(Date.now() - 90_000),
       })
       .returning();
     return row!;

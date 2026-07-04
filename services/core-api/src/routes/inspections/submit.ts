@@ -10,15 +10,57 @@ import {
   outbox,
   idempotencyKeys,
   defects,
+  users,
 } from '../../db/index.js';
+import { config } from '../../lib/config.js';
 import { httpError } from '../../lib/http-error.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { requestDigest } from '../../lib/request-digest.js';
+import { computeInspectionContentHash } from '../../lib/content-hash.js';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';
 import { buildBlockingDefect } from './blocking-defect.js';
+import { collectBlockingDefectDescriptions } from './blocking-defects.js';
 import { serializeInspection } from './serialize.js';
+import { notifyFailedInspectionTeams } from '../../lib/notifications/notify-failed-inspection-teams.js';
+import { notifyFailedInspection } from '../../lib/notifications/notify-failed-inspection.js';
+
+// Resolves the operator display name and the configured supervisor recipients, then hands off to
+// the fire-and-forget email notifier (DEV-21, wired in DEV-81). This runs off the request path: it
+// is called with `void` and never rejects, so neither the operator lookup nor an SMTP failure can
+// turn into a 5xx. The operator name comes from the users shadow table (inspections.operator_id is
+// a FK to it, so the row always exists); it falls back to the token email if the row is somehow
+// missing. Recipients come from SUPERVISOR_ALERT_EMAILS (ADR 0013 recipient-resolution note); when
+// empty the notifier logs and skips.
+const dispatchFailedInspectionEmail = async (params: {
+  equipmentName: string;
+  assetTag: string;
+  operatorId: string;
+  operatorEmailFallback: string;
+  submittedAt: Date;
+  blockingDefects: string[];
+}): Promise<void> => {
+  try {
+    const [operator] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, params.operatorId))
+      .limit(1);
+
+    await notifyFailedInspection({
+      result: 'FAIL_BLOCKING',
+      equipmentName: params.equipmentName,
+      assetTag: params.assetTag,
+      operatorDisplayName: operator?.displayName ?? params.operatorEmailFallback,
+      submittedAt: params.submittedAt,
+      blockingDefects: params.blockingDefects,
+      supervisorEmails: config().supervisorAlertEmails,
+    });
+  } catch (err) {
+    logger.warn({ err, assetTag: params.assetTag }, 'failed-inspection email dispatch errored');
+  }
+};
 
 // Looks up the cached idempotency record for (operatorId, key). Returns the stored response
 // when the digest matches, or throws IDEMPOTENCY_MISMATCH when it doesn't (ADR 0009).
@@ -135,20 +177,41 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
             })
             .returning();
 
-          if (body.responses.length > 0) {
+          // Normalized once and reused for both the insert and the content digest below, so the
+          // hash input is byte-identical to what a later reader reconstructs from the persisted
+          // rows (DEV-23 / ADR 0008).
+          const normalizedResponses = body.responses.map((response) => ({
+            itemKey: response.itemKey,
+            value: response.value,
+            passed: response.passed,
+            notes: response.notes ?? null,
+            notesSource: response.notesSource ?? null,
+          }));
+
+          if (normalizedResponses.length > 0) {
             await tx.insert(inspectionResponses).values(
-              body.responses.map((response) => ({
+              normalizedResponses.map((response) => ({
                 inspectionId: inspection!.id,
-                itemKey: response.itemKey,
-                value: response.value,
-                passed: response.passed,
-                notes: response.notes ?? null,
-                notesSource: response.notesSource ?? null,
+                ...response,
               })),
             );
           }
 
-          // Outbox row only; the poller, hash chain, and content digest are DEV-23.
+          // Seals the inspection + its responses + result into the audit chain (ADR 0008). A
+          // hash is not PII, so it is safe to carry in the outbox payload and the audit log.
+          const contentHash = computeInspectionContentHash({
+            inspectionId: inspection!.id,
+            equipmentId: body.equipmentId,
+            operatorId: req.user.id,
+            templateId: body.templateId,
+            templateVersion: template.version,
+            result,
+            submittedAt: inspection!.submittedAt.toISOString(),
+            responses: normalizedResponses,
+          });
+
+          // Outbox row; the poller (DEV-23) delivers it to the Audit Service, which seals it
+          // into the hash chain.
           await tx.insert(outbox).values({
             eventType: 'INSPECTION_SUBMITTED',
             payload: {
@@ -156,6 +219,7 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
               equipmentId: body.equipmentId,
               operatorId: req.user.id,
               result,
+              contentHash,
             },
           });
 
@@ -260,6 +324,43 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
         },
         'inspection submitted',
       );
+
+      // Fire-and-forget Teams fast-nudge to the Supervisors channel on a blocking failure (ADR
+      // 0013, DEV-39). notifyFailedInspectionTeams guards on result, so PASS and FAIL_WARNING are
+      // no-ops; only FAIL_BLOCKING posts a card. It never rejects and is not awaited (`void`), so
+      // a webhook failure cannot affect this 201 response. Placed after the commit and after the
+      // idempotency replay returns above, so a retried submit replays the cached 201 without
+      // re-posting the card.
+      //
+      // defectId carries the inspection id as a stand-in: the Defect record (ARCHITECTURE.md 7.2
+      // step 2, the Defect Path) is not built yet, so no Defect.id exists. Swap to the real
+      // Defect.id once that lands. The DEV-21 email alert (notifyFailedInspection, the minimum
+      // guaranteed channel) belongs at this same point.
+      void notifyFailedInspectionTeams({
+        result,
+        assetTag: equipmentRow.assetTag,
+        defectId: responseBody.id,
+        severity: 'BLOCKING',
+      });
+
+      // Fire-and-forget email alert to supervisors on a blocking failure (DEV-21 lib, wired in
+      // DEV-81). Email is the minimum guaranteed channel (ADR 0013). Gated on the result here so a
+      // PASS or FAIL_WARNING does not run the operator lookup or defect collection; the notifier
+      // also guards on result internally. Not awaited (`void`) and never rejects, so a mail failure
+      // cannot affect this 201. Placed after the idempotency replay returns above, so a retried
+      // submit replays the cached 201 without sending a second email.
+      if (result === 'FAIL_BLOCKING') {
+        void dispatchFailedInspectionEmail({
+          equipmentName: equipmentRow.name,
+          assetTag: equipmentRow.assetTag,
+          operatorId: req.user.id,
+          operatorEmailFallback: req.user.email,
+          // serializeInspection rendered submittedAt as an ISO string; parse it back to the Date
+          // the email formatter expects. Same instant, no precision loss for a second-granular ts.
+          submittedAt: new Date(responseBody.submittedAt),
+          blockingDefects: collectBlockingDefectDescriptions(template.items, body.responses),
+        });
+      }
 
       return reply.code(201).send(responseBody);
     },

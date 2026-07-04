@@ -11,6 +11,8 @@
 
 **All responses use RFC 7807 problem+json format on error.** Success responses return the resource directly, not wrapped in `{ success, data }`.
 
+**Path convention for admin endpoints:** admin-only endpoints are distinguished by role gating (🛡️, `requireRole('admin')`), not by a path prefix. There is no `/admin/*` namespace. An admin route sits alongside its resource (for example, publishing a checklist is `POST /checklists`, gated to admin). This matches the implemented routes; the reference lists admin endpoints under their resource with the 🛡️ indicator.
+
 ---
 
 ## Authentication
@@ -30,15 +32,15 @@ Authentication is handled by Entra ID. The application exposes thin wrappers for
 
 ## Equipment
 
-| Method | Endpoint                      | Auth | Description                                    |
-| ------ | ----------------------------- | ---- | ---------------------------------------------- |
-| GET    | `/equipment`                  | 🔒   | List equipment, paginated, filterable          |
-| GET    | `/equipment/:assetTag`        | 🔒   | Resolve QR code to equipment record            |
-| GET    | `/equipment/:id/history`      | 🔒   | Inspection and defect history for an equipment |
-| GET    | `/equipment/:id/qr`           | 🛡️   | Generate printable QR sticker PDF              |
-| POST   | `/admin/equipment`            | 🛡️   | Create equipment                               |
-| PATCH  | `/admin/equipment/:id`        | 🛡️   | Update equipment metadata (not status)         |
-| POST   | `/admin/equipment/:id/retire` | 🛡️   | Soft-retire (status → RETIRED, no hard delete) |
+| Method | Endpoint                 | Auth | Description                                    |
+| ------ | ------------------------ | ---- | ---------------------------------------------- |
+| GET    | `/equipment`             | 🔒   | List equipment, paginated, filterable          |
+| GET    | `/equipment/:assetTag`   | 🔒   | Resolve QR code to equipment record            |
+| GET    | `/equipment/:id/history` | 🔒   | Inspection and defect history for an equipment |
+| GET    | `/equipment/:id/qr`      | 🛡️   | Generate printable QR sticker PDF              |
+| POST   | `/equipment`             | 🛡️   | Create equipment                               |
+| PATCH  | `/equipment/:id`         | 🛡️   | Update equipment metadata (not status)         |
+| POST   | `/equipment/:id/retire`  | 🛡️   | Soft-retire (status → RETIRED, no hard delete) |
 
 **GET /equipment query params:**
 `type`, `location`, `status`, `cursor`, `limit` (default 50, max 100)
@@ -47,13 +49,13 @@ Authentication is handled by Entra ID. The application exposes thin wrappers for
 
 ## Checklist Templates
 
-| Method | Endpoint                              | Auth | Description                                            |
-| ------ | ------------------------------------- | ---- | ------------------------------------------------------ |
-| GET    | `/checklists/active`                  | 🔒   | Active template for an equipment type                  |
-| GET    | `/checklists/:id`                     | 🔒   | Specific template version (for historical inspections) |
-| GET    | `/admin/checklists`                   | 🛡️   | List all templates and versions                        |
-| POST   | `/admin/checklists`                   | 🛡️   | Publish a new template version                         |
-| GET    | `/admin/checklists/:id/diff/:otherId` | 🛡️   | Diff between two template versions                     |
+| Method | Endpoint                        | Auth | Description                                            |
+| ------ | ------------------------------- | ---- | ------------------------------------------------------ |
+| GET    | `/checklists/active`            | 🔒   | Active template for an equipment type                  |
+| GET    | `/checklists/:id`               | 🔒   | Specific template version (for historical inspections) |
+| GET    | `/checklists`                   | 🛡️   | List all templates and versions                        |
+| POST   | `/checklists`                   | 🛡️   | Publish a new template version                         |
+| GET    | `/checklists/:id/diff/:otherId` | 🛡️   | Diff between two template versions                     |
 
 **GET /checklists/active query params:**
 `type` (required, enum: OVERHEAD_CRANE, TRUCK, ELECTRIC_PALLET_JACK, FORKLIFT)
@@ -229,14 +231,14 @@ Audit events are read-only via API. Writes happen automatically as a side effect
 
 ## Admin: User Management
 
-| Method | Endpoint                       | Auth | Description                                 |
-| ------ | ------------------------------ | ---- | ------------------------------------------- |
-| GET    | `/admin/users`                 | 🛡️   | List users, paginated                       |
-| POST   | `/admin/users`                 | 🛡️   | Create user with role(s) and certifications |
-| PATCH  | `/admin/users/:id`             | 🛡️   | Update display name, roles, certifications  |
-| POST   | `/admin/users/:id/deactivate`  | 🛡️   | Set active = false                          |
-| POST   | `/admin/users/:id/reactivate`  | 🛡️   | Set active = true                           |
-| GET    | `/admin/users/:id/data-export` | 🛡️🔒 | Export all data tied to a user (FOIP)       |
+| Method | Endpoint                 | Auth | Description                                 |
+| ------ | ------------------------ | ---- | ------------------------------------------- |
+| GET    | `/users`                 | 🛡️   | List users, paginated                       |
+| POST   | `/users`                 | 🛡️   | Create user with role(s) and certifications |
+| PATCH  | `/users/:id`             | 🛡️   | Update display name, roles, certifications  |
+| POST   | `/users/:id/deactivate`  | 🛡️   | Set active = false                          |
+| POST   | `/users/:id/reactivate`  | 🛡️   | Set active = true                           |
+| GET    | `/users/:id/data-export` | 🛡️🔒 | Export all data tied to a user (FOIP)       |
 
 ---
 
@@ -292,7 +294,7 @@ Audit events are read-only via API. Writes happen automatically as a side effect
 | `DEFECT_NOT_FOUND`                    | 404    |                                                                        |
 | `DEFECT_INVALID_TRANSITION`           | 409    | Cannot transition Defect from current status to requested status       |
 | `RETURN_TO_SERVICE_BLOCKED`           | 409    | Cannot approve return to service while a blocking Defect is unresolved |
-| `CHECKLIST_TEMPLATE_NOT_FOUND`        | 404    | No active template for this equipment type                             |
+| `CHECKLIST_TEMPLATE_NOT_FOUND`        | 404    | No active template for the equipment type, or no template with that id |
 | `CHECKLIST_TEMPLATE_INVALID_REVIEWER` | 400    | reviewedBy must not be the publishing admin (no self-review)           |
 | `MEDIA_TOO_LARGE`                     | 413    | Upload exceeds size limit                                              |
 | `MEDIA_TYPE_INVALID`                  | 400    | Unsupported MIME type                                                  |
