@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { submitInspectionSchema, inspectionSchema } from '@mat-inspect/shared-schemas';
 import {
   db,
@@ -9,6 +9,7 @@ import {
   inspectionResponses,
   outbox,
   idempotencyKeys,
+  defects,
   users,
 } from '../../db/index.js';
 import { config } from '../../lib/config.js';
@@ -19,7 +20,7 @@ import { computeInspectionContentHash } from '../../lib/content-hash.js';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';
-import { collectBlockingDefectDescriptions } from './blocking-defects.js';
+import { buildBlockingDefect, collectBlockingDefectDescriptions } from './blocking-defects.js';
 import { serializeInspection } from './serialize.js';
 import { notifyFailedInspectionTeams } from '../../lib/notifications/notify-failed-inspection-teams.js';
 import { notifyFailedInspection } from '../../lib/notifications/notify-failed-inspection.js';
@@ -162,6 +163,9 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
       const result = deriveInspectionResult(template.items, body.responses);
 
       let responseBody: ReturnType<typeof serializeInspection>;
+      // Captured from inside the transaction so the post-commit Teams alert can deep-link to the
+      // real Defect, not the inspection. Stays null for PASS and FAIL_WARNING (no defect opened).
+      let openedDefectId: string | null = null;
       try {
         responseBody = await db.transaction(async (tx) => {
           const [inspection] = await tx
@@ -221,6 +225,81 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
             },
           });
 
+          // Defect lifecycle entry point (DEV-20, ADR 0006). A BLOCKING failure opens exactly
+          // one Defect and makes OUT_OF_SERVICE sticky, in the same transaction as the
+          // inspection so the record and the lockout either both commit or neither does.
+          if (result === 'FAIL_BLOCKING') {
+            const blockingDefect = buildBlockingDefect(template.items, body.responses);
+            // result === 'FAIL_BLOCKING' already implies a failed BLOCKING item, so this is
+            // never null here; the guard narrows the type and stays correct if the two
+            // derivations ever drift apart.
+            if (blockingDefect) {
+              const [defect] = await tx
+                .insert(defects)
+                .values({
+                  inspectionId: inspection!.id,
+                  equipmentId: body.equipmentId,
+                  itemKey: blockingDefect.itemKey,
+                  severity: blockingDefect.severity,
+                  description: blockingDefect.description,
+                })
+                .returning();
+
+              openedDefectId = defect!.id;
+
+              await tx.insert(outbox).values({
+                eventType: 'DEFECT_OPENED',
+                payload: {
+                  defectId: defect!.id,
+                  inspectionId: inspection!.id,
+                  equipmentId: body.equipmentId,
+                  operatorId: req.user.id,
+                  itemKey: blockingDefect.itemKey,
+                  severity: blockingDefect.severity,
+                },
+              });
+
+              // Lock the equipment row so concurrent submits serialize on the status write.
+              // RETIRED is terminal and OUT_OF_SERVICE is already the target, so neither is
+              // re-stamped and no spurious EQUIPMENT_STATUS_CHANGED is emitted for them.
+              const [locked] = await tx
+                .select({ status: equipment.status })
+                .from(equipment)
+                .where(eq(equipment.id, body.equipmentId))
+                .for('update')
+                .limit(1);
+              const previousStatus = locked!.status;
+
+              if (previousStatus !== 'OUT_OF_SERVICE' && previousStatus !== 'RETIRED') {
+                // currentStatusSince marks the start of this lockout. Written from Postgres now()
+                // (the transaction timestamp), the same clock and value as the Defect's opened_at
+                // default above, so return-to-service can scope "defects from the current lockout"
+                // as opened_at >= current_status_since without a cross-clock off-by-one.
+                await tx
+                  .update(equipment)
+                  .set({
+                    status: 'OUT_OF_SERVICE',
+                    currentStatusSince: sql`now()`,
+                    updatedAt: sql`now()`,
+                  })
+                  .where(eq(equipment.id, body.equipmentId));
+
+                await tx.insert(outbox).values({
+                  eventType: 'EQUIPMENT_STATUS_CHANGED',
+                  payload: {
+                    equipmentId: body.equipmentId,
+                    from: previousStatus,
+                    to: 'OUT_OF_SERVICE',
+                    reason: 'BLOCKING_INSPECTION_FAILURE',
+                    defectId: defect!.id,
+                    inspectionId: inspection!.id,
+                    operatorId: req.user.id,
+                  },
+                });
+              }
+            }
+          }
+
           const serialized = serializeInspection(inspection!);
 
           await tx.insert(idempotencyKeys).values({
@@ -264,14 +343,14 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
       // idempotency replay returns above, so a retried submit replays the cached 201 without
       // re-posting the card.
       //
-      // defectId carries the inspection id as a stand-in: the Defect record (ARCHITECTURE.md 7.2
-      // step 2, the Defect Path) is not built yet, so no Defect.id exists. Swap to the real
-      // Defect.id once that lands. The DEV-21 email alert (notifyFailedInspection, the minimum
-      // guaranteed channel) belongs at this same point.
+      // defectId is the real opened Defect.id: DEV-20 built the Defect Path (ARCHITECTURE.md 7.2
+      // step 2), so the card's dashboard deep link resolves to /defects/:id. openedDefectId is set
+      // whenever result is FAIL_BLOCKING; the responseBody.id fallback only guards the unreachable
+      // FAIL_BLOCKING-with-no-defect case and is never posted (the notifier no-ops on non-blocking).
       void notifyFailedInspectionTeams({
         result,
         assetTag: equipmentRow.assetTag,
-        defectId: responseBody.id,
+        defectId: openedDefectId ?? responseBody.id,
         severity: 'BLOCKING',
       });
 

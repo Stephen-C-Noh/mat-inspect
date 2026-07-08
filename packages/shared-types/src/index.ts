@@ -6,6 +6,8 @@ export type EquipmentStatus = 'READY' | 'AWAITING_INSPECTION' | 'OUT_OF_SERVICE'
 
 export type InspectionResult = 'PASS' | 'FAIL_WARNING' | 'FAIL_BLOCKING';
 
+export type DefectStatus = 'OPEN' | 'ACKNOWLEDGED' | 'IN_REPAIR' | 'RESOLVED' | 'REJECTED';
+
 export type NotesSource = 'TYPED' | 'VOICE_TRANSCRIBED' | 'VOICE_EDITED';
 
 // Only three types render (DEV-16, DEV-75). SIGNATURE is rejected by ADR 0007 and
