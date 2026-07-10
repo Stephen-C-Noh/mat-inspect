@@ -145,23 +145,22 @@ def _worker(
     *,
     worker_id: int,
     iterations: int,
-    args: argparse.Namespace,
+    whisper,
+    advisory,
+    audio: str | None,
     notes: list[str],
-    threads_per_worker: int,
     out: Timings,
     lock: threading.Lock,
 ) -> None:
-    whisper = None
-    if args.audio and not args.skip_transcription:
-        whisper = _load_whisper(args.whisper_model, threads_per_worker)
-    advisory = _load_advisory(args.advisory_model, threads_per_worker)
-
+    # Models are prebuilt and passed in. Constructing whisper/llama concurrently from several
+    # threads races their native global init and crashes, so main loads them sequentially and
+    # only the timed loop below runs concurrently.
     local = Timings()
     for i in range(iterations):
         start = time.perf_counter()
         if whisper is not None:
             t0 = time.perf_counter()
-            note_text = _transcribe(whisper, args.audio)
+            note_text = _transcribe(whisper, audio)
             local.transcribe_s.append(time.perf_counter() - t0)
         else:
             note_text = notes[(worker_id + i) % len(notes)]
@@ -235,6 +234,23 @@ def main() -> None:
         f"transcription={'on' if args.audio and not args.skip_transcription else 'off'}"
     )
 
+    # Build one model set per worker sequentially (concurrent native init crashes), and warm
+    # each so the timed loop measures steady-state latency, not cold start.
+    use_transcription = bool(args.audio) and not args.skip_transcription
+    print("loading models sequentially...")
+    worker_models: list[tuple[object | None, object]] = []
+    for _w in range(args.concurrency):
+        whisper = (
+            _load_whisper(args.whisper_model, threads_per_worker)
+            if use_transcription
+            else None
+        )
+        advisory = _load_advisory(args.advisory_model, threads_per_worker)
+        advisory.signals_defect("warm up")
+        if whisper is not None:
+            _transcribe(whisper, args.audio)
+        worker_models.append((whisper, advisory))
+
     out = Timings()
     lock = threading.Lock()
     sampler = HardwareSampler()
@@ -247,9 +263,10 @@ def main() -> None:
             kwargs=dict(
                 worker_id=w,
                 iterations=args.iterations,
-                args=args,
+                whisper=worker_models[w][0],
+                advisory=worker_models[w][1],
+                audio=args.audio,
                 notes=notes,
-                threads_per_worker=threads_per_worker,
                 out=out,
                 lock=lock,
             ),
@@ -273,22 +290,25 @@ def main() -> None:
 
     print("\nthermal / frequency:")
     if sampler.temps_c:
+        tmax = max(sampler.temps_c)
+        # The Ryzen 7 5825U throttles near ~95C. Flag on sustained high temperature, not on a
+        # start-to-end frequency drop: cores clock down when the short run ends, which looks
+        # like a drop but is not throttling.
+        throttling = tmax >= 90.0
         print(
-            f"  cpu temp     max={max(sampler.temps_c):5.1f}C  mean={statistics.mean(sampler.temps_c):5.1f}C"
+            f"  cpu temp     max={tmax:5.1f}C  mean={statistics.mean(sampler.temps_c):5.1f}C"
+            f"{'  <-- thermal throttling likely' if throttling else ''}"
         )
     else:
-        print("  cpu temp     (no thermal_zone readings on this host)")
+        print("  cpu temp     (no CPU temp sensor found)")
     if sampler.freqs_mhz:
-        early = sampler.freqs_mhz[: max(1, len(sampler.freqs_mhz) // 4)]
-        late = sampler.freqs_mhz[-max(1, len(sampler.freqs_mhz) // 4) :]
-        drop = 1.0 - (statistics.mean(late) / statistics.mean(early))
         print(
-            f"  cpu freq     start={statistics.mean(early):6.0f}MHz  "
-            f"end={statistics.mean(late):6.0f}MHz  drop={drop * 100:4.1f}%"
-            f"{'  <-- likely throttling' if drop > 0.15 else ''}"
+            f"  cpu freq     min={min(sampler.freqs_mhz):6.0f}MHz  "
+            f"mean={statistics.mean(sampler.freqs_mhz):6.0f}MHz  "
+            f"max={max(sampler.freqs_mhz):6.0f}MHz  (informational)"
         )
     else:
-        print("  cpu freq     (no cpufreq readings on this host)")
+        print("  cpu freq     (no cpufreq readings)")
 
 
 if __name__ == "__main__":
