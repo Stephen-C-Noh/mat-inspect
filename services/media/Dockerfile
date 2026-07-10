@@ -1,16 +1,42 @@
 # syntax=docker/dockerfile:1.7
 # Build context is the repo root (see docker-compose.yml).
-# server.js currently has no dependencies, but the workspace-aware install
-# is in place so the first added dep does not silently fail at runtime.
+# npm workspaces require visibility of every workspace package.json,
+# so all are copied here even though only media is built.
 
 ARG NODE_VERSION=22
 
-# ---- prod-deps: install only production deps (workspace-aware) ----
+# ---- deps: install all workspace deps (incl. dev, needed for the build stage) ----
+FROM node:${NODE_VERSION}-alpine AS deps
+WORKDIR /repo
+COPY package.json package-lock.json .npmrc ./
+COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-schemas/package.json packages/shared-schemas/
+COPY packages/shared-crypto/package.json packages/shared-crypto/
+COPY db/package.json db/
+COPY services/core-api/package.json services/core-api/
+COPY services/media/package.json services/media/
+COPY services/audit/package.json services/audit/
+COPY apps/pwa/package.json apps/pwa/
+COPY apps/dashboard/package.json apps/dashboard/
+RUN npm ci --ignore-scripts
+
+# ---- build: compile TS -> JS for media and its project references ----
+FROM deps AS build
+COPY tsconfig.base.json tsconfig.json ./
+COPY packages packages
+COPY services/media/tsconfig.json services/media/
+COPY services/media/src services/media/src
+# tsc -b walks the project references (shared-types, shared-schemas) in dependency order.
+RUN npx tsc -b services/media/tsconfig.json
+
+# ---- prod-deps: install only production deps for the runtime image ----
 FROM node:${NODE_VERSION}-alpine AS prod-deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
+COPY packages/shared-crypto/package.json packages/shared-crypto/
+COPY db/package.json db/
 COPY services/core-api/package.json services/core-api/
 COPY services/media/package.json services/media/
 COPY services/audit/package.json services/audit/
@@ -18,17 +44,25 @@ COPY apps/pwa/package.json apps/pwa/
 COPY apps/dashboard/package.json apps/dashboard/
 RUN npm ci --omit=dev --ignore-scripts
 
-# ---- runtime ----
+# ---- runtime: minimal image, non-root, prod node_modules + built JS ----
 FROM node:${NODE_VERSION}-alpine AS runtime
 WORKDIR /repo
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=prod-deps /repo/package.json ./
-COPY services/media/package.json services/media/
-COPY services/media/server.js services/media/
+COPY --from=build /repo/packages/shared-types/package.json packages/shared-types/
+COPY --from=build /repo/packages/shared-types/dist packages/shared-types/dist
+COPY --from=build /repo/packages/shared-schemas/package.json packages/shared-schemas/
+COPY --from=build /repo/packages/shared-schemas/dist packages/shared-schemas/dist
+COPY --from=build /repo/services/media/package.json services/media/
+COPY --from=build /repo/services/media/dist services/media/dist
+# Unlike core-api and audit, every media production dependency (fastify, @fastify/multipart,
+# fastify-type-provider-zod, @azure/storage-blob) hoists to the root node_modules copied above,
+# so there is no workspace-local node_modules to ship. If a future dependency conflict forces a
+# nested copy, add: COPY --from=prod-deps /repo/services/media/node_modules services/media/node_modules
 USER appuser
 WORKDIR /repo/services/media
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
-CMD ["node", "server.js"]
+  CMD wget -qO- http://127.0.0.1:3000/health || exit 1
+CMD ["node", "dist/server.js"]
