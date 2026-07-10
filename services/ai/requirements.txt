@@ -1,6 +1,9 @@
 fastapi==0.111.0
 uvicorn==0.30.1
 faster-whisper==1.1.1
+# faster-whisper 1.1.1 imports `requests` directly, but huggingface-hub 1.x dropped it as a
+# transitive dep (moved to httpx). Pin it explicitly so the import resolves.
+requests==2.32.3
 httpx==0.27.0
 azure-monitor-opentelemetry==1.6.4
 # On-prem advisory model runtime (DEV-83). CPU-only GGUF inference; keeps note text on the box.

@@ -35,14 +35,32 @@ from dataclasses import dataclass, field
 # --- hardware sampling --------------------------------------------------------------
 
 
+def _try_read_temp_c(path: str, out: list[float]) -> None:
+    try:
+        with open(path) as fh:
+            value = int(fh.read().strip()) / 1000.0
+        if 0.0 < value < 150.0:  # drop bogus/unpopulated sensors
+            out.append(value)
+    except (OSError, ValueError):
+        return
+
+
 def _read_cpu_temps_c() -> list[float]:
     temps: list[float] = []
+    # Intel laptops often expose the CPU here.
     for path in glob.glob("/sys/class/thermal/thermal_zone*/temp"):
+        _try_read_temp_c(path, temps)
+    # AMD (k10temp/zenpower) and many Intel (coretemp) expose the CPU temp via hwmon, not
+    # thermal_zone. Restrict to the CPU driver so nvme/wifi sensors do not pollute the max.
+    for hwmon in glob.glob("/sys/class/hwmon/hwmon*"):
         try:
-            with open(path) as fh:
-                temps.append(int(fh.read().strip()) / 1000.0)
-        except (OSError, ValueError):
+            with open(os.path.join(hwmon, "name")) as fh:
+                name = fh.read().strip()
+        except OSError:
             continue
+        if name in ("k10temp", "zenpower", "coretemp"):
+            for path in glob.glob(os.path.join(hwmon, "temp*_input")):
+                _try_read_temp_c(path, temps)
     return temps
 
 
