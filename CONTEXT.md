@@ -71,6 +71,17 @@ A competent human (Lab Tech) who performs the visual Inspection. Alberta OHS s.2
 requires the Inspection be completed by a competent human. The AI is assistive only
 and never decides pass or fail.
 
+## Advisory Check
+
+An assistive prompt that surfaces a possible inconsistency for the Operator to
+consider, for example a note describing a defect on an item the Operator marked as
+passing. It is advisory only: the Operator may act on it or dismiss it. It never
+determines the Inspection Result, never blocks submission, and leaves no trace on the
+Inspection record. Consistent with OHS s.257, the competent human makes every pass or
+fail judgment; an Advisory Check informs that judgment, it does not make it. Whether an
+Advisory Check is computed by rules or by a machine-learning model does not change this:
+the assistive-only limit binds the role, not the implementation.
+
 ## App Role
 
 An authorization role Entra ID issues in the access token `roles` claim. Four exist:

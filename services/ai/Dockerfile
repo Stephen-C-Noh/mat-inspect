@@ -7,8 +7,11 @@ FROM python:3.12-slim AS runtime
 WORKDIR /app
 RUN groupadd -r appgroup && useradd -r -g appgroup --home-dir /app appuser && chown -R appuser:appgroup /app
 COPY --from=build /app/packages ./packages
-COPY main.py ./
+COPY main.py advisory.py advisory_model.py ./
 ENV PYTHONPATH=/app/packages
+# Model weights are not baked into the image (large, license-bound). Mount them on the mini-PC
+# and point ADVISORY_MODEL_PATH at the local GGUF file. If unset, the advisory path is
+# UNAVAILABLE and submit is unaffected (ADR 0017, ADR 0018).
 USER appuser
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \

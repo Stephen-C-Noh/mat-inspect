@@ -64,6 +64,19 @@ Supporting points:
   PostgreSQL, the Azure SDKs against emulators) is unchanged and remains the artifact's runtime.
   Those ADRs are not superseded; their production half is deferred until a business owner and
   funding exist.
+- **AI Service usage-based autoscaling is deferred to the same post-handover track (ADR 0017).**
+  The capstone runs the AI Service on the single mini-PC with a concurrency cap and resource
+  reservation, not autoscaling. Autoscaling (Azure Container Apps with KEDA) is a post-adoption
+  step, described in ADR 0017 and conditional on the governance track, not a capstone deliverable.
+- **The Advisory Check runs on-prem and is FOIP-clean; the Azure Foundry conditions apply only if
+  the team later upgrades to a cloud model (ADR 0018).** The delivered path runs the advisory model
+  on the team mini-PC, so note text never leaves SAIT-controlled infrastructure and the feature
+  works on real note text with no tenant gate. Azure Foundry is retained only as a conditional
+  post-handover upgrade if the on-prem model's quality or throughput proves insufficient. If it is
+  ever adopted, real note text may be sent to Foundry only after the SAIT tenant uses a Standard
+  (regional) deployment in a Canada geography (not Global or DataZone) and approved modified abuse
+  monitoring (ContentLogging=false). These two conditions are FOIP prerequisites for the Foundry
+  upgrade and must be verified before it is turned on, not assumed.
 - **Compliance is self-documented and defensible by design.** ITS will not assess privacy during
   the capstone, so the team documents it. Voice clips and operator identification stay on
   team-controlled (and, post-adoption, SAIT-controllable) storage. No voice clip, photo, or
