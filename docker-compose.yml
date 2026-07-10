@@ -145,6 +145,13 @@ services:
       PORT: '8000'
       OTEL_SERVICE_NAME: ai
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+      # ADR 0017: the transcription concurrency cap is set as a matched pair with the CPU
+      # reservation below (cap == reserved cores). Sized to 2 by the mini-PC benchmark.
+      AI_MAX_CONCURRENCY: '2'
+    # ADR 0017: explicit CPU and memory bound so the ai container does not starve the other
+    # services or get starved by them. Reserved cores match AI_MAX_CONCURRENCY.
+    cpus: 2.0
+    mem_limit: 4g
     healthcheck:
       test:
         [
