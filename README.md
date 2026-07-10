@@ -10,28 +10,14 @@ Prerequisites: Docker Desktop, Node 22 LTS, Git.
 ```bash
 git clone https://github.com/Stephen-C-Noh/mat-inspect.git
 cd mat-inspect
-cp .env.example .env
-docker compose up
 ```
 
-Open http://localhost:3000 for the operator PWA.
-Open http://localhost:3001 for the manager dashboard.
-
-### Running one app locally (without Docker)
-
-The Docker stack runs everything together. To iterate on a single app, run
-`npm run dev` from that app's folder. Local dev ports:
-
-| App       | Local dev port |
-| --------- | -------------- |
-| core-api  | 3000           |
-| dashboard | 3001           |
-| pwa       | 3002           |
-
-The PWA uses 3002 locally because core-api holds 3000 and the dashboard holds 3001. These local ports differ from the Docker host ports above, where the PWA
-is on 3000 and core-api sits behind Caddy with no host port. When the PWA gets
-MSAL login (DEV-26), add `http://localhost:3002` as a redirect URI on the app
-registration.
+Get a real `.env` file from Stephen (`.env.example` alone will not boot;
+core-api and the audit service refuse to start with blank or placeholder
+Entra, Application Insights, or audit-token values). Then see
+[docs/QUICKSTART.md](docs/QUICKSTART.md) for bring-up order, the DB
+migrate/seed step, and the difference between running the full Docker stack
+and iterating on one app with `npm run dev`.
 
 ## New Teammate? Read These in Order
 
