@@ -33,6 +33,10 @@ describe('storePhoto against Azurite', () => {
       .withCommand(['azurite-blob', '--blobHost', '0.0.0.0', '--skipApiVersionCheck'])
       .withExposedPorts(10000)
       .withWaitStrategy(Wait.forLogMessage(/Azurite Blob service successfully listens/))
+      // Raise the startup budget above the 60s default: when the full suite runs, many
+      // testcontainers start at once and a slow Azurite boot under that contention would
+      // otherwise time out (a flake, not a real failure).
+      .withStartupTimeout(120_000)
       .start();
 
     connectionString = buildConnectionString(container.getHost(), container.getMappedPort(10000));

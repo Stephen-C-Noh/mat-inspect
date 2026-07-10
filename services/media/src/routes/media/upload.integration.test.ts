@@ -78,6 +78,9 @@ describe('POST /api/v1/media/upload', () => {
       .withCommand(['azurite-blob', '--blobHost', '0.0.0.0', '--skipApiVersionCheck'])
       .withExposedPorts(10000)
       .withWaitStrategy(Wait.forLogMessage(/Azurite Blob service successfully listens/))
+      // Raise the startup budget above the 60s default so a slow Azurite boot under full-suite
+      // container contention does not flake (see blob-storage.integration.test.ts).
+      .withStartupTimeout(120_000)
       .start();
 
     connectionString =
