@@ -3,10 +3,14 @@
 The tests exercise the contract and the hard constraints from ADR 0018 and ADR 0017:
 assistive only, non-blocking, fail-open, note text stays on-prem, ephemeral. They inject a
 fake defect-signal model so the suite does not need the real GGUF weights or llama.cpp.
+
+assess_note is async; the tests drive it with asyncio.run so the suite needs no async pytest
+plugin (CI installs plain pytest).
 """
 
 from __future__ import annotations
 
+import asyncio
 import socket
 from pathlib import Path
 
@@ -48,21 +52,25 @@ class SlowModel:
 # --- assess_note: direction and skip rules -----------------------------------------
 
 
-async def test_fail_item_is_not_assessed() -> None:
+def test_fail_item_is_not_assessed() -> None:
     # MVP direction: only a note on a PASS item can contradict. A FAIL item is out of scope,
     # and the model must not even be consulted.
     model = FakeModel(verdict=True)
-    result = await assess_note(
-        note_text="hydraulic line is leaking", item_marked_pass=False, model=model
+    result = asyncio.run(
+        assess_note(
+            note_text="hydraulic line is leaking", item_marked_pass=False, model=model
+        )
     )
     assert result.flagged is False
     assert result.status is AdvisoryStatus.OK
     assert model.calls == []
 
 
-async def test_empty_note_is_not_assessed() -> None:
+def test_empty_note_is_not_assessed() -> None:
     model = FakeModel(verdict=True)
-    result = await assess_note(note_text="   ", item_marked_pass=True, model=model)
+    result = asyncio.run(
+        assess_note(note_text="   ", item_marked_pass=True, model=model)
+    )
     assert result.flagged is False
     assert result.status is AdvisoryStatus.OK
     assert model.calls == []
@@ -71,22 +79,24 @@ async def test_empty_note_is_not_assessed() -> None:
 # --- assess_note: model verdicts ---------------------------------------------------
 
 
-async def test_pass_item_with_defect_note_is_flagged() -> None:
+def test_pass_item_with_defect_note_is_flagged() -> None:
     model = FakeModel(verdict=True)
-    result = await assess_note(
-        note_text="left rear tire is worn down to the cords",
-        item_marked_pass=True,
-        model=model,
+    result = asyncio.run(
+        assess_note(
+            note_text="left rear tire is worn down to the cords",
+            item_marked_pass=True,
+            model=model,
+        )
     )
     assert result.flagged is True
     assert result.status is AdvisoryStatus.OK
     assert model.calls == ["left rear tire is worn down to the cords"]
 
 
-async def test_pass_item_with_clean_note_is_not_flagged() -> None:
+def test_pass_item_with_clean_note_is_not_flagged() -> None:
     model = FakeModel(verdict=False)
-    result = await assess_note(
-        note_text="checked, all good", item_marked_pass=True, model=model
+    result = asyncio.run(
+        assess_note(note_text="checked, all good", item_marked_pass=True, model=model)
     )
     assert result.flagged is False
     assert result.status is AdvisoryStatus.OK
@@ -95,29 +105,33 @@ async def test_pass_item_with_clean_note_is_not_flagged() -> None:
 # --- assess_note: fail-open (never blocks or delays submit) -------------------------
 
 
-async def test_missing_model_is_unavailable_not_flagged() -> None:
-    result = await assess_note(
-        note_text="brake feels soft", item_marked_pass=True, model=None
+def test_missing_model_is_unavailable_not_flagged() -> None:
+    result = asyncio.run(
+        assess_note(note_text="brake feels soft", item_marked_pass=True, model=None)
     )
     assert result.flagged is False
     assert result.status is AdvisoryStatus.UNAVAILABLE
 
 
-async def test_model_error_fails_open() -> None:
-    result = await assess_note(
-        note_text="brake feels soft", item_marked_pass=True, model=ExplodingModel()
+def test_model_error_fails_open() -> None:
+    result = asyncio.run(
+        assess_note(
+            note_text="brake feels soft", item_marked_pass=True, model=ExplodingModel()
+        )
     )
     assert result.flagged is False
     assert result.status is AdvisoryStatus.UNAVAILABLE
 
 
-async def test_slow_model_times_out_and_fails_open() -> None:
+def test_slow_model_times_out_and_fails_open() -> None:
     # A slow model must degrade to "no advisory", never delay the operator (ADR 0017).
-    result = await assess_note(
-        note_text="brake feels soft",
-        item_marked_pass=True,
-        model=SlowModel(delay=1.0),
-        timeout_seconds=0.05,
+    result = asyncio.run(
+        assess_note(
+            note_text="brake feels soft",
+            item_marked_pass=True,
+            model=SlowModel(delay=1.0),
+            timeout_seconds=0.05,
+        )
     )
     assert result.flagged is False
     assert result.status is AdvisoryStatus.UNAVAILABLE
@@ -126,17 +140,23 @@ async def test_slow_model_times_out_and_fails_open() -> None:
 # --- note text stays on-prem -------------------------------------------------------
 
 
-async def test_advisory_path_opens_no_network_socket(
+def test_advisory_path_opens_no_network_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Note text never leaves the box (ADR 0018). Block all socket creation and confirm the
-    # advisory path still completes: it talks only to the in-process model.
-    def blocked(*args: object, **kwargs: object) -> None:
-        raise AssertionError("advisory path attempted a network socket")
+    # Note text never leaves the box (ADR 0018). Block outbound socket connections and confirm
+    # the advisory path still completes: it talks only to the in-process model. Blocking connect
+    # (not socket creation) targets network egress without breaking asyncio's own internals.
+    def blocked_connect(*args: object, **kwargs: object) -> None:
+        raise AssertionError("advisory path attempted an outbound network connection")
 
-    monkeypatch.setattr(socket, "socket", blocked)
-    result = await assess_note(
-        note_text="forks are bent", item_marked_pass=True, model=FakeModel(verdict=True)
+    monkeypatch.setattr(socket.socket, "connect", blocked_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", blocked_connect)
+    result = asyncio.run(
+        assess_note(
+            note_text="forks are bent",
+            item_marked_pass=True,
+            model=FakeModel(verdict=True),
+        )
     )
     assert result.flagged is True
 

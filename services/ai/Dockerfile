@@ -1,12 +1,7 @@
 FROM python:3.12-slim AS build
 WORKDIR /app
 COPY requirements.txt ./
-# llama-cpp-python (advisory model, DEV-83) needs a native CPU backend. Install it from the
-# prebuilt CPU wheel index so the image needs no C/C++ toolchain. The mini-PC benchmark builds
-# its own AVX2-tuned wheel in a local venv (see benchmark/README.md).
-RUN pip install --no-cache-dir --target=/app/packages \
-  --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu \
-  -r requirements.txt
+RUN pip install --no-cache-dir --target=/app/packages -r requirements.txt
 
 FROM python:3.12-slim AS runtime
 WORKDIR /app
