@@ -67,6 +67,32 @@ with a worker pool becomes worthwhile and can be revisited in a superseding ADR.
 design keeps audio on SAIT-controlled infrastructure; audio is biometric PII under FOIP
 and is never sent to an external AI API.
 
+### Benchmark result and derived cap (2026-07-10)
+
+The benchmark ran on the mini-PC (Ryzen 7 5825U, CPU only): faster-whisper small.en (int8)
+plus Qwen2.5-1.5B-Instruct (Q4_K_M), transcribe plus advise per note, worst case (every worker
+running flat out on its own model instances), 20 iterations per worker.
+
+| Concurrency | transcribe p95 | advisory p95 | combined p95 | CPU temp max |
+| ----------- | -------------- | ------------ | ------------ | ------------ |
+| 2           | 3.5 s          | 275 ms       | 3.7 s        | 69.5 C       |
+| 3           | 4.8 s          | 399 ms       | 5.1 s        | 78.9 C       |
+| 4           | 6.1 s          | 378 ms       | 6.6 s        | 82.6 C       |
+
+Findings. No thermal throttling at any level (max 82.6 C, well below the roughly 95 C trip), so
+heat is not the binding constraint. The advisory stays cheap (p95 under 400 ms, 3 to 8 percent
+of the combined time) and is never the bottleneck; its worst outlier (2.6 s) stays inside the
+advisory fail-open timeout. Transcription is the bottleneck and grows with concurrency as
+workers share fewer cores, crossing the DEV-31 5-second target between 3 and 4 concurrent.
+Throughput is flat (about 0.6 operations per second), which matches the single-box premise.
+
+Derived cap. Set the concurrency cap (semaphore) to 2, with the container CPU reservation
+matched so two concurrent transcriptions each keep enough cores. At cap 2 both transcription
+(3.5 s p95) and combined (3.7 s p95) sit inside the 5-second target with margin. Requests beyond
+the cap wait briefly or receive 429 and fall back to typed notes. Cap 3 is a burst ceiling
+(combined p95 just over 5 s); cap 4 exceeds the target. Full numbers are in
+services/ai/benchmark/RESULTS.md.
+
 ## Consequences
 
 Positive: the 5-second NFR is defended on a single CPU box without an orchestrator. Load
