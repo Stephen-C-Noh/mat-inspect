@@ -1,0 +1,99 @@
+# ADR 0017: AI Service Scaling Strategy (Concurrency Cap First, Autoscale Deferred)
+
+Date: 2026-07-09
+Status: Accepted
+
+## Context
+
+The AI Service (DEV-31) runs faster-whisper `small.en` with CPU inference in a Docker
+container. It transcribes operator voice notes. A question arose during planning: can
+this service scale with usage?
+
+Two constraints shape the answer.
+
+First, deployment. During the capstone the whole stack runs on one team mini-PC through a
+single `docker-compose.yml`. SAIT IT confirmed no hosted infrastructure during the
+project (ADR 0016). Docker Compose has no usage-based autoscaling. `docker compose up
+--scale ai=N` sets a fixed replica count; it does not react to CPU load or queue depth.
+
+Second, the workload. Transcription is CPU-bound. On a single box, adding `ai` replicas
+does not raise throughput; the replicas contend for the same physical cores. Under
+concurrent load this makes each request slower and threatens the 5-second NFR in DEV-31,
+rather than serving more requests.
+
+The AI Service is assistive only (OHS s.257) and its failure must not block inspection
+submission; the caller falls back to typed notes. So the goal is not maximum throughput.
+The goal is to protect the per-request latency NFR under load and stay within the box.
+
+## Decision
+
+For the capstone deployment, do not autoscale the AI Service. Protect it with load
+control instead. Apply three levers together, at three layers.
+
+1. Resource reservation (container/OS layer). Give the `ai` container an explicit CPU and
+   memory bound in Compose (`cpus`, `mem_limit`) so it does not starve other services or
+   get starved by them.
+
+2. Concurrency cap (application layer). Gate transcription behind a semaphore or bounded
+   queue inside the service. Size the cap to the reserved cores. Requests beyond the cap
+   wait briefly or receive 429. This is the lever that actually defends the 5-second NFR.
+
+3. Non-blocking background transcription (interaction layer). Transcription runs off the
+   inspection-submit critical path. The caller invokes the service without blocking the
+   operator, shows a non-blocking "transcribing" state, and lets the operator continue the
+   checklist. The transcript populates an editable note field for review before submit
+   (`notesSource` VOICE_TRANSCRIBED, then VOICE_EDITED if changed). If the service is slow,
+   at capacity (429), or down, the field stays editable and the operator types instead.
+   Submit is never blocked. Under this model the 5-second latency figure is a backend
+   performance target at nominal load, not a user-facing blocking gate; exceeding it
+   degrades to "the transcript arrives late", not an error shown to the operator.
+
+The reservation and the concurrency cap are set as a matched pair: the semaphore size
+equals the reserved core count. They are applied at the same time, not in sequence.
+
+The AI Service box now hosts a second CPU consumer: the on-prem Advisory Check model
+(ADR 0018) reads the transcript text and runs on the same mini-PC. The reservation and cap
+above are re-derived to cover both consumers. Transcription and the advisory are sequential
+per note (transcribe first, then advise), and the advisory is non-blocking, so the advisory
+runs behind transcription in the shared pool rather than requiring dedicated headroom. The
+combined load is validated by a benchmark on the actual mini-PC (faster-whisper small.en
+int8 plus the candidate advisory model Q4, under 2 to 4 concurrent operations, measuring
+latency and thermal throttling).
+
+Defer true usage-based autoscaling to after handover, when an orchestrator exists. Azure
+Container Apps with KEDA is the recommended target: it can scale on HTTP concurrency or
+queue length. At that point, moving transcription from a synchronous POST to a job queue
+with a worker pool becomes worthwhile and can be revisited in a superseding ADR. Any such
+design keeps audio on SAIT-controlled infrastructure; audio is biometric PII under FOIP
+and is never sent to an external AI API.
+
+## Consequences
+
+Positive: the 5-second NFR is defended on a single CPU box without an orchestrator. Load
+control is declarative (Compose limits) plus a small in-process gate, both within the
+capstone toolchain. The three levers do not conflict; they compose.
+
+Negative: the service does not scale out under the capstone deployment. Sustained load
+above the concurrency cap degrades to waiting or 429, and callers fall back to typed
+notes more often. Throughput is bounded by the mini-PC core count until handover. The
+full asynchronous form (job queue plus worker pool) is not built now, so a later move to
+autoscaling will require that additional work.
+
+## Alternatives Considered
+
+Compose `--scale` for the AI Service. Rejected. It sets a static replica count, not
+usage-based scaling, and on one box the replicas contend for the same cores, lowering
+per-request latency rather than raising throughput.
+
+Docker Swarm. Rejected. It is close to Compose but still has no built-in autoscaling; it
+adds orchestration surface the capstone does not need and does not solve the single-box
+core limit.
+
+Kubernetes with HPA now. Rejected for the capstone. It provides real autoscaling but is
+heavy to run and operate on a single mini-PC and exceeds the project scope. It remains a
+possible post-handover path, though Azure Container Apps is the lighter fit.
+
+Job queue plus worker pool now. Rejected for the MVP. It is the right shape for
+autoscaling later, but it conflicts with the current synchronous POST acceptance
+criterion in DEV-31 and adds a broker and worker lifecycle the capstone does not yet
+need. Staged for the post-handover autoscaling work.
