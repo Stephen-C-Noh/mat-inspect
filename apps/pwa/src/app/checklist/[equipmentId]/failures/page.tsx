@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useRef, type ReactElement } from 'react';
-import { ChevronRight, ImageIcon, Mic, X, AlertTriangle } from 'lucide-react';
+import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { AuthGuard } from '@/components/auth-guard';
 
 const MOCK_FAILURES = [
@@ -11,9 +11,13 @@ const MOCK_FAILURES = [
   { id: '2', question: 'Brake Functionality?' },
 ];
 
+// Tracks the origin of a defect note for audit compliance (OHS s.257).
+type NotesSource = 'TYPED' | 'VOICE_TRANSCRIBED' | 'VOICE_EDITED';
+
 type FailureEntry = {
   notes: string;
   photo: string | null;
+  notes_source: NotesSource;
 };
 
 function FailureCard({
@@ -31,11 +35,101 @@ function FailureCard({
 }): ReactElement {
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Audio capture and background tracking states
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+
+  // Retains original text to determine if modifications have occurred
+  const rawTranscriptRef = useRef<string>('');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     onChange({ ...entry, photo: url });
+  };
+
+  // Handles starting the microphone recording interface
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        sendAudioToAIService(audioBlob);
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch {
+      // Audio interface access denied or missing configuration
+    }
+  };
+
+  // Stops microphone recording
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  // Sends audio payload matching the backend configuration parameters
+  const sendAudioToAIService = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+
+    try {
+      const formData = new FormData();
+      // Matches backend contract: parameter must be exactly 'clip'
+      formData.append('clip', audioBlob, 'clip.wav');
+
+      const response = await fetch('/api/v1/ai/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const incomingText = data.text || ''; // Matches exact response schema: { text: string }
+
+        rawTranscriptRef.current = incomingText;
+
+        onChange({
+          ...entry,
+          notes: incomingText,
+          notes_source: 'VOICE_TRANSCRIBED',
+        });
+      } else {
+        // Soft failure fallback (413/429/503 respond silently to allow typing)
+      }
+    } catch {
+      // AI Service communication soft-failure handled cleanly in background
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  // Dynamically alters notes_source flag if user edits a voice transcription
+  const handleTextChange = (textValue: string) => {
+    let nextSource: NotesSource = 'TYPED';
+
+    if (entry.notes_source === 'VOICE_TRANSCRIBED' || entry.notes_source === 'VOICE_EDITED') {
+      nextSource = textValue === rawTranscriptRef.current ? 'VOICE_TRANSCRIBED' : 'VOICE_EDITED';
+    }
+
+    onChange({
+      ...entry,
+      notes: textValue,
+      notes_source: nextSource,
+    });
   };
 
   return (
@@ -88,29 +182,41 @@ function FailureCard({
           )}
         </div>
 
-        {/* Notes */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Description of Failure
-            </p>
-            <button
-              type="button"
-              disabled
-              title="Voice input coming soon"
-              className="flex items-center gap-1 rounded-sm bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground opacity-50 cursor-not-allowed"
-            >
-              <Mic className="size-3.5" />
-              Voice
-            </button>
-          </div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Description of Failure
+        </p>
+
+        <div className="relative">
           <textarea
             rows={3}
             placeholder="Describe the defect observed..."
             value={entry.notes}
-            onChange={(e) => onChange({ ...entry, notes: e.target.value })}
+            onChange={(e) => handleTextChange(e.target.value)}
             className="w-full resize-none rounded-sm border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          {/* Visual background indicator during API processing loops */}
+          {isTranscribing && (
+            <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-background/90 px-1.5 py-0.5 rounded text-[11px] font-medium text-primary">
+              <Loader2 className="size-3 animate-spin" />
+              Transcribing...
+            </div>
+          )}
+
+          {/* Notes */}
+          <div className="mb-2">
+            <button
+              type="button"
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`flex w-full items-center justify-center gap-2 rounded-sm py-3 text-sm font-bold shadow-card transition-colors ${
+                isRecording
+                  ? 'bg-red-600 text-white animate-pulse hover:bg-red-700'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              }`}
+            >
+              <Mic className="size-4" />
+              {isRecording ? 'Stop Recording' : 'Add Voice Note'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -121,8 +227,18 @@ function FailuresContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
 
+  // Initialize the state container mapping each mock failure to a clean default state
   const [entries, setEntries] = useState<Record<string, FailureEntry>>(
-    Object.fromEntries(MOCK_FAILURES.map((f) => [f.id, { notes: '', photo: null }])),
+    Object.fromEntries(
+      MOCK_FAILURES.map((f) => [
+        f.id,
+        {
+          notes: '',
+          photo: null,
+          notes_source: 'TYPED', // Defaults to TYPED until a voice capture is initiated
+        },
+      ]),
+    ),
   );
 
   const updateEntry = (id: string, updated: FailureEntry) => {
