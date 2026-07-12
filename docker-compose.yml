@@ -145,12 +145,19 @@ services:
       PORT: '8000'
       OTEL_SERVICE_NAME: ai
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
-      # ADR 0017: the transcription concurrency cap is set as a matched pair with the CPU
-      # reservation below (cap == reserved cores). Sized to 2 by the mini-PC benchmark.
-      AI_MAX_CONCURRENCY: '2'
-    # ADR 0017: explicit CPU and memory bound so the ai container does not starve the other
-    # services or get starved by them. Reserved cores match AI_MAX_CONCURRENCY.
-    cpus: 2.0
+      # ADR 0017: the transcription concurrency cap and the container's CPU ceiling are the same
+      # number, so a saturated cap cannot ask for more CPU time than the container may use.
+      # AI_CPUS is the single source for both. Sized to 2 by the mini-PC benchmark.
+      AI_MAX_CONCURRENCY: ${AI_CPUS:-2}
+    # ADR 0017. `cpus` is a ceiling (CFS quota), not a reservation: it stops the ai container
+    # starving the other services, but it does not stop them starving it. Docker has no true CPU
+    # reservation (Compose ignores deploy.resources.reservations.cpus outside Swarm), so the
+    # defence against contention is weight: cpu_shares puts the ai container ahead of the default
+    # 1024 when the box is oversubscribed. Under sustained contention the container can still get
+    # less than AI_CPUS worth of CPU and transcription latency degrades; pin with `cpuset` if the
+    # mini-PC ever needs a hard partition.
+    cpus: ${AI_CPUS:-2}
+    cpu_shares: 2048
     mem_limit: 4g
     healthcheck:
       test:

@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import os
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import TypeVar
 
 if os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
     from azure.monitor.opentelemetry import configure_azure_monitor
@@ -9,42 +11,54 @@ if os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
     configure_azure_monitor()
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
+from starlette.formparsers import MultiPartParser
 
 from advisory import AdvisoryStatus, DefectSignalModel, assess_note
 from transcription import (
     DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
+    DEFAULT_INFERENCE_TIMEOUT_SECONDS,
     DEFAULT_MAX_CONCURRENCY,
+    MAX_AUDIO_BYTES,
     AudioTooLarge,
     Transcriber,
     TranscriptionAtCapacity,
+    TranscriptionFailed,
     TranscriptionUnavailable,
     transcribe_clip,
 )
 
 logger = logging.getLogger("ai")
 
+T = TypeVar("T")
 
-def _int_env(name: str, default: int) -> int:
+
+def _env(name: str, default: T, cast: Callable[[str], T]) -> T:
+    """Read one env var, falling back to the default if it is unset or unparseable."""
     raw = os.environ.get(name)
     if not raw:
         return default
     try:
-        return int(raw)
+        return cast(raw)
     except ValueError:
-        logger.warning("invalid %s=%r; using default %d", name, raw, default)
+        logger.warning("invalid %s=%r; using default %r", name, raw, default)
         return default
 
 
-def _float_env(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if not raw:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        logger.warning("invalid %s=%r; using default %s", name, raw, default)
-        return default
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
+
+
+def _parse_bool(raw: str) -> bool:
+    # Strict: bool("false") is True in Python, so a plain truthiness check would let
+    # AI_TRANSCRIPTION_DISABLED=false silently disable transcription.
+    value = raw.strip().lower()
+    if value in _TRUE_VALUES:
+        return True
+    if value in _FALSE_VALUES:
+        return False
+    raise ValueError(raw)
 
 
 def _load_advisory_model() -> DefectSignalModel | None:
@@ -70,7 +84,7 @@ def _load_transcriber() -> Transcriber | None:
     # blocked), the service still boots and /transcribe returns 503: a soft failure the caller
     # handles by keeping the note field editable (ADR 0017). Set AI_TRANSCRIPTION_DISABLED to skip
     # loading entirely (dev without the model).
-    if os.environ.get("AI_TRANSCRIPTION_DISABLED"):
+    if _env("AI_TRANSCRIPTION_DISABLED", False, _parse_bool):
         return None
     try:
         from transcription_model import FasterWhisperTranscriber
@@ -86,13 +100,17 @@ def _load_transcriber() -> Transcriber | None:
 async def lifespan(app: FastAPI):
     app.state.advisory_model = _load_advisory_model()
     app.state.transcriber = _load_transcriber()
-    # ADR 0017: cap sized to the reserved cores, applied as a matched pair with the Compose
-    # cpus/mem_limit reservation. The semaphore, not the event loop, bounds transcription.
+    # ADR 0017: the cap is sized to the CPU ceiling on the ai container. Compose derives
+    # AI_MAX_CONCURRENCY and the container's `cpus` ceiling from one value (AI_CPUS), so the two
+    # cannot drift apart. The semaphore, not the event loop, bounds transcription.
     app.state.transcription_semaphore = asyncio.Semaphore(
-        _int_env("AI_MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY)
+        _env("AI_MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY, int)
     )
-    app.state.transcription_acquire_timeout = _float_env(
-        "AI_TRANSCRIPTION_ACQUIRE_TIMEOUT", DEFAULT_ACQUIRE_TIMEOUT_SECONDS
+    app.state.transcription_acquire_timeout = _env(
+        "AI_TRANSCRIPTION_ACQUIRE_TIMEOUT", DEFAULT_ACQUIRE_TIMEOUT_SECONDS, float
+    )
+    app.state.transcription_inference_timeout = _env(
+        "AI_TRANSCRIPTION_TIMEOUT", DEFAULT_INFERENCE_TIMEOUT_SECONDS, float
     )
     yield
     app.state.advisory_model = None
@@ -101,13 +119,59 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Set at app creation as well as in lifespan(), so the accessors below always find state and can
+# read it directly. The semaphore in particular has no safe per-request fallback: handing back a
+# fresh Semaphore would silently remove the concurrency cap (ADR 0017).
+app.state.advisory_model = None
+app.state.transcriber = None
+app.state.transcription_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENCY)
+app.state.transcription_acquire_timeout = DEFAULT_ACQUIRE_TIMEOUT_SECONDS
+app.state.transcription_inference_timeout = DEFAULT_INFERENCE_TIMEOUT_SECONDS
+
+# Multipart framing (boundary, part headers) wrapped around the clip itself.
+MULTIPART_OVERHEAD_BYTES = 4 * 1024
+MAX_REQUEST_BYTES = MAX_AUDIO_BYTES + MULTIPART_OVERHEAD_BYTES
+
+# FOIP: audio is biometric PII. Starlette spools an upload part to a temp file on disk once it
+# grows past this threshold (SpooledTemporaryFile), which at the 1 MB default would write most
+# real voice notes to local disk before the app ever sees them. Raise it above the largest body
+# the guard below admits, so a request that gets parsed at all is held only in memory.
+MultiPartParser.max_file_size = MAX_REQUEST_BYTES
+
+
+@app.middleware("http")
+async def limit_transcribe_body(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    # Runs before routing, so an oversized clip is rejected before the multipart parser reads
+    # (and would spool) it. A dependency would be too late: FastAPI parses the form first.
+    if request.url.path != "/transcribe" or request.method != "POST":
+        return await call_next(request)
+
+    declared = request.headers.get("content-length")
+    if declared is None:
+        # Without a length the body can only be measured by reading it, which is the thing this
+        # guard exists to avoid. The PWA posts a Blob, so the browser always sets it.
+        return JSONResponse(
+            status_code=411, content={"detail": "content-length required"}
+        )
+    try:
+        length = int(declared)
+    except ValueError:
+        return JSONResponse(
+            status_code=400, content={"detail": "invalid content-length"}
+        )
+    if length > MAX_REQUEST_BYTES:
+        return JSONResponse(status_code=413, content={"detail": "audio clip too large"})
+    return await call_next(request)
+
 
 def get_advisory_model(request: Request) -> DefectSignalModel | None:
-    return getattr(request.app.state, "advisory_model", None)
+    return request.app.state.advisory_model
 
 
 def get_transcriber(request: Request) -> Transcriber | None:
-    return getattr(request.app.state, "transcriber", None)
+    return request.app.state.transcriber
 
 
 def get_transcription_semaphore(request: Request) -> asyncio.Semaphore:
@@ -115,11 +179,11 @@ def get_transcription_semaphore(request: Request) -> asyncio.Semaphore:
 
 
 def get_acquire_timeout(request: Request) -> float:
-    return getattr(
-        request.app.state,
-        "transcription_acquire_timeout",
-        DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
-    )
+    return request.app.state.transcription_acquire_timeout
+
+
+def get_inference_timeout(request: Request) -> float:
+    return request.app.state.transcription_inference_timeout
 
 
 @app.get("/health")
@@ -167,11 +231,12 @@ async def transcribe(
     transcriber: Transcriber | None = Depends(get_transcriber),
     semaphore: asyncio.Semaphore = Depends(get_transcription_semaphore),
     acquire_timeout: float = Depends(get_acquire_timeout),
+    inference_timeout: float = Depends(get_inference_timeout),
 ) -> TranscriptionResponse:
-    # Audio stays in memory and on the box: it is read here, passed to the on-prem model, and
-    # never written to disk or sent to an external host (FOIP). The three failure paths below are
-    # all soft: the caller keeps the note field editable and the operator types instead, so
-    # inspection submit is never blocked.
+    # Audio stays in memory and on the box: the body-size guard and the raised spool threshold
+    # above keep the clip out of a temp file, and it goes only to the on-prem model, never to an
+    # external host (FOIP). Every failure path below is soft: the caller keeps the note field
+    # editable and the operator types instead, so inspection submit is never blocked.
     audio = await clip.read()
     if not audio:
         raise HTTPException(status_code=400, detail="empty audio clip")
@@ -181,10 +246,13 @@ async def transcribe(
             transcriber=transcriber,
             semaphore=semaphore,
             acquire_timeout_seconds=acquire_timeout,
+            inference_timeout_seconds=inference_timeout,
         )
     except AudioTooLarge:
         raise HTTPException(status_code=413, detail="audio clip too large")
-    except TranscriptionUnavailable:
+    except (TranscriptionUnavailable, TranscriptionFailed):
+        # A missing model and a model that raised or hung are the same thing to the caller: no
+        # transcript this time, type the note instead.
         raise HTTPException(status_code=503, detail="transcription unavailable")
     except TranscriptionAtCapacity:
         raise HTTPException(status_code=429, detail="transcription at capacity")
