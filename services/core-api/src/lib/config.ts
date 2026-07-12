@@ -30,6 +30,7 @@ const rawSchema = z.object({
   DASHBOARD_BASE_URL: z.string().trim().optional(),
   AUDIT_SERVICE_URL: z.string().trim().optional(),
   AUDIT_INGEST_TOKEN: z.string().trim().optional(),
+  AI_SERVICE_URL: z.string().trim().optional(),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   SMTP_HOST: z.string().trim().optional(),
   // Treat a blank SMTP_PORT the same as unset, matching how orUndefined handles the other SMTP
@@ -86,6 +87,10 @@ export type AppConfig = {
   dashboardBaseUrl: string | undefined;
   auditServiceUrl: string | undefined;
   auditIngestToken: string | undefined;
+  // Internal address of the AI Service. The PWA reaches transcription through core-api, so this is
+  // the only route to it; the AI Service is not published to the browser (ADR 0019). undefined only
+  // under NODE_ENV=test.
+  aiServiceUrl: string | undefined;
   outboxPollIntervalMs: number;
   // undefined when SMTP is not configured. The notifier treats this as "skip and warn",
   // not a boot failure: a missing relay must not block the service from starting, and the
@@ -138,6 +143,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   const appInsights = orUndefined(env.APPLICATIONINSIGHTS_CONNECTION_STRING);
   const auditServiceUrl = orUndefined(env.AUDIT_SERVICE_URL);
   const auditIngestToken = orUndefined(env.AUDIT_INGEST_TOKEN);
+  const aiServiceUrl = orUndefined(env.AI_SERVICE_URL);
 
   // Reject placeholders for every secret. A half-filled .env (the value copied from
   // .env.example) fails at boot with a clear message, not later with an opaque client error.
@@ -209,6 +215,15 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   }
   if (requireAzure && !auditIngestToken) {
     problems.push('AUDIT_INGEST_TOKEN is required (only NODE_ENV=test may omit it)');
+  }
+
+  // core-api is the only way the PWA can reach transcription (ADR 0019). Without this, the voice
+  // note path is dead and the operator gets a soft failure on every clip with nothing in the logs
+  // pointing at the cause. Required outside tests, like the audit and Azure config above.
+  if (requireAzure && !aiServiceUrl) {
+    problems.push('AI_SERVICE_URL is required (only NODE_ENV=test may omit it)');
+  } else if (aiServiceUrl && !/^https?:\/\//.test(aiServiceUrl)) {
+    problems.push('AI_SERVICE_URL must be an http(s):// URL');
   }
 
   // SMTP for the failed-inspection email alert. Optional: a missing relay does not abort boot
@@ -297,6 +312,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     dashboardBaseUrl,
     auditServiceUrl,
     auditIngestToken,
+    aiServiceUrl,
     outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
     smtp,
     supervisorAlertEmails,

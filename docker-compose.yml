@@ -78,6 +78,9 @@ services:
       # Outbox poller delivery target (DEV-23 / ADR 0008).
       AUDIT_SERVICE_URL: 'http://audit:3000'
       AUDIT_INGEST_TOKEN: ${AUDIT_INGEST_TOKEN}
+      # Transcription proxy target (ADR 0019). Internal address only: the AI Service is not
+      # published to the browser, and core-api is the only client that authenticates in front of it.
+      AI_SERVICE_URL: 'http://ai:8000'
     depends_on:
       postgres:
         condition: service_healthy
