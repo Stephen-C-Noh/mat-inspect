@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "composite": true
+  },
+  "include": ["src"],
+  "exclude": ["**/*.test.ts"],
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/shared-schemas" }
+  ]
+}

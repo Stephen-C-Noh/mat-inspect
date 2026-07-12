@@ -261,3 +261,27 @@ export const auditEventIngestResponseSchema = z.object({
 });
 
 export type AuditEventIngestResponse = z.infer<typeof auditEventIngestResponseSchema>;
+
+// Image content types the Media Service accepts for a photo upload (DEV-32). The set is
+// enforced by sniffing the file's leading bytes, not the client-declared Content-Type, so a
+// spoofed header cannot smuggle a non-image through (see services/media image-type sniffing).
+export const photoContentTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp']);
+
+export type PhotoContentType = z.infer<typeof photoContentTypeSchema>;
+
+// Response for POST /api/v1/media/upload (Media Service, DEV-32). photoId is the stable
+// reference the operator PWA stores in an InspectionResponse.photo_ids array at submit time
+// (DEV-18); it is also the blob name inside the container, so the id alone locates the object.
+// The Media Service writes no core_db row: the association between a photo and an inspection
+// response lives in core_db and is created by the submit endpoint, not here. sha256 is the
+// content hash recorded on the blob for later integrity checks (report/audit export path).
+export const mediaUploadResponseSchema = z.object({
+  photoId: uuidSchema,
+  container: z.string().min(1),
+  blobName: z.string().min(1),
+  contentType: photoContentTypeSchema,
+  size: z.number().int().nonnegative(),
+  sha256: z.string().length(64),
+});
+
+export type MediaUploadResponse = z.infer<typeof mediaUploadResponseSchema>;
