@@ -5,6 +5,21 @@
 **Sponsor:** School of Manufacturing, Automation, and Transportation
 **Handover Target:** August 15, 2026
 
+**Status:** Post-handover provisioning request. This document describes what a SAIT-hosted
+deployment would require. It does not describe the current state, and SAIT IT has not
+committed to providing any of it.
+
+SAIT ITS declined to host the system during the capstone (reply of 2026-06-24; see ADR
+0016). The capstone runs entirely on team-owned hardware: the full stack (operator PWA,
+manager dashboard, services, PostgreSQL, object storage) runs in Docker Compose on a
+team mini-PC, with auth on a project-owned Entra tenant. Nothing below is a capstone
+dependency.
+
+The system is built so it can be adopted without redesign. If the School of MAT decides to
+pursue adoption, and a business owner and governance approval are in place, the resources
+listed here are what SAIT IT would provision at that point. Deployment to a SAIT tenant is
+a configuration change (connection strings, tenant IDs, app registration), not a rewrite.
+
 ---
 
 ## What This System Does
@@ -15,9 +30,9 @@ Alberta OHS Code (Part 19, s.257) requires a visual inspection before equipment 
 
 ---
 
-## What SAIT IT Needs to Provision
+## What SAIT IT Would Need to Provision (Post-Handover)
 
-The system uses Azure services already available in the SAIT tenant. No new vendors or services are introduced.
+The system uses Azure services already available in the SAIT tenant. No new vendors or services are introduced. None of the resources below is provisioned today; the list defines the target state if adoption proceeds.
 
 | Resource        | Service                                              | Notes                                                                     |
 | --------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |

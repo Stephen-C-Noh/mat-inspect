@@ -8,7 +8,13 @@ This file briefs AI coding assistants (Claude, ChatGPT, Cursor, Copilot, and oth
 
 MAT-Inspect is a digital pre-use inspection system for high-risk equipment at SAIT Main Campus (4 overhead cranes, 2 trucks, 1 electric pallet jack, 3 forklifts). It replaces paper inspection sheets with a mobile PWA, voice-to-text defect notes, a manager dashboard, and tamper-evident audit logs.
 
-Capstone project, 5 students, 13 weeks (May to August 2026). Deployed to SAIT Azure tenant (resources provided by SAIT IT).
+Capstone project, 5 students, 13 weeks (May to August 2026).
+
+SAIT provides no infrastructure during the capstone. SAIT ITS declined to host the system in writing (2026-06-24). The capstone deploys to a team-operated Docker Compose stack on a team-owned mini-PC, and auth runs on a project-owned Entra tenant, not SAIT's. See ADR 0016.
+
+The capstone therefore delivers two things: a self-contained containerized artifact (the full stack: PWA, dashboard, services, database, Compose files), and a governance package. Build so SAIT can later self-host that stack or deploy it to its own Azure infrastructure with no redesign. Any SAIT-hosted deployment is a post-handover possibility gated on a governance track the team does not own. Do not write code or docs that assume it has happened.
+
+The Azure services in the stack below stay in the design (Azure Blob Storage, Azure Monitor, Azure Database for PostgreSQL; ADRs 0003 to 0005). Their production halves are deferred, not cancelled: dev and dev-staging run against Azurite and self-hosted Postgres.
 
 The architectural source of truth is `docs/ARCHITECTURE.md` (also called the Capstone Plan). Read it before suggesting structural changes.
 
