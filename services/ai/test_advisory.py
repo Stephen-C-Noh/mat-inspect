@@ -12,12 +12,19 @@ from __future__ import annotations
 
 import asyncio
 import socket
+import threading
+import time
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from advisory import AdvisoryStatus, assess_note
+from advisory import (
+    AdvisoryResult,
+    AdvisoryStatus,
+    SerializedDefectModel,
+    assess_note,
+)
 from main import app, get_advisory_model
 
 
@@ -135,6 +142,107 @@ def test_slow_model_times_out_and_fails_open() -> None:
     )
     assert result.flagged is False
     assert result.status is AdvisoryStatus.UNAVAILABLE
+
+
+# --- serialization: the model never sees two inferences at once ---------------------
+
+
+class OverlapDetectingModel:
+    """Fails if a second call starts while the first is still inside the model."""
+
+    def __init__(self, delay: float) -> None:
+        self.delay = delay
+        self.concurrent = 0
+        self.max_concurrent = 0
+        self.calls = 0
+        self._lock = threading.Lock()
+
+    def signals_defect(self, note_text: str) -> bool:  # noqa: ARG002
+        with self._lock:
+            self.calls += 1
+            self.concurrent += 1
+            self.max_concurrent = max(self.max_concurrent, self.concurrent)
+        try:
+            time.sleep(self.delay)
+            return True
+        finally:
+            with self._lock:
+                self.concurrent -= 1
+
+
+def test_serialized_model_never_runs_two_inferences_at_once() -> None:
+    # llama.cpp's context is not thread-safe: two overlapping inferences corrupt its tensors and
+    # kill the process (GGML_ASSERT), taking transcription down with it. Observed on the mini-PC
+    # in DEV-95 with two concurrent /advisory calls. Nothing else guards this path; the ADR 0017
+    # semaphore covers transcription only.
+    inner = OverlapDetectingModel(delay=0.2)
+    model = SerializedDefectModel(inner)
+
+    async def two_at_once() -> list[AdvisoryResult]:
+        return list(
+            await asyncio.gather(
+                assess_note(
+                    note_text="hose leaking", item_marked_pass=True, model=model
+                ),
+                assess_note(
+                    note_text="chain frayed", item_marked_pass=True, model=model
+                ),
+            )
+        )
+
+    results = asyncio.run(two_at_once())
+
+    assert inner.max_concurrent == 1, "two inferences overlapped inside the model"
+    # The loser is shed, not queued: one real verdict, one UNAVAILABLE.
+    statuses = sorted(r.status for r in results)
+    assert statuses == [AdvisoryStatus.OK, AdvisoryStatus.UNAVAILABLE]
+
+
+def test_serialized_model_stays_usable_after_a_shed_call() -> None:
+    # Shedding must not leave the lock held. A subsequent note is assessed normally.
+    inner = OverlapDetectingModel(delay=0.05)
+    model = SerializedDefectModel(inner)
+
+    async def contend_then_retry() -> AdvisoryResult:
+        await asyncio.gather(
+            assess_note(note_text="a", item_marked_pass=True, model=model),
+            assess_note(note_text="b", item_marked_pass=True, model=model),
+        )
+        return await assess_note(
+            note_text="forks are bent", item_marked_pass=True, model=model
+        )
+
+    result = asyncio.run(contend_then_retry())
+    assert result.status is AdvisoryStatus.OK
+    assert result.flagged is True
+
+
+def test_timed_out_inference_keeps_holding_the_model() -> None:
+    # asyncio.wait_for cancels the coroutine that is waiting; it cannot stop native work already
+    # running in a thread. The timed-out inference is therefore still inside the model, and a
+    # request arriving behind it must be shed rather than started on top of it. This is the exact
+    # sequence that segfaulted the AI Service on the mini-PC.
+    inner = OverlapDetectingModel(delay=0.5)
+    model = SerializedDefectModel(inner)
+
+    async def timeout_then_immediately_retry() -> AdvisoryResult:
+        slow = await assess_note(
+            note_text="hose leaking",
+            item_marked_pass=True,
+            model=model,
+            timeout_seconds=0.05,
+        )
+        assert slow.status is AdvisoryStatus.UNAVAILABLE
+        # The first inference is still running in its thread right now.
+        return await assess_note(
+            note_text="chain frayed", item_marked_pass=True, model=model
+        )
+
+    second = asyncio.run(timeout_then_immediately_retry())
+    assert second.status is AdvisoryStatus.UNAVAILABLE
+    assert inner.max_concurrent == 1, (
+        "a timed-out inference was overlapped by the next one"
+    )
 
 
 # --- note text stays on-prem -------------------------------------------------------

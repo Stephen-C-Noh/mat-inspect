@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
@@ -41,6 +42,44 @@ class DefectSignalModel(Protocol):
     """Judges whether note text reports a defect, damage, or problem with the item."""
 
     def signals_defect(self, note_text: str) -> bool: ...
+
+
+class ModelBusy(Exception):
+    """An inference is already in flight. Expected under load, not an error."""
+
+
+class SerializedDefectModel:
+    """Serializes inference so the underlying model never sees two calls at once.
+
+    llama.cpp's context is not thread-safe. Two overlapping inferences corrupt its tensors and
+    kill the process (`GGML_ASSERT(a->ne[2] == b->ne[0]) failed`, observed on the mini-PC in
+    DEV-95), which takes transcription down with it: they share one process. Nothing else guards
+    this path. The ADR 0017 semaphore covers transcription only, and two operators writing notes
+    at the same time is ordinary, not peak, load.
+
+    The lock is taken and released by the thread that runs the native call, which is what makes
+    this hold under the timeout in assess_note. `asyncio.wait_for` cancels the coroutine that is
+    waiting; it cannot stop native work already running in a thread. So a timed-out inference
+    keeps running, and it keeps holding this lock until it truly returns, which is exactly when
+    it becomes safe for another inference to start.
+
+    A caller that arrives mid-inference is shed (ModelBusy, which the advisory reports as
+    UNAVAILABLE), not queued behind it. The advisory is assistive and dismissible: an operator
+    who has already submitted has no use for a prompt that arrives late, and queueing would let a
+    backlog outlive the request that caused it.
+    """
+
+    def __init__(self, model: DefectSignalModel) -> None:
+        self._model = model
+        self._in_flight = threading.Lock()
+
+    def signals_defect(self, note_text: str) -> bool:
+        if not self._in_flight.acquire(blocking=False):
+            raise ModelBusy
+        try:
+            return self._model.signals_defect(note_text)
+        finally:
+            self._in_flight.release()
 
 
 async def assess_note(
@@ -72,6 +111,11 @@ async def assess_note(
             asyncio.to_thread(model.signals_defect, note_text),
             timeout=timeout_seconds,
         )
+    except ModelBusy:
+        # Load shed, not a failure: another note is being assessed. Logged at info so it does not
+        # read as an incident when several operators are on shift at once.
+        logger.info("advisory model busy; returning UNAVAILABLE")
+        return AdvisoryResult(flagged=False, status=AdvisoryStatus.UNAVAILABLE)
     except asyncio.TimeoutError:
         logger.warning("advisory model timed out; returning UNAVAILABLE")
         return AdvisoryResult(flagged=False, status=AdvisoryStatus.UNAVAILABLE)

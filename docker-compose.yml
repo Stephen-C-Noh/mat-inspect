@@ -158,6 +158,17 @@ services:
       # number, so a saturated cap cannot ask for more CPU time than the container may use.
       # AI_CPUS is the single source for both. Sized to 2 by the mini-PC benchmark.
       AI_MAX_CONCURRENCY: ${AI_CPUS:-2}
+      # Weights live on the host and are bind-mounted read-only below (DEV-95). Both paths point
+      # into that mount, so neither model reaches the network at load time. If the mount is empty
+      # the service still boots: /advisory answers UNAVAILABLE and /transcribe answers 503.
+      ADVISORY_MODEL_PATH: /models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+      # A local CTranslate2 directory, not the bare name "small.en". The bare name makes
+      # faster-whisper resolve the model through the Hugging Face cache and download it on a miss,
+      # which would put a network fetch on the service's boot path.
+      AI_TRANSCRIPTION_MODEL: /models/faster-whisper-small.en
+      # Belt and braces on the line above: if a path is ever wrong, fail the model load instead of
+      # silently downloading 461 MB from Hugging Face on boot.
+      HF_HUB_OFFLINE: '1'
     # ADR 0017. `cpus` is a ceiling (CFS quota), not a reservation: it stops the ai container
     # starving the other services, but it does not stop them starving it. Docker has no true CPU
     # reservation (Compose ignores deploy.resources.reservations.cpus outside Swarm), so the
@@ -168,6 +179,12 @@ services:
     cpus: ${AI_CPUS:-2}
     cpu_shares: 2048
     mem_limit: 4g
+    volumes:
+      # Read-only: the service loads weights, it never writes them. Provisioned once per box by
+      # scripts/fetch-ai-models.sh, so redeploys do not re-download 1.5 GB. Not a named volume: an
+      # operator has to be able to see, verify and replace these files without entering a
+      # container. See docs/runbooks/ai-model-weights.md.
+      - ${AI_MODELS_DIR:-./models}:/models:ro
     healthcheck:
       test:
         [
