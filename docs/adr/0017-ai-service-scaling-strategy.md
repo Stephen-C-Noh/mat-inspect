@@ -30,13 +30,20 @@ The goal is to protect the per-request latency NFR under load and stay within th
 For the capstone deployment, do not autoscale the AI Service. Protect it with load
 control instead. Apply three levers together, at three layers.
 
-1. Resource reservation (container/OS layer). Give the `ai` container an explicit CPU and
-   memory bound in Compose (`cpus`, `mem_limit`) so it does not starve other services or
-   get starved by them.
+1. Resource bound (container/OS layer). Give the `ai` container an explicit CPU and memory
+   bound in Compose (`cpus`, `mem_limit`) so it does not starve the other services.
+
+   `cpus` is a ceiling, not a reservation. Compose maps it to a CFS quota (`cpu.max`), which
+   caps how much CPU time the container may consume and guarantees it nothing. Docker offers no
+   true CPU reservation here: `deploy.resources.reservations.cpus` is ignored outside Swarm (it
+   sets no cgroup value at all). The only defence against contention is relative weight, so the
+   container also carries `cpu_shares: 2048`, which puts it ahead of the default 1024 when the
+   box is oversubscribed. A hard partition would require pinning every service with `cpuset`,
+   which is out of scope for the capstone. See the consequence below.
 
 2. Concurrency cap (application layer). Gate transcription behind a semaphore or bounded
-   queue inside the service. Size the cap to the reserved cores. Requests beyond the cap
-   wait briefly or receive 429. This is the lever that actually defends the 5-second NFR.
+   queue inside the service. Size the cap to the CPU ceiling, so a saturated cap cannot ask for
+   more CPU time than the container may use. Requests beyond the cap wait briefly or receive 429. This is the lever that actually defends the 5-second NFR.
 
 3. Non-blocking background transcription (interaction layer). Transcription runs off the
    inspection-submit critical path. The caller invokes the service without blocking the
@@ -48,11 +55,20 @@ control instead. Apply three levers together, at three layers.
    performance target at nominal load, not a user-facing blocking gate; exceeding it
    degrades to "the transcript arrives late", not an error shown to the operator.
 
-The reservation and the concurrency cap are set as a matched pair: the semaphore size
-equals the reserved core count. They are applied at the same time, not in sequence.
+The CPU ceiling and the concurrency cap are one number, not two: Compose derives both the
+container's `cpus` ceiling and `AI_MAX_CONCURRENCY` from a single variable (`AI_CPUS`), so an
+edit to one cannot silently desync the other.
+
+The two units are not identical, so the service reconciles them. Docker accepts a fractional
+`cpus` value; a semaphore counts whole permits. The service floors the value it is given
+(`AI_CPUS=1.5` yields a ceiling of 1.5 cores and a cap of 1), so the cap never admits more
+concurrent work than the container may run. It also floors to a minimum of 1: `AI_CPUS=0` means
+"unlimited" to Docker, but a cap of 0 would answer 429 to every clip, and a 429 is a soft failure
+the operator sees only as "type the note instead", so the transcription path would be dead with
+nothing to say so.
 
 The AI Service box now hosts a second CPU consumer: the on-prem Advisory Check model
-(ADR 0018) reads the transcript text and runs on the same mini-PC. The reservation and cap
+(ADR 0018) reads the transcript text and runs on the same mini-PC. The bound and cap
 above are re-derived to cover both consumers. Transcription and the advisory are sequential
 per note (transcribe first, then advise), and the advisory is non-blocking, so the advisory
 runs behind transcription in the shared pool rather than requiring dedicated headroom. The
@@ -86,8 +102,10 @@ advisory fail-open timeout. Transcription is the bottleneck and grows with concu
 workers share fewer cores, crossing the DEV-31 5-second target between 3 and 4 concurrent.
 Throughput is flat (about 0.6 operations per second), which matches the single-box premise.
 
-Derived cap. Set the concurrency cap (semaphore) to 2, with the container CPU reservation
-matched so two concurrent transcriptions each keep enough cores. At cap 2 both transcription
+Derived cap. Set the concurrency cap (semaphore) to 2, with the container CPU ceiling matched so
+two concurrent transcriptions cannot ask for more CPU time than the container may use. The
+numbers below were measured on an otherwise idle box, so they hold at the ceiling; a contended
+box gives the container less and the figures degrade. At cap 2 both transcription
 (3.5 s p95) and combined (3.7 s p95) sit inside the 5-second target with margin. Requests beyond
 the cap wait briefly or receive 429 and fall back to typed notes. Cap 3 is a burst ceiling
 (combined p95 just over 5 s); cap 4 exceeds the target. Full numbers are in
@@ -104,6 +122,13 @@ above the concurrency cap degrades to waiting or 429, and callers fall back to t
 notes more often. Throughput is bounded by the mini-PC core count until handover. The
 full asynchronous form (job queue plus worker pool) is not built now, so a later move to
 autoscaling will require that additional work.
+
+Negative: the benchmarked latency holds only while the container can actually reach its CPU
+ceiling. `cpus` caps the container, it does not protect it, so a noisy neighbour on the mini-PC
+(a CI build, a database restore) can push the container below 2 cores of real CPU time while the
+cap still admits 2 concurrent transcriptions. `cpu_shares` biases the contention but does not
+remove it. The visible failure is slow transcripts, not errors: the caller degrades to typed
+notes. If this shows up in practice, pin the services with `cpuset` and re-run the benchmark.
 
 ## Alternatives Considered
 

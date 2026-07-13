@@ -71,6 +71,10 @@ COPY --from=prod-deps /repo/services/core-api/node_modules services/core-api/nod
 # manifest and its emitted output at that target.
 COPY --from=build /repo/db/package.json db/
 COPY --from=build /repo/db/dist db/dist
+# The migration SQL, next to the compiled migrator that looks for it. tsc emits .js and copies
+# nothing else, so without this the image ships db/dist/migrate.js pointing at a migrations folder
+# that is not there, and a box with only the images cannot create its schema (DEV-97).
+COPY --from=build /repo/db/migrations db/dist/migrations
 USER appuser
 WORKDIR /repo/services/core-api
 EXPOSE 3000

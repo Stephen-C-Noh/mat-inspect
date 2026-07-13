@@ -3,10 +3,10 @@ mat-inspect.staging {
 
 	respond /health 200
 
-	@ai path /api/v1/ai/*
-	handle @ai {
-		reverse_proxy ai:8000
-	}
+	# No route to the AI Service. It has no authentication of its own, and the audio it accepts is
+	# biometric PII under FOIP, so it is not published to the browser. /api/v1/ai/* falls through to
+	# core-api below, which authenticates the operator and proxies the clip on the internal network
+	# (ADR 0019).
 
 	@media path /api/v1/media/*
 	handle @media {

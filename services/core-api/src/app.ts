@@ -19,6 +19,7 @@ import { acknowledgeDefectRoute } from './routes/defects/acknowledge.js';
 import { startRepairDefectRoute } from './routes/defects/start-repair.js';
 import { resolveDefectRoute } from './routes/defects/resolve.js';
 import { rejectDefectRoute } from './routes/defects/reject.js';
+import { transcribeRoute } from './routes/ai/transcribe.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
@@ -55,6 +56,25 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
         detail: err.message,
         instance: req.url,
       });
+      return;
+    }
+
+    // Fastify's own client errors already carry the right status and code: a body over the route's
+    // bodyLimit is 413, an unparseable content type is 415. Reporting them as 500 would tell the
+    // caller the server broke when the request was at fault, and the transcription route's soft
+    // failure contract reads the status to decide what to show the operator.
+    if (typeof err.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 500) {
+      logger.warn({ err, reqId: req.id }, 'request rejected');
+      void reply
+        .code(err.statusCode)
+        .type('application/problem+json')
+        .send({
+          type: `https://errors.mat-inspect/problem/${err.code ?? 'BAD_REQUEST'}`,
+          title: err.code ?? 'BAD_REQUEST',
+          status: err.statusCode,
+          detail: err.message,
+          instance: req.url,
+        });
       return;
     }
 
@@ -95,6 +115,9 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   await app.register(startRepairDefectRoute, { prefix: '/api/v1' });
   await app.register(resolveDefectRoute, { prefix: '/api/v1' });
   await app.register(rejectDefectRoute, { prefix: '/api/v1' });
+  // Transcription is proxied, not implemented here: core-api authenticates the operator and passes
+  // the clip to the AI Service, which is not reachable from the browser (ADR 0019).
+  await app.register(transcribeRoute, { prefix: '/api/v1' });
 
   if (process.env['NODE_ENV'] !== 'production') {
     const { devTokenRoutes } = await import('./routes/dev-token.js');
