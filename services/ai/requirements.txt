@@ -1,5 +1,7 @@
 fastapi==0.111.0
 uvicorn==0.30.1
+# Required for the multipart audio upload on POST /transcribe (DEV-31).
+python-multipart==0.0.32
 faster-whisper==1.1.1
 # faster-whisper 1.1.1 imports `requests` directly, but huggingface-hub 1.x dropped it as a
 # transitive dep (moved to httpx). Pin it explicitly so the import resolves.

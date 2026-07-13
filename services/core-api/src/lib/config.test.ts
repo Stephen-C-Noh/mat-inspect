@@ -15,6 +15,7 @@ const fullDev = (overrides: Record<string, string | undefined> = {}): NodeJS.Pro
   APPLICATIONINSIGHTS_CONNECTION_STRING: VALID_CONN,
   AUDIT_SERVICE_URL: 'http://audit:3000',
   AUDIT_INGEST_TOKEN: 'a-real-shared-secret',
+  AI_SERVICE_URL: 'http://ai:8000',
   ...overrides,
 });
 
@@ -113,10 +114,12 @@ describe('loadConfig', () => {
       APPLICATIONINSIGHTS_CONNECTION_STRING: VALID_CONN,
       AUDIT_SERVICE_URL: 'http://audit:3000',
       AUDIT_INGEST_TOKEN: 'a-real-shared-secret',
+      AI_SERVICE_URL: 'http://ai:8000',
     });
     expect(cfg.nodeEnv).toBe('production');
     expect(cfg.telemetryEnabled).toBe(true);
     expect(cfg.auditServiceUrl).toBe('http://audit:3000');
+    expect(cfg.aiServiceUrl).toBe('http://ai:8000');
   });
 
   it('requires AUDIT_SERVICE_URL and AUDIT_INGEST_TOKEN in development', () => {
@@ -144,6 +147,18 @@ describe('loadConfig', () => {
     );
   });
 
+  it('requires AI_SERVICE_URL in development', () => {
+    // core-api is the only route the PWA has to transcription (ADR 0019). Without this, every
+    // voice note soft-fails and nothing in the logs says why.
+    const env = fullDev();
+    delete env['AI_SERVICE_URL'];
+    expectProblem(env, /AI_SERVICE_URL is required/);
+  });
+
+  it('rejects a non-http(s) AI_SERVICE_URL', () => {
+    expectProblem(fullDev({ AI_SERVICE_URL: 'ai:8000' }), /AI_SERVICE_URL must be an http\(s\)/);
+  });
+
   it('defaults OUTBOX_POLL_INTERVAL_MS to 2000', () => {
     expect(loadConfig(fullDev()).outboxPollIntervalMs).toBe(2000);
   });
@@ -155,6 +170,7 @@ describe('loadConfig', () => {
     });
     expect(cfg.auditServiceUrl).toBeUndefined();
     expect(cfg.auditIngestToken).toBeUndefined();
+    expect(cfg.aiServiceUrl).toBeUndefined();
   });
 
   it('leaves smtp undefined when SMTP_HOST is not set', () => {
