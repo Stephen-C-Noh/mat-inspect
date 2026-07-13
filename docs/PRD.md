@@ -392,7 +392,7 @@ See `docs/ARCHITECTURE.md` Section 15 for the full sprint plan. Summary:
 
 | Service or Library     | Purpose                                      | Hosting Choice                                                                       |
 | ---------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Azure AD / Entra ID    | Authentication and identity                  | SAIT existing tenant; provided by SAIT IT                                            |
+| Azure AD / Entra ID    | Authentication and identity                  | Project-owned tenant for the capstone; a SAIT tenant only post-handover (ADR 0016)   |
 | PostgreSQL 16          | Primary relational data                      | Self-hosted Docker container; managed Postgres if on Azure                           |
 | Azure Blob Storage     | Object storage for photos, voice clips, PDFs | Azurite emulator in dev and dev-staging; Azure Blob Storage in production (ADR 0004) |
 | faster-whisper         | On-prem speech-to-text                       | Self-hosted Docker container, CPU inference                                          |
