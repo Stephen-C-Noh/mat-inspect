@@ -59,6 +59,14 @@ The CPU ceiling and the concurrency cap are one number, not two: Compose derives
 container's `cpus` ceiling and `AI_MAX_CONCURRENCY` from a single variable (`AI_CPUS`), so an
 edit to one cannot silently desync the other.
 
+The two units are not identical, so the service reconciles them. Docker accepts a fractional
+`cpus` value; a semaphore counts whole permits. The service floors the value it is given
+(`AI_CPUS=1.5` yields a ceiling of 1.5 cores and a cap of 1), so the cap never admits more
+concurrent work than the container may run. It also floors to a minimum of 1: `AI_CPUS=0` means
+"unlimited" to Docker, but a cap of 0 would answer 429 to every clip, and a 429 is a soft failure
+the operator sees only as "type the note instead", so the transcription path would be dead with
+nothing to say so.
+
 The AI Service box now hosts a second CPU consumer: the on-prem Advisory Check model
 (ADR 0018) reads the transcript text and runs on the same mini-PC. The bound and cap
 above are re-derived to cover both consumers. Transcription and the advisory are sequential

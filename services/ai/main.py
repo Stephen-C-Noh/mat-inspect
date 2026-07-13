@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import os
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -44,6 +45,21 @@ def _env(name: str, default: T, cast: Callable[[str], T]) -> T:
     except ValueError:
         logger.warning("invalid %s=%r; using default %r", name, raw, default)
         return default
+
+
+def _parse_concurrency(raw: str) -> int:
+    # Compose passes AI_MAX_CONCURRENCY and the container's `cpus` ceiling from one value (AI_CPUS,
+    # ADR 0017), but Docker accepts a fractional CPU limit and a semaphore cannot be fractional.
+    # Floor it, so the cap never exceeds the CPU the container may actually use: AI_CPUS=1.5 gives a
+    # ceiling of 1.5 cores and a cap of 1. A plain int() would raise on "1.5" and fall back to the
+    # default of 2, which is the desync this derivation exists to prevent.
+    #
+    # Floor to at least 1. AI_CPUS=0 means "unlimited" to Docker, but Semaphore(0) would admit
+    # nothing and answer 429 to every clip forever, and a 429 is a soft failure the operator sees
+    # only as "type the note instead". A silently dead transcription path is worse than a
+    # conservative one.
+    value = math.floor(float(raw))
+    return max(1, value)
 
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
@@ -104,7 +120,7 @@ async def lifespan(app: FastAPI):
     # AI_MAX_CONCURRENCY and the container's `cpus` ceiling from one value (AI_CPUS), so the two
     # cannot drift apart. The semaphore, not the event loop, bounds transcription.
     app.state.transcription_semaphore = asyncio.Semaphore(
-        _env("AI_MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY, int)
+        _env("AI_MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY, _parse_concurrency)
     )
     app.state.transcription_acquire_timeout = _env(
         "AI_TRANSCRIPTION_ACQUIRE_TIMEOUT", DEFAULT_ACQUIRE_TIMEOUT_SECONDS, float
@@ -136,6 +152,17 @@ MAX_REQUEST_BYTES = MAX_AUDIO_BYTES + MULTIPART_OVERHEAD_BYTES
 # grows past this threshold (SpooledTemporaryFile), which at the 1 MB default would write most
 # real voice notes to local disk before the app ever sees them. Raise it above the largest body
 # the guard below admits, so a request that gets parsed at all is held only in memory.
+#
+# max_file_size is Starlette's own class attribute, not a public setting. If a version bump renames
+# or drops it, a plain assignment would create a dead attribute, the parser would fall back to its
+# 1 MB default, and voice notes would start landing on disk with nothing to say so. Fail the boot
+# instead: a service that cannot honour the FOIP constraint must not accept audio.
+if not hasattr(MultiPartParser, "max_file_size"):
+    raise RuntimeError(
+        "starlette MultiPartParser has no max_file_size attribute; the multipart spool threshold "
+        "cannot be raised, so audio would be written to disk (FOIP). Pin starlette or port this "
+        "guard to the new attribute."
+    )
 MultiPartParser.max_file_size = MAX_REQUEST_BYTES
 
 

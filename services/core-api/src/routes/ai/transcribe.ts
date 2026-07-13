@@ -74,8 +74,12 @@ export const transcribeRoute: FastifyPluginAsync = async (app) => {
   app.post(
     '/ai/transcribe',
     {
-      onRequest: [rejectOversizedClip],
-      preHandler: [requireRole('operator')],
+      // Both hooks are onRequest, and the order is load-bearing. Fastify parses the body between
+      // onRequest and preHandler, so an auth guard in preHandler would let an anonymous caller push
+      // a 10 MB clip into memory before being told 401. Size first, then identity: a request that
+      // reaches the parser is one core-api has already agreed to read. The ADR 0014 boot guard
+      // accepts an auth hook in either position.
+      onRequest: [rejectOversizedClip, requireRole('operator')],
       schema: { response: { 200: transcriptionSchema } },
     },
     async (req, reply) => {
@@ -133,6 +137,11 @@ export const transcribeRoute: FastifyPluginAsync = async (app) => {
           { reqId: req.id, userId: req.user.id, upstreamStatus: upstream.status, elapsedMs },
           'transcription rejected by ai service',
         );
+        // undici holds the socket open until the body is consumed. The error body is a detail
+        // string nothing here reads, and the status that produces it most often is 429, which
+        // arrives in bursts by definition (ADR 0017 caps concurrency at 2). Leaving it undrained
+        // would leak a connection per rejected clip, exactly when the AI Service is busiest.
+        await upstream.body?.cancel();
         if (code) {
           throw httpError(upstream.status, code, 'Transcription did not produce a transcript');
         }
@@ -140,7 +149,17 @@ export const transcribeRoute: FastifyPluginAsync = async (app) => {
         throw httpError(502, 'TRANSCRIPTION_FAILED', 'Transcription failed');
       }
 
-      const parsed = transcriptionSchema.safeParse(await upstream.json());
+      // A 200 that is not JSON at all (a proxy error page in front of the AI Service, say) makes
+      // json() reject. Catching it keeps that case on the soft-failure contract: 502, type the note
+      // instead. Letting it escape would surface as a 500, which says core-api broke.
+      let payload: unknown;
+      try {
+        payload = await upstream.json();
+      } catch {
+        payload = undefined;
+      }
+
+      const parsed = transcriptionSchema.safeParse(payload);
       if (!parsed.success) {
         logger.error(
           { reqId: req.id, upstreamStatus: upstream.status },

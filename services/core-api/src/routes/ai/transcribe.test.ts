@@ -139,6 +139,31 @@ describe('POST /api/v1/ai/transcribe', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('never reads the body of an unauthenticated request', async () => {
+    // Fastify parses the body between onRequest and preHandler, so authenticating in a preHandler
+    // would let an anonymous caller push a 10 MB clip into core-api's memory and only then be told
+    // 401. Auth runs in onRequest instead. This test proves the ordering: the payload stream is
+    // never pulled from.
+    stubUpstream(jsonResponse({ text: 'ok' }));
+    const clip = multipart(Buffer.from('fake-audio-bytes'));
+    let readBytes = 0;
+    const counted = new Readable({
+      read() {
+        readBytes += clip.length;
+        this.push(clip);
+        this.push(null);
+      },
+    });
+
+    const res = await post({
+      payload: counted,
+      headers: { 'content-length': String(clip.length) },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(readBytes).toBe(0);
+  });
+
   it('rejects a caller without the operator role', async () => {
     // Transcription is part of the inspection an operator performs. A manager has no reason to
     // reach it, and operator is not a role other roles inherit (OHS s.257 competency).
@@ -190,6 +215,33 @@ describe('POST /api/v1/ai/transcribe', () => {
 
     expect(res.statusCode).toBe(status);
     expect(res.json()).toMatchObject({ title: code, status });
+  });
+
+  it('drains the upstream body when the AI Service rejects the clip', async () => {
+    // undici holds the socket until the body is consumed. 429 is the status that arrives in bursts
+    // (the ADR 0017 cap is 2), so an undrained error body would leak a connection per rejected clip
+    // exactly when the AI Service is busiest.
+    const upstream = jsonResponse({ detail: 'at capacity' }, 429);
+    stubUpstream(upstream);
+
+    const res = await post({ token: operatorToken });
+
+    expect(res.statusCode).toBe(429);
+    expect(upstream.bodyUsed).toBe(true);
+  });
+
+  it('reports a 200 that is not JSON as a soft failure, not a server error', async () => {
+    // A proxy error page in front of the AI Service makes json() reject. That must stay on the
+    // soft-failure contract (type the note instead), not surface as core-api having broken.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('<html>gateway</html>', { status: 200 })),
+    );
+
+    const res = await post({ token: operatorToken });
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toMatchObject({ title: 'TRANSCRIPTION_FAILED' });
   });
 
   it('reports an unexpected upstream status as a bad gateway', async () => {

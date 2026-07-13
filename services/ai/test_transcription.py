@@ -23,6 +23,7 @@ from main import (
     MAX_REQUEST_BYTES,
     _env,
     _parse_bool,
+    _parse_concurrency,
     app,
     get_acquire_timeout,
     get_inference_timeout,
@@ -415,6 +416,40 @@ def test_clip_within_the_size_limit_is_accepted() -> None:
 
 
 # --- env parsing -------------------------------------------------------------------
+
+
+def test_concurrency_cap_never_exceeds_a_fractional_cpu_ceiling() -> None:
+    # Docker takes a fractional `cpus` limit and Compose feeds the same AI_CPUS to both settings
+    # (ADR 0017). A semaphore counts whole permits, so the cap floors: a 1.5-core ceiling admits 1
+    # concurrent transcription, never 2. Parsing "1.5" with a bare int() would raise and fall back
+    # to the default of 2, which is the desync the shared variable exists to prevent.
+    assert _parse_concurrency("1.5") == 1
+    assert _parse_concurrency("2") == 2
+    assert _parse_concurrency("2.9") == 2
+
+
+def test_concurrency_cap_floors_to_one() -> None:
+    # AI_CPUS=0 means "unlimited" to Docker, but Semaphore(0) admits nothing and answers 429 to
+    # every clip forever. A 429 is a soft failure, so the operator would just see "type the note
+    # instead" and the transcription path would be silently dead.
+    assert _parse_concurrency("0") == 1
+    assert _parse_concurrency("-4") == 1
+
+
+def test_concurrency_cap_falls_back_to_the_default_when_unparseable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_MAX_CONCURRENCY", "two")
+    assert _env("AI_MAX_CONCURRENCY", 2, _parse_concurrency) == 2
+
+
+def test_multipart_spool_threshold_attribute_still_exists() -> None:
+    # main.py raises the Starlette spool threshold so audio is never written to disk (FOIP). The
+    # attribute is Starlette's own, not a public setting: if a version bump renames it, the
+    # assignment would silently become a no-op and the 1 MB default would put voice notes on disk.
+    from starlette.formparsers import MultiPartParser
+
+    assert MultiPartParser.max_file_size == MAX_REQUEST_BYTES
 
 
 def test_disabled_flag_is_parsed_strictly(monkeypatch: pytest.MonkeyPatch) -> None:
