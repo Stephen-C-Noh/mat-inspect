@@ -1,13 +1,22 @@
-# MAT-Inspect API: Integration Requirements for a SAIT-Hosted Frontend
+# MAT-Inspect API: Integration Requirements for Any Calling Frontend
 
 Date: 2026-06-17
-Status: Draft. Items 1 to 3 are locked. Item 4 is pending the tenant decision.
+Revised: 2026-07-12
+Status: Items 1 to 3 are locked. Item 4 is pending the tenant decision (ADR 0016).
 
-SAIT will not host the project. SAIT builds its own webpage on its own
-infrastructure and calls the MAT-Inspect API for data. These requirements define
-the interface that webpage must meet. They hold in every hosting topology. They
-are interface requirements, not preferences. Two of them follow from Alberta OHS
-and are not negotiable.
+SAIT does not host the project during the capstone (ADR 0016). The capstone
+delivers the full stack: the operator PWA, the manager dashboard, the services,
+the database, and the Compose files that run them. SAIT can adopt that stack as
+delivered, self-host it, or deploy it to its own Azure infrastructure. No
+redesign is required for any of those paths, and SAIT does not need to build a
+frontend to use the system.
+
+SAIT may still choose to build its own frontend against the MAT-Inspect API.
+That option is supported. The requirements below define the interface any calling
+frontend must meet, whether it is the PWA delivered with the stack or one SAIT
+writes later. They hold in every hosting topology. They are interface
+requirements, not preferences. Two of them follow from Alberta OHS and are not
+negotiable.
 
 ## 1. The API is a protected resource. Each frontend is its own client.
 
@@ -40,8 +49,15 @@ writes, because it erases the operator identity the law requires.
 To finalize the exact audience and issuer the API validates, two answers are
 needed: which tenant issues the access tokens (the SAIT tenant, a project tenant,
 or both), and whether SAIT IT will configure the API and client app registrations
-and assign the App Roles (operator, supervisor, manager, admin). The auth design
-cannot be finalized until these are confirmed.
+and assign the App Roles (operator, supervisor, manager, admin). The exact
+audience and issuer values cannot be fixed until these are confirmed.
+
+This is a post-capstone item. ADR 0016 records that the tenant decision does not
+happen during the capstone: Entra ID stays on a project tenant, and a tenant swap
+is a handover step gated on the governance track. Items 1 to 3 do not depend on
+the answer, so the API contract is stable now. Only the configured audience and
+issuer values change when a tenant is chosen. The runbook for that step is part
+of the handover package (DEV-44).
 
 ## Regulatory basis
 
