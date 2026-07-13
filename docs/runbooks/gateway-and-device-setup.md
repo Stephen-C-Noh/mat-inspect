@@ -60,13 +60,49 @@ iOS needs both halves: installing the profile is not the same as trusting it.
 
 ### 4. Register the origin with Entra
 
-Both origins must be redirect URIs on the SPA app registration, or MSAL refuses to complete the
-login:
+Both origins must be redirect URIs on the app registration, or MSAL refuses to complete the login:
 
 - `https://mat-inspect.staging`
 - `https://dashboard.mat-inspect.staging`
 
-No trailing slash. MSAL sends the page origin exactly as the browser reports it.
+No trailing slash. MSAL sends the page origin exactly as the browser reports it. Both were added on
+2026-07-13, so a device that follows steps 1 to 3 can sign in today.
+
+**Where the app registration is.** It is not in a SAIT tenant. SAIT blocked Entra for the capstone
+(ADR 0016), so the project runs on a personal tenant, and the handover moves the registration to
+SAIT's.
+
+```
+portal.azure.com  (or entra.microsoft.com)
+  sign in as        lowell2753@gmail.com
+  tenant            fa517e85-9b05-41bb-856e-d2e79fdeb18a  ("Default Directory")
+  Microsoft Entra ID > App registrations > MAT-inspect Dashboard
+    appId           1c5d923a-195c-4fa7-ad2a-99c544b22ee4   (this is ENTRA_CLIENT_ID)
+    Authentication > Single-page application > Redirect URIs
+```
+
+The name says Dashboard, but one registration serves both apps. The PWA and the dashboard share the
+client id and the App Roles; they differ only in which roles each app admits (`ALLOWED_ROLES` in
+each app's `src/lib/auth.ts`).
+
+The rest of what this registration holds, and what breaks when it is wrong:
+
+| Setting                       | Value                                                     | Breaks if wrong                                                                 |
+| ----------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| App Roles                     | operator, supervisor, manager, admin, auditor (lowercase) | `requireRole` compares case-sensitively, so a capitalised value denies everyone |
+| `requestedAccessTokenVersion` | 2                                                         | A v1 token has the wrong `aud` and issuer, and every API call 401s (ADR 0012)   |
+| Exposed API scope             | `access_as_user` on `api://<appId>`                       | The PWA cannot acquire an API token at all                                      |
+| Sign-in audience              | Single tenant                                             | -                                                                               |
+
+Roles are not hierarchical. `operator` encodes the OHS s.257 competency and is never inherited by a
+manager or an admin, so a user who needs both is assigned both.
+
+Read the current state without the portal:
+
+```
+az ad app show --id 1c5d923a-195c-4fa7-ad2a-99c544b22ee4 \
+  --query "{spa:spa.redirectUris, roles:appRoles[].value, tokenVersion:api.requestedAccessTokenVersion}"
+```
 
 ## Why not a publicly-trusted certificate
 
