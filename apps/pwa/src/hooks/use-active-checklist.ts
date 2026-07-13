@@ -2,7 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useMsal } from '@azure/msal-react';
 import { checklistTemplateSchema, type ChecklistTemplate } from '@mat-inspect/shared-schemas';
 import type { EquipmentType } from '@mat-inspect/shared-types';
-import { acquireAccessToken } from '@/lib/access-token';
+import { acquireAccessToken } from '@/lib/auth';
 
 // Fetches the active checklist template for an equipment type (DEV-13 endpoint). The query
 // stays disabled until the equipment type is known, so the equipment lookup (DEV-15) runs first.

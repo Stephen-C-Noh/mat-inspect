@@ -6,7 +6,7 @@ import { useState, useRef, useEffect, type ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { AuthGuard } from '@/components/auth-guard';
-import { acquireAccessToken } from '@/lib/access-token';
+import { acquireAccessToken } from '@/lib/auth';
 import {
   applyTextEdit,
   applyTranscript,

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { hasAllowedRole } from '@mat-inspect/shared-auth';
-import { ALLOWED_ROLES, loginRequest } from '@/lib/msal-config';
+import { ALLOWED_ROLES, loginRequest } from '@/lib/auth';
 
 export default function LoginPage() {
   const { instance, accounts } = useMsal();
