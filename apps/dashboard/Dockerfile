@@ -32,6 +32,10 @@ ARG NEXT_PUBLIC_AZURE_TENANT_ID
 ARG NEXT_PUBLIC_AZURE_CLIENT_ID
 ENV NEXT_PUBLIC_AZURE_TENANT_ID=$NEXT_PUBLIC_AZURE_TENANT_ID
 ENV NEXT_PUBLIC_AZURE_CLIENT_ID=$NEXT_PUBLIC_AZURE_CLIENT_ID
+# next.config rewrites() bakes the /api/v1 proxy destination into routes-manifest.json at build
+# time, so GATEWAY_URL must be present here, not just at runtime (ADR 0020).
+ARG GATEWAY_URL
+ENV GATEWAY_URL=$GATEWAY_URL
 RUN npm run build --workspace=@mat-inspect/dashboard
 
 # ---- runtime: standalone Next.js server, non-root ----

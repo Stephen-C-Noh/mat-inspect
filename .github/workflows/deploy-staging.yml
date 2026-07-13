@@ -43,3 +43,8 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans --wait --wait-timeout 180
             ./scripts/docker-health-check.sh
+            # Healthy containers are not a working gateway. This checks the routing table through
+            # the real front door, and that the AI Service still has no unauthenticated path from
+            # the browser (ADR 0020). The authenticated end-to-end transcribe check needs an
+            # operator token and runs on demand: scripts/smoke-transcribe.sh.
+            ./scripts/smoke-gateway.sh

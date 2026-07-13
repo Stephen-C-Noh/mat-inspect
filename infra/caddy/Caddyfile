@@ -1,26 +1,74 @@
-mat-inspect.staging {
-	tls internal
-
-	respond /health 200
-
-	# No route to the AI Service. It has no authentication of its own, and the audio it accepts is
-	# biometric PII under FOIP, so it is not published to the browser. /api/v1/ai/* falls through to
-	# core-api below, which authenticates the operator and proxies the clip on the internal network
-	# (ADR 0019).
-
+# The routing table for /api/v1 lives here and nowhere else (ADR 0020). Every site block imports
+# this snippet, so one origin cannot disagree with another about where a path goes.
+#
+# A service is published here only if it validates Entra tokens itself (ADR 0020). media does, with
+# the same shared verifier as core-api (packages/shared-auth-server). The AI Service does not, so it
+# gets no route: /api/v1/ai/* falls through to core-api, which authenticates the operator and proxies
+# the clip on the internal network (ADR 0019). Do not add a route to ai:8000. The audio it accepts is
+# biometric PII under FOIP and the service has no gate of its own.
+#
+# audit has no route either. It registers only the internal ingest route today; the report routes
+# (DEV-38) get their rule when they exist and carry requireRole.
+(api) {
 	@media path /api/v1/media/*
 	handle @media {
 		reverse_proxy media:3000
 	}
 
-	@audit path /api/v1/reports/* /api/v1/audit/*
-	handle @audit {
-		reverse_proxy audit:3000
-	}
-
 	handle /api/v1/* {
 		reverse_proxy core-api:3000
 	}
+}
 
-	respond "MAT-Inspect API Gateway" 200
+# The gateway's own liveness, on a path no app owns. It has to be a `handle`, not a bare `respond`:
+# each site ends in a catch-all `handle` for its app, and a catch-all handle takes the request before
+# a `respond` ever runs. A /health here answered from the PWA's own /health page instead, and the
+# dashboard, which has no such page, answered 404.
+(gateway_health) {
+	handle /gateway/health {
+		respond "ok" 200
+	}
+}
+
+# The operator PWA. MSAL needs a secure context for crypto.subtle, so the browser reaches the app
+# over TLS here rather than over plain HTTP on a published container port.
+mat-inspect.staging {
+	tls internal
+
+	import gateway_health
+	import api
+
+	handle {
+		reverse_proxy pwa:3000
+	}
+}
+
+# The manager dashboard, on its own origin. Mounting it under a path of the PWA's origin would put
+# both apps' MSAL caches in one sessionStorage, so an operator session and a manager session would
+# share a boundary (ADR 0020).
+dashboard.mat-inspect.staging {
+	tls internal
+
+	import gateway_health
+	import api
+
+	handle {
+		reverse_proxy dashboard:3000
+	}
+}
+
+# Dev listener. `npm run dev` runs the apps outside Compose, and their Next rewrites proxy /api/v1
+# here (GATEWAY_URL), so dev resolves a path through the same table staging uses (ADR 0020).
+#
+# Plain HTTP, and matched on port rather than hostname, because the caller is the Next dev server on
+# the same host, not a browser. Compose publishes it on 127.0.0.1 only, so it is not reachable from
+# the LAN. It carries no authentication and needs none: the services behind it authenticate.
+:8080 {
+	import api
+
+	# The dev-token issuer and its JWKS (core-api, non-production only). Reachable on this listener
+	# alone, never on a site a browser can open.
+	handle /dev/* {
+		reverse_proxy core-api:3000
+	}
 }
