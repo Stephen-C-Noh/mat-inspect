@@ -57,6 +57,10 @@ COPY --from=build /repo/packages/shared-crypto/package.json packages/shared-cryp
 COPY --from=build /repo/packages/shared-crypto/dist packages/shared-crypto/dist
 COPY --from=build /repo/services/audit/package.json services/audit/
 COPY --from=build /repo/services/audit/dist services/audit/dist
+# The migration SQL, next to the compiled migrator that looks for it. tsc emits .js and copies
+# nothing else, so without this the image ships dist/db/migrate.js pointing at a migrations folder
+# that is not there, and a box with only the images cannot create its schema (DEV-97).
+COPY --from=build /repo/services/audit/db/migrations services/audit/dist/db/migrations
 # fastify-type-provider-zod pins a peer range that blocks npm from hoisting it to the root
 # node_modules (same issue core-api hits, DEV-58), so it stays in the workspace-local
 # node_modules. Ship that too.
