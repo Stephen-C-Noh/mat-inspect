@@ -331,8 +331,8 @@ function FailuresContent(): ReactElement {
         ))}
       </div>
 
-      {/* Fixed submit */}
-      <div className="fixed inset-x-4 bottom-4 mx-auto max-w-xl space-y-2">
+      {/* Fixed submit. Same box as the card container above, so the buttons line up with the cards. */}
+      <div className="fixed inset-x-0 bottom-4 mx-auto max-w-lg px-4 space-y-2">
         <Link href={`/checklist/${params.equipmentId}/submitted/fail`} className="block">
           <button
             type="button"
