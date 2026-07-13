@@ -16,7 +16,12 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from starlette.formparsers import MultiPartParser
 
-from advisory import AdvisoryStatus, DefectSignalModel, assess_note
+from advisory import (
+    AdvisoryStatus,
+    DefectSignalModel,
+    SerializedDefectModel,
+    assess_note,
+)
 from transcription import (
     DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
     DEFAULT_INFERENCE_TIMEOUT_SECONDS,
@@ -87,7 +92,13 @@ def _load_advisory_model() -> DefectSignalModel | None:
     try:
         from advisory_model import LlamaCppDefectModel
 
-        return LlamaCppDefectModel(model_path)
+        model = SerializedDefectModel(LlamaCppDefectModel(model_path))
+        # First inference on a freshly loaded model is far slower than a warm one: llama.cpp mmaps
+        # the weights, so the first pass faults them in. On the mini-PC that cold pass took 4.4 s
+        # and blew the 4 s advisory budget, which made the first advisory after every deploy
+        # UNAVAILABLE. Pay it here, at boot, instead of on an operator's first note.
+        model.signals_defect("warmup")
+        return model
     except Exception:
         logger.exception(
             "advisory model failed to load; advisory path will be UNAVAILABLE"
