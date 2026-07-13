@@ -79,7 +79,7 @@ The PWA and the dashboard stop publishing host ports. The only way in is `https:
 
 Every device that wants to open the apps needs the CA root and two hosts entries, including stakeholders' phones. This is the cost of the internal CA and it is real. The runbook exists so that it is not tribal knowledge.
 
-Two Entra redirect URIs have to be registered on the SPA app registration (`https://mat-inspect.staging` and `https://dashboard.mat-inspect.staging`), or MSAL rejects the origin.
+Two Entra redirect URIs had to be registered on the SPA app registration (`https://mat-inspect.staging` and `https://dashboard.mat-inspect.staging`), or MSAL rejects the origin. Both were added on 2026-07-13. The runbook records which registration and which tenant, because that was tribal knowledge until now.
 
 Developers now run Caddy locally for `npm run dev` to reach the API. That is one more container in the dev loop. It buys the guarantee that a route which resolves in dev also resolves in staging.
 
