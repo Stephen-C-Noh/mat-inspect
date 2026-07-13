@@ -124,19 +124,44 @@ is committed). Record a short one on the box, or reuse the clip the DEV-83 bench
 
 ## Failure modes
 
-| Symptom                                                      | Cause                                                                                                                                                                         |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/transcribe` returns 503, `/advisory` returns `UNAVAILABLE` | `/models` is empty or not mounted. Run the provisioning script.                                                                                                               |
-| `/advisory` returns `UNAVAILABLE`, `/transcribe` works       | GGUF missing or `ADVISORY_MODEL_PATH` wrong. Check the log line `advisory model failed to load`.                                                                              |
-| The `ai` container dies at start with `Illegal instruction`  | The llama.cpp build used instructions the CPU lacks. The Dockerfile pins the Zen3 baseline (`GGML_NATIVE=OFF`, AVX2/FMA/F16C); a CPU older than that needs the flags relaxed. |
-| The `ai` container is OOM-killed                             | Both models resident exceed `mem_limit`. Raise it and record the observed figure.                                                                                             |
+| Symptom                                                      | Cause                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/transcribe` returns 503, `/advisory` returns `UNAVAILABLE` | `/models` is empty or not mounted. Run the provisioning script.                                                                                                                                                                        |
+| `/advisory` returns `UNAVAILABLE`, `/transcribe` works       | GGUF missing or `ADVISORY_MODEL_PATH` wrong. Check the log line `advisory model failed to load`.                                                                                                                                       |
+| The `ai` container dies at start with `Illegal instruction`  | The llama.cpp build used instructions the CPU lacks. The Dockerfile pins the Zen3 baseline (`GGML_NATIVE=OFF`, AVX2/FMA/F16C); a CPU older than that needs the flags relaxed.                                                          |
+| The `ai` container is OOM-killed                             | Both models resident exceed `mem_limit`. Raise it and record the observed figure.                                                                                                                                                      |
+| `/advisory` intermittently returns `UNAVAILABLE` under load  | Working as designed. One inference runs at a time; a note that arrives mid-inference is shed rather than queued, and a note that exceeds the 4-second budget is abandoned. Both show the operator no prompt and neither blocks submit. |
 
-## Resource envelope
+## Resource envelope, as measured
 
 Both models are resident in one container. `docker-compose.yml` gives the `ai` service
 `cpus: ${AI_CPUS:-2}`, `cpu_shares: 2048` and `mem_limit: 4g` (ADR 0017).
 
-Measured on the mini-PC with both models loaded: see the DEV-95 measurement notes. Note that the
-ADR 0017 benchmark ran on the bare box with all 16 hardware threads available, not inside a
-container capped at `cpus: 2`; the in-container latency is therefore not the benchmark figure, and
-that gap is tracked separately.
+Measured on the mini-PC (Ryzen 7 5825U) on 2026-07-13, in the container, at the concurrency cap
+of 2, both models resident, transcribing an 11-second clip and then assessing the note:
+
+|                | in-container (`cpus: 2`) | ADR 0017 benchmark (bare box) | DEV-31 target          |
+| -------------- | ------------------------ | ----------------------------- | ---------------------- |
+| transcribe p95 | 10.5 s                   | 3.5 s                         | 5 s                    |
+| advisory p95   | 3.6 s                    | 0.28 s                        | 4 s (fail-open budget) |
+| combined p95   | about 14 s               | 3.7 s                         | 5 s                    |
+| peak memory    | 722 MiB                  | not measured                  | 4 GiB limit            |
+
+**Memory holds with room to spare.** Both models resident peak at well under a quarter of
+`mem_limit: 4g`, under load, with no OOM kill. llama.cpp mmaps the GGUF, so most of the 1 GB of
+advisory weights stays in page cache rather than the container's RSS.
+
+**Latency does not hold, and the reason is a unit mismatch, not the models.** The ADR 0017
+benchmark ran on the bare box: at concurrency 2 it gave each of its two workers 8 of the box's 16
+hardware threads. The container is capped at `cpus: 2`, which is a CFS quota of two CPUs of total
+CPU time, about an eighth of what the benchmark used. The concurrency cap counts concurrent
+requests; `cpus` counts cores. ADR 0017 derives both from one variable (`AI_CPUS`), which is what
+puts them out of step. The models are also given no explicit thread count, so each spawns threads
+for every CPU it can see on the host (16) while the cgroup admits two.
+
+The consequence today: transcription runs at about twice the 5-second target, and the advisory sits
+within 0.4 s of its own 4-second fail-open timeout, so a little extra load will start returning
+UNAVAILABLE at nominal usage. Neither failure blocks inspection submit (ADR 0017, ADR 0018): a slow
+transcript arrives late, and a missing advisory shows no prompt. Tracked separately; do not "fix" it
+by raising `AI_CPUS`, which would raise the concurrency cap in lockstep and make transcription
+slower still.
