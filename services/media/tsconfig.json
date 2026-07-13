@@ -10,6 +10,7 @@
   "exclude": ["**/*.test.ts"],
   "references": [
     { "path": "../../packages/shared-types" },
+    { "path": "../../packages/shared-auth-server" },
     { "path": "../../packages/shared-schemas" }
   ]
 }

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { AUTH_PREHANDLER } from './auth.js';
+import { AUTH_PREHANDLER } from '@mat-inspect/shared-auth-server';
 
 // Routes that intentionally carry no auth preHandler. Kept explicit so the fail-closed
 // guard can tell a public route from a forgotten one. /health is the liveness probe; the

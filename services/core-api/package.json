@@ -16,6 +16,7 @@
   "dependencies": {
     "@azure/monitor-opentelemetry": "^1.0.0",
     "@mat-inspect/db": "^0.0.0",
+    "@mat-inspect/shared-auth-server": "^0.0.0",
     "@mat-inspect/shared-crypto": "^0.0.0",
     "@mat-inspect/shared-schemas": "^0.0.0",
     "@mat-inspect/shared-types": "^0.0.0",

@@ -1,15 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import http from 'node:http';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-// Must be at module top level so vitest hoisting picks it up (not inside describe).
-vi.mock('../lib/jwks.js', () => ({
-  getJwks: vi.fn(),
-  resetJwksForTest: vi.fn(),
-}));
+// No JWKS setup here. The poller sends no authenticated request, and the shared verifier builds
+// its key set on first verification, so nothing in this suite reaches the network for keys.
 
 const INGEST_TOKEN = 'poller-test-token';
 

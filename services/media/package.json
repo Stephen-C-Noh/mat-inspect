@@ -14,6 +14,7 @@
     "@azure/monitor-opentelemetry": "^1.0.0",
     "@azure/storage-blob": "^12.28.0",
     "@fastify/multipart": "^9.2.1",
+    "@mat-inspect/shared-auth-server": "^0.0.0",
     "@mat-inspect/shared-schemas": "^0.0.0",
     "@mat-inspect/shared-types": "^0.0.0",
     "fastify": "^5.8.5",

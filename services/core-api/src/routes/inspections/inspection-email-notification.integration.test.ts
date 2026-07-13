@@ -6,6 +6,7 @@ import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import type { ChecklistItem } from '@mat-inspect/shared-schemas';
+import { setJwksForTest } from '../../middleware/auth.js';
 
 // Mock only the external SMTP boundary (CLAUDE.md: mock external services only). vi.hoisted runs
 // before the hoisted vi.mock factory so the spy can be referenced inside it. Asserting on
@@ -21,10 +22,9 @@ const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: 
 const publicJwk = { ...(await exportJWK(publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
 const localJwks = createLocalJWKSet({ keys: [publicJwk] });
 
-vi.mock('../../lib/jwks.js', () => ({
-  getJwks: () => localJwks,
-  resetJwksForTest: vi.fn(),
-}));
+// Inject the local key set so token verification never reaches the network. The shared
+// verifier owns the JWKS fetch (DEV-98); tests hand it keys instead of mocking the module.
+setJwksForTest(localJwks);
 
 const ADMIN_ID = '55555555-5555-5555-5555-555555555555';
 const OPERATOR_ID = '66666666-6666-6666-6666-666666666666';

@@ -1,0 +1,29 @@
+{
+  "name": "@mat-inspect/shared-auth-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mat-inspect/shared-types": "^0.0.0",
+    "jose": "^6.2.3"
+  },
+  "peerDependencies": {
+    "fastify": "^5.8.5"
+  },
+  "devDependencies": {
+    "fastify": "^5.8.5",
+    "typescript": "*"
+  }
+}

@@ -1,16 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { requireRole } from '../../middleware/auth.js';
+import { requireRole, setJwksForTest } from '../../middleware/auth.js';
 
 const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
 const localJwks = createLocalJWKSet({ keys: [publicJwk] });
 
-vi.mock('../../lib/jwks.js', () => ({
-  getJwks: () => localJwks,
-  resetJwksForTest: vi.fn(),
-}));
+// Inject the local key set so token verification never reaches the network. The shared
+// verifier owns the JWKS fetch (DEV-98); tests hand it keys instead of mocking the module.
+setJwksForTest(localJwks);
 
 const makeToken = async (claims: Record<string, unknown> = {}) =>
   new SignJWT({ sub: 'user-1', oid: 'user-1', roles: ['operator'], tid: 'test-tenant', ...claims })

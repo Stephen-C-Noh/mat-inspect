@@ -1,23 +1,23 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { BlobServiceClient } from '@azure/storage-blob';
+import { setJwksForTest } from '../../middleware/auth.js';
 
 // End-to-end coverage of POST /api/v1/media/upload against a real Azurite container. Exercises the
 // four DEV-32 acceptance criteria: authenticated upload stores the photo and returns a reference;
 // non-image and oversized uploads are rejected; the returned reference resolves the stored blob.
 
-// --- Auth setup: mint tokens with a local keypair and stub the JWKS fetch (an external HTTP call,
-// the only boundary these tests mock; verifyToken itself runs for real). Mirrors core-api's
-// auth.test.ts.
+// --- Auth setup: mint tokens with a local keypair and hand them to the shared verifier, so the
+// JWKS fetch (an external HTTP call, the only boundary these tests replace) never happens and
+// verifyToken itself runs for real. The verifier's own suite lives in @mat-inspect/shared-auth-server.
 const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
 const localJwks = createLocalJWKSet({ keys: [publicJwk] });
 
-vi.mock('../../lib/jwks.js', () => ({
-  getJwks: () => localJwks,
-  resetJwksForTest: vi.fn(),
-}));
+// Inject the local key set so token verification never reaches the network. The shared
+// verifier owns the JWKS fetch (DEV-98); tests hand it keys instead of mocking the module.
+setJwksForTest(localJwks);
 
 const makeToken = async (claims: Record<string, unknown> = {}): Promise<string> =>
   new SignJWT({ sub: 'op-1', oid: 'op-1', roles: ['operator'], tid: 'test-tenant', ...claims })
