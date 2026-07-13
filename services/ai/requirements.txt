@@ -8,7 +8,9 @@ faster-whisper==1.1.1
 requests==2.32.3
 httpx==0.27.0
 azure-monitor-opentelemetry==1.6.4
-# The on-prem advisory model runtime (llama-cpp-python, DEV-83) is NOT installed in the base
-# image. Nothing calls the advisory endpoint yet (it fails open to UNAVAILABLE without the
-# runtime), and the mini-PC benchmark installs it in a separate venv (benchmark/README.md). The
-# runtime and the GGUF weights are added when the advisory is wired end-to-end and deployed.
+# The on-prem advisory model runtime (DEV-83, ADR 0018). Same version the mini-PC benchmark ran,
+# so the deployed runtime is the one the numbers in benchmark/RESULTS.md came from. No wheel is
+# published on PyPI, so this builds llama.cpp from source; see the Dockerfile for the build deps
+# and the instruction-set flags. The GGUF weights are still not in the image (DEV-95): they are
+# mounted at /models, so the runtime is present but idle until ADVISORY_MODEL_PATH resolves.
+llama-cpp-python==0.3.2

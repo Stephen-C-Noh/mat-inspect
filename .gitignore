@@ -60,3 +60,6 @@ docs/agents/
 
 # Claude Code (commit team settings.json, keep personal local settings out)
 .claude/settings.local.json
+
+# AI model weights, fetched per box by scripts/fetch-ai-models.sh (DEV-95). About 1.5 GB.
+/models/
