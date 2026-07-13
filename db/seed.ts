@@ -1,8 +1,13 @@
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { equipment } from './schema/equipment';
-import { checklistTemplates, type ChecklistItemRecord } from './schema/checklist-templates';
-import { users } from './schema/users';
+// The .js extensions are required, not optional. tsconfig sets moduleResolution "Bundler", which
+// accepts a bare specifier at compile time, but this package is `type: module` and Node's ESM
+// loader resolves the emitted import literally. Without the extension the compiled seed.js throws
+// ERR_MODULE_NOT_FOUND. `npm run db:seed` hides this because it runs the TypeScript through tsx;
+// the deployed image runs the compiled output, and that is where it broke (DEV-97).
+import { equipment } from './schema/equipment.js';
+import { checklistTemplates, type ChecklistItemRecord } from './schema/checklist-templates.js';
+import { users } from './schema/users.js';
 
 const { Pool } = pg;
 
