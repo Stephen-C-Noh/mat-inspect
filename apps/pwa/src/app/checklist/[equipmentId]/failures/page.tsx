@@ -2,23 +2,28 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useRef, type ReactElement } from 'react';
+import { useState, useRef, useEffect, type ReactElement } from 'react';
+import { useMsal } from '@azure/msal-react';
 import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { AuthGuard } from '@/components/auth-guard';
+import { acquireAccessToken } from '@/lib/access-token';
+import {
+  applyTextEdit,
+  applyTranscript,
+  clipFilename,
+  emptyFailureEntry,
+  formatElapsed,
+  parseTranscript,
+  transcriptionErrorMessage,
+  AUDIO_BITS_PER_SECOND,
+  MAX_RECORDING_MS,
+  type FailureEntry,
+} from '@/lib/voice-notes';
 
 const MOCK_FAILURES = [
   { id: '1', question: 'Tire Condition & Pressure?' },
   { id: '2', question: 'Brake Functionality?' },
 ];
-
-// Tracks the origin of a defect note for audit compliance (OHS s.257).
-type NotesSource = 'TYPED' | 'VOICE_TRANSCRIBED' | 'VOICE_EDITED';
-
-type FailureEntry = {
-  notes: string;
-  photo: string | null;
-  notes_source: NotesSource;
-};
 
 function FailureCard({
   failure,
@@ -31,105 +36,152 @@ function FailureCard({
   index: number;
   total: number;
   entry: FailureEntry;
-  onChange: (updated: FailureEntry) => void;
+  // An updater, not a value: a transcript can land after the operator has typed into the field, and
+  // a snapshot taken when recording started would overwrite what they wrote.
+  onChange: (update: (prev: FailureEntry) => FailureEntry) => void;
 }): ReactElement {
   const fileRef = useRef<HTMLInputElement>(null);
+  const { instance, accounts } = useMsal();
 
-  // Audio capture and background tracking states
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
-  // Retains original text to determine if modifications have occurred
-  const rawTranscriptRef = useRef<string>('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const tickRef = useRef<number | null>(null);
+  const capRef = useRef<number | null>(null);
+
+  // Voice is biometric PII under FOIP. Leaving the tracks live keeps the microphone open (and the
+  // browser and OS recording indicators lit) after the operator believes recording ended.
+  const releaseMicrophone = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
+
+  const clearTimers = () => {
+    if (tickRef.current !== null) window.clearInterval(tickRef.current);
+    if (capRef.current !== null) window.clearTimeout(capRef.current);
+    tickRef.current = null;
+    capRef.current = null;
+  };
+
+  useEffect(() => {
+    // Navigating away mid-recording must release the microphone too. The onstop handler is dropped
+    // first: an operator leaving the screen is not asking for a transcript.
+    return () => {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.onstop = null;
+        recorder.stop();
+      }
+      if (tickRef.current !== null) window.clearInterval(tickRef.current);
+      if (capRef.current !== null) window.clearTimeout(capRef.current);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
-    onChange({ ...entry, photo: url });
+    onChange((prev) => ({ ...prev, photo: url }));
   };
 
-  // Handles starting the microphone recording interface
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        sendAudioToAIService(audioBlob);
-      };
-
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-    } catch {
-      // Audio interface access denied or missing configuration
-    }
-  };
-
-  // Stops microphone recording
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  // Sends audio payload matching the backend configuration parameters
-  const sendAudioToAIService = async (audioBlob: Blob) => {
+  // Sends the clip to core-api, which forwards it to the AI Service on the internal network. The
+  // AI Service is not reachable from the browser (ADR 0019).
+  const sendAudioToAIService = async (clip: Blob, mimeType: string) => {
     setIsTranscribing(true);
+    setVoiceError(null);
 
     try {
-      const formData = new FormData();
-      // Matches backend contract: parameter must be exactly 'clip'
-      formData.append('clip', audioBlob, 'clip.wav');
+      const accessToken = await acquireAccessToken(instance, accounts);
 
-      const response = await fetch('/api/v1/ai/transcribe', {
+      const formData = new FormData();
+      // The field name is fixed by the core-api contract. Content-Type is left to the browser: it
+      // carries the multipart boundary, and core-api forwards the header to the AI Service verbatim.
+      formData.append('clip', clip, clipFilename(mimeType));
+
+      const res = await fetch('/api/v1/ai/transcribe', {
         method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
         body: formData,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const incomingText = data.text || ''; // Matches exact response schema: { text: string }
-
-        rawTranscriptRef.current = incomingText;
-
-        onChange({
-          ...entry,
-          notes: incomingText,
-          notes_source: 'VOICE_TRANSCRIBED',
-        });
-      } else {
-        // Soft failure fallback (413/429/503 respond silently to allow typing)
+      if (!res.ok) {
+        setVoiceError(transcriptionErrorMessage(res.status));
+        return;
       }
+
+      const text = parseTranscript(await res.json());
+      if (text.trim().length === 0) {
+        // A 200 with nothing in it. Say so, rather than stopping the spinner over an unchanged field
+        // and leaving the operator to guess.
+        setVoiceError(transcriptionErrorMessage(400));
+        return;
+      }
+
+      onChange((prev) => applyTranscript(prev, text));
     } catch {
-      // AI Service communication soft-failure handled cleanly in background
+      // Transcription never blocks an inspection (ADR 0017): the note field stays typable either way.
+      setVoiceError(transcriptionErrorMessage('network'));
     } finally {
       setIsTranscribing(false);
     }
   };
 
-  // Dynamically alters notes_source flag if user edits a voice transcription
-  const handleTextChange = (textValue: string) => {
-    let nextSource: NotesSource = 'TYPED';
+  // Reads the recorder's state rather than isRecording, because the recording cap fires this from a
+  // closure captured before isRecording was ever true.
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    clearTimers();
+    setIsRecording(false);
+  };
 
-    if (entry.notes_source === 'VOICE_TRANSCRIBED' || entry.notes_source === 'VOICE_EDITED') {
-      nextSource = textValue === rawTranscriptRef.current ? 'VOICE_TRANSCRIBED' : 'VOICE_EDITED';
+  const startRecording = async () => {
+    setVoiceError(null);
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setVoiceError(transcriptionErrorMessage('microphone'));
+      return;
     }
 
-    onChange({
-      ...entry,
-      notes: textValue,
-      notes_source: nextSource,
-    });
+    // The recorder picks its own container (WebM/Opus on Chrome and Android, mp4 on iOS Safari), so
+    // the clip is labelled with recorder.mimeType below rather than an assumed type. The bitrate is
+    // set explicitly to keep a capped recording well under the 10 MB the AI Service accepts.
+    const recorder = new MediaRecorder(stream, { audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
+    streamRef.current = stream;
+    mediaRecorderRef.current = recorder;
+    audioChunksRef.current = [];
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) audioChunksRef.current.push(event.data);
+    };
+
+    recorder.onstop = () => {
+      releaseMicrophone();
+      const chunks = audioChunksRef.current;
+      audioChunksRef.current = [];
+      if (chunks.length === 0) return;
+      void sendAudioToAIService(new Blob(chunks, { type: recorder.mimeType }), recorder.mimeType);
+    };
+
+    const startedAt = Date.now();
+    recorder.start();
+    setIsRecording(true);
+    setElapsedMs(0);
+
+    tickRef.current = window.setInterval(() => setElapsedMs(Date.now() - startedAt), 250);
+    // Auto-stop at the cap. Without it the operator can record past what the AI Service accepts and
+    // learn about it only after the upload (a 413).
+    capRef.current = window.setTimeout(stopRecording, MAX_RECORDING_MS);
   };
 
   return (
@@ -164,7 +216,7 @@ function FailureCard({
               />
               <button
                 type="button"
-                onClick={() => onChange({ ...entry, photo: null })}
+                onClick={() => onChange((prev) => ({ ...prev, photo: null }))}
                 className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white"
               >
                 <X className="size-3.5" />
@@ -191,10 +243,9 @@ function FailureCard({
             rows={3}
             placeholder="Describe the defect observed..."
             value={entry.notes}
-            onChange={(e) => handleTextChange(e.target.value)}
+            onChange={(e) => onChange((prev) => applyTextEdit(prev, e.target.value))}
             className="w-full resize-none rounded-sm border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
-          {/* Visual background indicator during API processing loops */}
           {isTranscribing && (
             <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-background/90 px-1.5 py-0.5 rounded text-[11px] font-medium text-primary">
               <Loader2 className="size-3 animate-spin" />
@@ -202,19 +253,29 @@ function FailureCard({
             </div>
           )}
 
+          {/* The operator is told which failure happened, and always that they can type instead. */}
+          {voiceError && (
+            <p role="status" className="mb-2 text-xs font-semibold text-warning">
+              {voiceError}
+            </p>
+          )}
+
           {/* Notes */}
           <div className="mb-2">
             <button
               type="button"
               onClick={isRecording ? stopRecording : startRecording}
-              className={`flex w-full items-center justify-center gap-2 rounded-sm py-3 text-sm font-bold shadow-card transition-colors ${
+              disabled={isTranscribing}
+              className={`flex w-full items-center justify-center gap-2 rounded-sm py-3 text-sm font-bold shadow-card transition-colors disabled:opacity-60 ${
                 isRecording
                   ? 'bg-red-600 text-white animate-pulse hover:bg-red-700'
                   : 'bg-primary text-primary-foreground hover:bg-primary/90'
               }`}
             >
               <Mic className="size-4" />
-              {isRecording ? 'Stop Recording' : 'Add Voice Note'}
+              {isRecording
+                ? `Stop Recording ${formatElapsed(elapsedMs)} / ${formatElapsed(MAX_RECORDING_MS)}`
+                : 'Add Voice Note'}
             </button>
           </div>
         </div>
@@ -227,22 +288,12 @@ function FailuresContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
 
-  // Initialize the state container mapping each mock failure to a clean default state
   const [entries, setEntries] = useState<Record<string, FailureEntry>>(
-    Object.fromEntries(
-      MOCK_FAILURES.map((f) => [
-        f.id,
-        {
-          notes: '',
-          photo: null,
-          notes_source: 'TYPED', // Defaults to TYPED until a voice capture is initiated
-        },
-      ]),
-    ),
+    Object.fromEntries(MOCK_FAILURES.map((f) => [f.id, emptyFailureEntry()])),
   );
 
-  const updateEntry = (id: string, updated: FailureEntry) => {
-    setEntries((prev) => ({ ...prev, [id]: updated }));
+  const updateEntry = (id: string, update: (prev: FailureEntry) => FailureEntry) => {
+    setEntries((prev) => ({ ...prev, [id]: update(prev[id]!) }));
   };
 
   return (
@@ -275,7 +326,7 @@ function FailuresContent(): ReactElement {
             index={i}
             total={MOCK_FAILURES.length}
             entry={entries[f.id]!}
-            onChange={(updated) => updateEntry(f.id, updated)}
+            onChange={(update) => updateEntry(f.id, update)}
           />
         ))}
       </div>
