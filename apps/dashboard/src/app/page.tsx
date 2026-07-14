@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { hasAllowedRole } from '@mat-inspect/shared-auth';
-import { ALLOWED_ROLES } from '@/lib/msal-config';
+import { ALLOWED_ROLES } from '@/lib/auth';
 
 export default function RootPage() {
   const isAuthenticated = useIsAuthenticated();

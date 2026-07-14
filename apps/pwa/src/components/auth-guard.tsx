@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { hasAllowedRole } from '@mat-inspect/shared-auth';
-import { ALLOWED_ROLES } from '@/lib/msal-config';
+import { ALLOWED_ROLES } from '@/lib/auth';
 
 export const AuthGuard = ({
   children,

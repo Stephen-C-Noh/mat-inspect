@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountInfo } from '@azure/msal-browser';
 import type { UserRole } from '@mat-inspect/shared-types';
-import { getRolesFromAccount, hasAllowedRole } from './index';
+import { getRolesFromAccount, hasAllowedRole } from './roles';
 
 // Build a minimal AccountInfo. Only idTokenClaims.roles is read by the helpers.
 const makeAccount = (claims?: Record<string, unknown>): AccountInfo =>
