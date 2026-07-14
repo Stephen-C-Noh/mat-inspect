@@ -2,15 +2,15 @@ import { Readable } from 'node:stream';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import type { FastifyInstance } from 'fastify';
+import { setJwksForTest } from '../../middleware/auth.js';
 
 const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
 const localJwks = createLocalJWKSet({ keys: [publicJwk] });
 
-vi.mock('../../lib/jwks.js', () => ({
-  getJwks: () => localJwks,
-  resetJwksForTest: vi.fn(),
-}));
+// Inject the local key set so token verification never reaches the network. The shared
+// verifier owns the JWKS fetch (DEV-98); tests hand it keys instead of mocking the module.
+setJwksForTest(localJwks);
 
 const AI_SERVICE_URL = 'http://ai.test:8000';
 

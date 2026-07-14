@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { AUTH_PREHANDLER } from './auth.js';
+import { AUTH_PREHANDLER } from '@mat-inspect/shared-auth-server';
 
 // /health is the liveness probe, intentionally public. Every other route must declare an auth
 // preHandler (requireRole) or the boot crashes (fail-closed, ADR 0014; mirrors core-api and audit).

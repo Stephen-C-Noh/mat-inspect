@@ -10,6 +10,7 @@ FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-auth-server/package.json packages/shared-auth-server/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
@@ -37,6 +38,7 @@ FROM node:${NODE_VERSION}-alpine AS prod-deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-auth-server/package.json packages/shared-auth-server/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
@@ -55,6 +57,8 @@ COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=prod-deps /repo/package.json ./
 COPY --from=build /repo/packages/shared-types/package.json packages/shared-types/
 COPY --from=build /repo/packages/shared-types/dist packages/shared-types/dist
+COPY --from=build /repo/packages/shared-auth-server/package.json packages/shared-auth-server/
+COPY --from=build /repo/packages/shared-auth-server/dist packages/shared-auth-server/dist
 COPY --from=build /repo/packages/shared-schemas/package.json packages/shared-schemas/
 COPY --from=build /repo/packages/shared-schemas/dist packages/shared-schemas/dist
 COPY --from=build /repo/packages/shared-crypto/package.json packages/shared-crypto/

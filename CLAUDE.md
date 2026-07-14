@@ -118,8 +118,9 @@ Pinned versions as of project start. Match these when generating code.
 
 - Every endpoint declares its required role(s) via Fastify's `preHandler` hook.
 - Endpoints without a declared role fail closed (return 403).
-- JWT validation goes through the shared `verifyToken` middleware. Do not write per-endpoint JWT parsing.
+- JWT validation goes through the shared `verifyToken` middleware, which every service builds from `packages/shared-auth-server` (`createEntraAuth`). Do not write per-endpoint JWT parsing, and do not add a second copy of the JWKS fetch or the issuer check to a service.
 - Never read `req.user` directly without going through `verifyToken` first.
+- Browser-side MSAL config and token acquisition come from `packages/shared-auth`. It imports `@azure/msal-browser`, so a Node service cannot depend on it; the server half is `packages/shared-auth-server`.
 
 ### Error Handling
 
@@ -158,6 +159,8 @@ mat-inspect/
 │   ├── audit/                # Node.js + Fastify, hash-chained audit + PDF reports
 │   └── ai/                   # Python + FastAPI, Whisper transcription
 ├── packages/
+│   ├── shared-auth/          # Browser: MSAL config, token acquisition, role helpers
+│   ├── shared-auth-server/   # Services: Entra token verification (verifyToken, requireRole)
 │   ├── shared-schemas/       # Zod schemas shared between client and server
 │   └── shared-types/         # TypeScript types shared across services
 ├── db/

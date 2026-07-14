@@ -1,19 +1,19 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import type { ChecklistItem } from '@mat-inspect/shared-schemas';
+import { setJwksForTest } from '../../middleware/auth.js';
 
 const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
 const localJwks = createLocalJWKSet({ keys: [publicJwk] });
 
-vi.mock('../../lib/jwks.js', () => ({
-  getJwks: () => localJwks,
-  resetJwksForTest: vi.fn(),
-}));
+// Inject the local key set so token verification never reaches the network. The shared
+// verifier owns the JWKS fetch (DEV-98); tests hand it keys instead of mocking the module.
+setJwksForTest(localJwks);
 
 const ADMIN_ID = '33333333-3333-3333-3333-333333333333';
 const OPERATOR_ID = '44444444-4444-4444-4444-444444444444';
