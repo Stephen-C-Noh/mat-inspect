@@ -1,7 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useMsal } from '@azure/msal-react';
 import { equipmentSchema, type Equipment } from '@mat-inspect/shared-schemas';
-import { acquireAccessToken } from '@/lib/access-token';
+import { acquireAccessToken } from '@/lib/auth';
 
 export const useEquipmentList = (): UseQueryResult<Equipment[], Error> => {
   const { instance, accounts } = useMsal();
