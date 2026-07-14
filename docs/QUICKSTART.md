@@ -117,7 +117,9 @@ scripted.
 
 The PWA uses 3002 on the host because core-api holds 3000 and the dashboard
 holds 3001. If the PWA gets a new redirect URI, add it on the Entra app
-registration (see [ONBOARDING.md](ONBOARDING.md)).
+registration. Which registration, in which tenant, and what else it holds:
+[runbooks/gateway-and-device-setup.md](runbooks/gateway-and-device-setup.md).
+(ONBOARDING.md used to be cited here and says nothing about Entra.)
 
 ## Databases
 

@@ -45,19 +45,50 @@ services:
     ports:
       - '80:80'
       - '443:443'
+      # Dev listener (ADR 0020). Loopback only: it is plain HTTP and exists so the Next dev servers
+      # can proxy /api/v1 through the same routing table staging uses. Not reachable from the LAN.
+      - '127.0.0.1:8080:8080'
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    # The browser reaches the apps through here, so they are upstreams like any service. ai is not:
+    # it has no route (ADR 0019, ADR 0020).
     depends_on:
       - core-api
       - media
       - audit
-      - ai
+      - pwa
+      - dashboard
+    # Probe the site over TLS, not the admin API. The old check hit the admin socket on 127.0.0.1:2019,
+    # which answers even when Caddy is serving nothing, so a gateway with a broken listener reported
+    # healthy (seen on the box in DEV-95). This request goes through the real site block, so it fails
+    # if the site is not served or the internal CA never issued its certificate.
+    #
+    # It cannot tell whether the port is published on the HOST: a Docker healthcheck runs inside the
+    # container, and a probe aimed back at the host returns through Docker's DNAT rules even when the
+    # host-side bind failed (reproduced on a dev box where another process held 443). That property
+    # is checked from outside, on the box, by scripts/smoke-gateway.sh after every deploy.
+    #
+    # extra_hosts resolves the site name to the container itself so the request matches the site
+    # block. --no-check-certificate: the certificate is from Caddy's own internal CA, and this is a
+    # liveness probe, not a trust check.
+    extra_hosts:
+      - 'mat-inspect.staging:127.0.0.1'
+      - 'dashboard.mat-inspect.staging:127.0.0.1'
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2019/config/']
+      test:
+        [
+          'CMD',
+          'wget',
+          '-q',
+          '--no-check-certificate',
+          '-O-',
+          'https://mat-inspect.staging/gateway/health',
+        ]
       interval: 10s
       timeout: 5s
+      start_period: 30s
       retries: 3
     networks:
       - mat-internal
@@ -207,13 +238,15 @@ services:
       args:
         NEXT_PUBLIC_AZURE_TENANT_ID: ${ENTRA_TENANT_ID}
         NEXT_PUBLIC_AZURE_CLIENT_ID: ${ENTRA_CLIENT_ID}
-        CORE_API_URL: 'http://core-api:3000'
+        # Baked into routes-manifest.json by next.config rewrites(), so it is a build arg, not a
+        # runtime variable. In Compose the browser reaches Caddy directly and this rewrite carries
+        # no traffic; it points at the gateway anyway, never at a service (ADR 0020).
+        GATEWAY_URL: 'http://caddy:8080'
     environment:
       PORT: '3000'
       APP_NAME: pwa
-      CORE_API_URL: 'http://core-api:3000'
-    ports:
-      - '3000:3000'
+    # No published port. The browser reaches the PWA through Caddy over TLS, because MSAL needs a
+    # secure context and http://<box>:3000 is not one (ADR 0020).
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 10s
@@ -232,8 +265,11 @@ services:
       args:
         NEXT_PUBLIC_AZURE_TENANT_ID: ${ENTRA_TENANT_ID}
         NEXT_PUBLIC_AZURE_CLIENT_ID: ${ENTRA_CLIENT_ID}
-    ports:
-      - '3001:3000'
+        GATEWAY_URL: 'http://caddy:8080'
+    environment:
+      PORT: '3000'
+    # No published port, same reason as the PWA: the dashboard is served over TLS at
+    # dashboard.mat-inspect.staging (ADR 0020).
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health']
       interval: 10s
