@@ -355,4 +355,25 @@ describe('equipment API', () => {
     expect(verify.json().location).not.toBe('MAT Bay Z');
     expect(verify.json().status).toBe('AWAITING_INSPECTION');
   });
+
+  // DEV-82: readiness_baseline_at is a server-set watermark (ADR 0006); only
+  // return-to-service may move it. patchEquipmentSchema omits the field, so .strict()
+  // rejects any body carrying it, the same mechanism that protects status above.
+  it('PATCH /equipment/:id rejects a body that tries to set readinessBaselineAt', async () => {
+    const { db, equipment } = await import('../../db/index.js');
+    const { eq } = await import('drizzle-orm');
+    const [before] = await db.select().from(equipment).where(eq(equipment.id, seededId));
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/equipment/${seededId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { readinessBaselineAt: new Date().toISOString() },
+    });
+
+    expect(res.statusCode).toBe(400);
+
+    const [after] = await db.select().from(equipment).where(eq(equipment.id, seededId));
+    expect(after!.readinessBaselineAt).toEqual(before!.readinessBaselineAt);
+  });
 });
