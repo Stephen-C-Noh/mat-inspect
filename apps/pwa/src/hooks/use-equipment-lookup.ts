@@ -3,7 +3,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useMsal } from '@azure/msal-react';
 import { equipmentSchema, type Equipment } from '@mat-inspect/shared-schemas';
-import { tokenRequest } from '@/lib/msal-config';
+import { acquireAccessToken } from '@/lib/auth';
 
 export const useEquipmentLookup = (assetTag: string | null): UseQueryResult<Equipment, Error> => {
   const { instance, accounts } = useMsal();
@@ -13,14 +13,11 @@ export const useEquipmentLookup = (assetTag: string | null): UseQueryResult<Equi
     queryFn: async () => {
       if (!assetTag) throw new Error('No asset tag provided');
 
-      const response = await instance.acquireTokenSilent({
-        ...tokenRequest,
-        account: accounts[0],
-      });
+      const accessToken = await acquireAccessToken(instance, accounts);
 
       const res = await fetch(`/api/v1/equipment/by-tag/${assetTag}`, {
         headers: {
-          Authorization: `Bearer ${response.accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });

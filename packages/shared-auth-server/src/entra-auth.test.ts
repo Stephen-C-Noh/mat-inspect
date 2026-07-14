@@ -1,19 +1,35 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import Fastify, { type FastifyError } from 'fastify';
-import { verifyToken, requireRole } from './auth.js';
-import { resetJwksForTest } from '../lib/jwks.js';
+import { AUTH_PREHANDLER, createEntraAuth } from './entra-auth.js';
 
-// Generate a test keypair once for the suite
+// Generate a test keypair once for the suite.
 const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
 const localJwks = createLocalJWKSet({ keys: [publicJwk] });
 
-// Replace the remote JWKS fetch with an in-memory set for all tests
-vi.mock('../lib/jwks.js', () => ({
-  getJwks: () => localJwks,
-  resetJwksForTest: vi.fn(),
-}));
+// Stand-ins for what a service injects. httpError mirrors the services' RFC 7807 error, which
+// carries status and code; the test error handler below reads them the same way.
+class TestHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    detail: string,
+  ) {
+    super(detail);
+    this.name = 'HttpError';
+  }
+}
+
+const httpError = (status: number, code: string, detail: string): Error =>
+  new TestHttpError(status, code, detail);
+
+const warnings: object[] = [];
+const logger = {
+  warn: (obj: object): void => {
+    warnings.push(obj);
+  },
+};
 
 const makeToken = async (claims: Record<string, unknown> = {}, expiresIn = '15m') =>
   new SignJWT({ sub: 'user-1', oid: 'user-1', roles: ['operator'], tid: 'test-tenant', ...claims })
@@ -22,7 +38,12 @@ const makeToken = async (claims: Record<string, unknown> = {}, expiresIn = '15m'
     .setExpirationTime(expiresIn)
     .sign(privateKey);
 
+// Build the auth for a test the way a service does, then hand it the local key set so nothing
+// reaches the network. The remote JWKS fetch is the only external dependency here.
 const buildTestApp = () => {
+  const auth = createEntraAuth({ httpError, logger });
+  auth.setJwksForTest(localJwks);
+
   const app = Fastify();
 
   app.setErrorHandler((err: FastifyError & { status?: number; code?: string }, _req, reply) => {
@@ -30,22 +51,26 @@ const buildTestApp = () => {
     void reply.code(status).send({ code: err.code, detail: err.message });
   });
 
-  app.get('/protected', { preHandler: [verifyToken] }, async (req) => ({ userId: req.user.id }));
-
-  app.get('/operator-only', { preHandler: [requireRole('operator')] }, async (req) => ({
+  app.get('/protected', { preHandler: [auth.verifyToken] }, async (req) => ({
     userId: req.user.id,
   }));
 
-  app.get('/manager-or-admin', { preHandler: [requireRole('manager', 'admin')] }, async (req) => ({
+  app.get('/operator-only', { preHandler: [auth.requireRole('operator')] }, async (req) => ({
     userId: req.user.id,
   }));
+
+  app.get(
+    '/manager-or-admin',
+    { preHandler: [auth.requireRole('manager', 'admin')] },
+    async (req) => ({ userId: req.user.id }),
+  );
 
   return app;
 };
 
 describe('verifyToken', () => {
   beforeEach(() => {
-    resetJwksForTest();
+    warnings.length = 0;
     delete process.env['ENTRA_TENANT_ID'];
     delete process.env['ENTRA_CLIENT_ID'];
   });
@@ -104,7 +129,7 @@ describe('verifyToken', () => {
 
   it('returns 401 for an expired token', async () => {
     const app = buildTestApp();
-    // Use a past Unix timestamp (seconds) to create an already-expired token
+    // Use a past Unix timestamp (seconds) to create an already-expired token.
     const expiredAt = Math.floor(Date.now() / 1000) - 60;
     const token = await new SignJWT({ sub: 'user-1', oid: 'user-1', roles: ['operator'] })
       .setProtectedHeader({ alg: 'RS256', kid: 'test-1' })
@@ -139,11 +164,50 @@ describe('verifyToken', () => {
     expect(res.statusCode).toBe(401);
     expect(res.json().code).toBe('INVALID_TOKEN');
   });
+
+  it('logs a warning when verification fails', async () => {
+    const app = buildTestApp();
+
+    await app.inject({
+      method: 'GET',
+      url: '/protected',
+      headers: { authorization: 'Bearer not-a-token' },
+    });
+
+    expect(warnings).toHaveLength(1);
+  });
+
+  it('does not log the token itself', async () => {
+    // The logger receives the jose error, never the credential. Logging rules forbid tokens
+    // in the log stream (CLAUDE.md 4).
+    const app = buildTestApp();
+    const token = await makeToken({}, '-1s');
+
+    await app.inject({
+      method: 'GET',
+      url: '/protected',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(JSON.stringify(warnings)).not.toContain(token);
+  });
+});
+
+describe('AUTH_PREHANDLER marker', () => {
+  // The fail-closed route guard (ADR 0014) recognises an authenticating preHandler by this
+  // marker alone. If it stops being attached, every guarded route silently looks unguarded and
+  // the boot check that should catch a forgotten role declaration stops catching anything.
+  it('marks both verifyToken and the requireRole preHandler', () => {
+    const auth = createEntraAuth({ httpError, logger });
+    const marked = (fn: unknown): unknown => (fn as Record<symbol, unknown>)[AUTH_PREHANDLER];
+
+    expect(marked(auth.verifyToken)).toBe(true);
+    expect(marked(auth.requireRole('operator'))).toBe(true);
+  });
 });
 
 describe('requireRole', () => {
   beforeEach(() => {
-    resetJwksForTest();
     delete process.env['ENTRA_TENANT_ID'];
     delete process.env['ENTRA_CLIENT_ID'];
   });
@@ -194,11 +258,26 @@ describe('requireRole', () => {
 
     expect(res.statusCode).toBe(401);
   });
+
+  // Roles are not hierarchical. operator encodes the OHS s.257 competency and is never inherited
+  // by a manager or an admin (DEV-30).
+  it('denies a manager on an operator-only route', async () => {
+    const app = buildTestApp();
+    const token = await makeToken({ roles: ['manager'] });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/operator-only',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
 });
 
-// DEV-30 spike: pin the Entra access-token contract. The other suites delete the
-// ENTRA_* env vars, so the issuer and audience branches in verifyToken never run.
-// These tests set both, exercising the validation a real Entra access token must pass.
+// DEV-30 spike: pin the Entra access-token contract. The other suites delete the ENTRA_* env
+// vars, so the issuer and audience branches in verifyToken never run. These tests set both,
+// exercising the validation a real Entra access token must pass.
 describe('verifyToken with Entra issuer and audience validation', () => {
   const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
   const TENANT_ID = '22222222-2222-2222-2222-222222222222';
@@ -206,7 +285,6 @@ describe('verifyToken with Entra issuer and audience validation', () => {
   const ISSUER = `https://login.microsoftonline.com/${TENANT_ID}/v2.0`;
 
   beforeEach(() => {
-    resetJwksForTest();
     process.env['ENTRA_CLIENT_ID'] = CLIENT_ID;
     process.env['ENTRA_TENANT_ID'] = TENANT_ID;
   });
