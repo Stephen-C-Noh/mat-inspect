@@ -6,7 +6,7 @@ import { useState, useRef, useEffect, type ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { AuthGuard } from '@/components/auth-guard';
-import { acquireAccessToken } from '@/lib/auth';
+import { acquireMediaAccessToken } from '@/lib/auth';
 import {
   applyTextEdit,
   applyTranscript,
@@ -98,7 +98,7 @@ function FailureCard({
     setVoiceError(null);
 
     try {
-      const accessToken = await acquireAccessToken(instance, accounts);
+      const accessToken = await acquireMediaAccessToken(instance, accounts);
 
       const formData = new FormData();
       // The field name is fixed by the core-api contract. Content-Type is left to the browser: it
@@ -253,14 +253,12 @@ function FailureCard({
             </div>
           )}
 
-          {/* The operator is told which failure happened, and always that they can type instead. */}
           {voiceError && (
             <p role="status" className="mb-2 text-xs font-semibold text-warning">
               {voiceError}
             </p>
           )}
 
-          {/* Notes */}
           <div className="mb-2">
             <button
               type="button"
@@ -287,13 +285,55 @@ function FailureCard({
 function FailuresContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
+  const { instance, accounts } = useMsal();
 
   const [entries, setEntries] = useState<Record<string, FailureEntry>>(
     Object.fromEntries(MOCK_FAILURES.map((f) => [f.id, emptyFailureEntry()])),
   );
 
+  // New state to manage the submission lifecycle per ADR 0020.
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Requirement: block submission until every failure card has a corresponding photo.
+  const allPhotosAttached = Object.values(entries).every((e) => e.photo !== null);
+
   const updateEntry = (id: string, update: (prev: FailureEntry) => FailureEntry) => {
     setEntries((prev) => ({ ...prev, [id]: update(prev[id]!) }));
+  };
+
+  // Uploads evidence photos to the Media Service via the Gateway.
+  // This must complete successfully before we allow the inspection to transition to 'submitted'.
+  const uploadPhoto = async (photoUrl: string) => {
+    const response = await fetch(photoUrl);
+    const blob = await response.blob();
+    const accessToken = await acquireMediaAccessToken(instance, accounts);
+    const formData = new FormData();
+    formData.append('file', blob, 'failure.jpg');
+
+    const res = await fetch('/api/v1/media/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error('Upload failed');
+    return await res.json();
+  };
+
+  // Handles the final submission workflow. Ensures all media is persisted
+  // before updating the inspection status to 'submitted'.
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const uploadPromises = Object.values(entries).map((entry) => uploadPhoto(entry.photo!));
+      await Promise.all(uploadPromises);
+      router.push(`/checklist/${params.equipmentId}/submitted/fail`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Submission failed', err);
+      setIsSubmitting(false);
+      alert('Failed to upload photos. Please try again.');
+    }
   };
 
   return (
@@ -331,16 +371,25 @@ function FailuresContent(): ReactElement {
         ))}
       </div>
 
-      {/* Fixed submit. Same box as the card container above, so the buttons line up with the cards. */}
-      <div className="fixed inset-x-0 bottom-4 mx-auto max-w-lg px-4 space-y-2">
-        <Link href={`/checklist/${params.equipmentId}/submitted/fail`} className="block">
-          <button
-            type="button"
-            className="w-full rounded-sm bg-warning py-4 text-sm font-bold text-warning-foreground shadow-card"
-          >
-            Submit Inspection with Failures
-          </button>
-        </Link>
+      <div className="relative mx-auto max-w-lg px-4 mt-6 space-y-2">
+        {/* Submit button now handles the async upload chain and state locking. */}
+        <button
+          type="button"
+          disabled={!allPhotosAttached || isSubmitting}
+          onClick={handleSubmit}
+          className={`w-full rounded-sm py-4 text-sm font-bold shadow-card transition-colors ${
+            allPhotosAttached && !isSubmitting
+              ? 'bg-warning text-warning-foreground'
+              : 'bg-muted text-muted-foreground cursor-not-allowed'
+          }`}
+        >
+          {isSubmitting
+            ? 'Uploading...'
+            : allPhotosAttached
+              ? 'Submit Inspection with Failures'
+              : 'Attach all photos to continue'}
+        </button>
+
         <Link href={`/checklist/${params.equipmentId}/submitted`} className="block">
           <button
             type="button"
