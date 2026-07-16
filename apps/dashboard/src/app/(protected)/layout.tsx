@@ -1,10 +1,10 @@
 import { AuthGuard } from '@/components/auth-guard';
-import { DashboardNav } from '@/components/dashboard-nav';
+import { TopBar } from '@/components/ui/top-bar';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      <DashboardNav />
+      <TopBar />
       {children}
     </AuthGuard>
   );

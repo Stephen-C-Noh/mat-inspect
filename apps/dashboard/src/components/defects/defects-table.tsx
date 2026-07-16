@@ -2,48 +2,122 @@
 
 import { useMemo, useState, type ReactElement } from 'react';
 import type { Defect } from '@mat-inspect/shared-schemas';
+import type { DefectStatus } from '@mat-inspect/shared-types';
 import { useDefects } from '@/hooks/use-defects';
 import { useAcknowledgeDefect } from '@/hooks/use-acknowledge-defect';
 import { useStartRepairDefect } from '@/hooks/use-start-repair-defect';
 import { useResolveDefect } from '@/hooks/use-resolve-defect';
 import { useReturnToService } from '@/hooks/use-return-to-service';
-import { MOCK_EQUIPMENT } from '@/lib/mock-defects';
+import { MOCK_EQUIPMENT } from '@/lib/mock-equipment';
 import { DefectStatusTag } from './defect-status-tag';
+import { DefectSeverityTag } from './defect-severity-tag';
 
-// MOCK_EQUIPMENT stands in for a real equipment lookup/join until DEV-20 merges and the
-// defects response (or a paired equipment fetch) carries the equipment name directly.
-const equipmentName = (equipmentId: string): string =>
-  MOCK_EQUIPMENT.find((e) => e.id === equipmentId)?.name ?? equipmentId;
+// GET /api/v1/equipment is operator-only today (services/core-api/src/routes/equipment/list.ts),
+// so the dashboard can't fetch real equipment names/locations yet — out of scope for DEV-35.
+// MOCK_EQUIPMENT stands in for that join until a separate ticket opens that endpoint up.
+const equipmentFor = (equipmentId: string) => MOCK_EQUIPMENT.find((e) => e.id === equipmentId);
 
 const formatDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+  new Date(iso).toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
-type DefectRowProps = { defect: Defect };
+// Cosmetic display id only (e.g. "DEF-0001"); the real id used for API calls is defect.id.
+const displayId = (id: string): string => {
+  const match = /(\d+)$/.exec(id);
+  return match ? `DEF-${match[1].padStart(4, '0')}` : id.slice(0, 8).toUpperCase();
+};
 
-const DefectRow = ({ defect }: DefectRowProps): ReactElement => {
+const categoryFor = (itemKey: string): string =>
+  itemKey
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+const FILTERS: { label: string; status: DefectStatus | 'ALL' }[] = [
+  { label: 'All', status: 'ALL' },
+  { label: 'Open', status: 'OPEN' },
+  { label: "Ack'd", status: 'ACKNOWLEDGED' },
+  { label: 'In Repair', status: 'IN_REPAIR' },
+];
+
+type DetailPanelProps = { defect: Defect; canReturnToService: boolean };
+
+const DefectDetailPanel = ({ defect, canReturnToService }: DetailPanelProps): ReactElement => {
   const [resolving, setResolving] = useState(false);
   const [notes, setNotes] = useState('');
 
   const acknowledge = useAcknowledgeDefect();
   const startRepair = useStartRepairDefect();
   const resolve = useResolveDefect();
+  const returnToService = useReturnToService();
+
+  const equipment = equipmentFor(defect.equipmentId);
 
   return (
-    <tr className="border-b border-border align-top">
-      <td className="p-3 text-sm text-foreground">{defect.description}</td>
-      <td className="p-3 text-sm text-muted-foreground">
-        Inspection {defect.inspectionId} &middot; {formatDate(defect.openedAt)}
-      </td>
-      <td className="p-3">
+    <div className="rounded-sm border border-border bg-card p-6 shadow-card">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-muted-foreground">{displayId(defect.id)}</span>
         <DefectStatusTag status={defect.status} />
-      </td>
-      <td className="p-3">
+        <DefectSeverityTag severity={defect.severity} />
+      </div>
+
+      <h2 className="mt-3 text-xl font-bold text-foreground">{defect.description}</h2>
+
+      <div className="mt-4 grid grid-cols-2 gap-4 rounded-sm bg-muted p-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Equipment
+          </p>
+          <p className="text-sm text-foreground">
+            {equipment?.name ?? defect.equipmentId}
+            {equipment && <span className="text-muted-foreground"> · {equipment.assetTag}</span>}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Location
+          </p>
+          <p className="text-sm text-foreground">{equipment?.location ?? 'Unknown'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Category
+          </p>
+          <p className="text-sm text-foreground">{categoryFor(defect.itemKey)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Inspection
+          </p>
+          <p className="text-sm text-foreground">
+            {defect.inspectionId} · {formatDate(defect.openedAt)}
+          </p>
+        </div>
+      </div>
+
+      {defect.resolutionNotes && (
+        <div className="mt-4 rounded-sm border border-success/30 bg-success/10 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-success">Resolution Notes</p>
+          <p className="mt-1 text-sm text-foreground">{defect.resolutionNotes}</p>
+        </div>
+      )}
+
+      <div className="mt-6">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+          Actions
+        </p>
+
         {defect.status === 'OPEN' && (
           <button
             type="button"
             onClick={() => acknowledge.mutate(defect.id)}
             disabled={acknowledge.isPending}
-            className="rounded-sm bg-accent px-3 py-1.5 text-xs font-bold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-foreground hover:opacity-90 disabled:opacity-50"
           >
             Acknowledge
           </button>
@@ -54,7 +128,7 @@ const DefectRow = ({ defect }: DefectRowProps): ReactElement => {
             type="button"
             onClick={() => startRepair.mutate(defect.id)}
             disabled={startRepair.isPending}
-            className="rounded-sm bg-accent px-3 py-1.5 text-xs font-bold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-foreground hover:opacity-90 disabled:opacity-50"
           >
             Start Repair
           </button>
@@ -64,7 +138,7 @@ const DefectRow = ({ defect }: DefectRowProps): ReactElement => {
           <button
             type="button"
             onClick={() => setResolving(true)}
-            className="rounded-sm bg-accent px-3 py-1.5 text-xs font-bold text-accent-foreground hover:bg-accent/90"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-foreground hover:opacity-90"
           >
             Resolve
           </button>
@@ -76,111 +150,170 @@ const DefectRow = ({ defect }: DefectRowProps): ReactElement => {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Resolution notes (required)"
-              className="w-full rounded-sm border border-border bg-card p-2 text-xs outline-none focus:ring-2 focus:ring-ring"
-              rows={2}
+              className="w-full rounded-sm border border-border bg-card p-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              rows={3}
             />
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => resolve.mutate({ defectId: defect.id, resolutionNotes: notes })}
                 disabled={resolve.isPending || notes.trim().length === 0}
-                className="rounded-sm bg-success px-3 py-1.5 text-xs font-bold text-success-foreground disabled:opacity-50"
+                className="rounded-lg bg-success px-4 py-2 text-sm font-bold text-success-foreground hover:opacity-90 disabled:opacity-50"
               >
                 Submit
               </button>
               <button
                 type="button"
                 onClick={() => setResolving(false)}
-                className="rounded-sm border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted"
               >
                 Cancel
               </button>
             </div>
           </div>
         )}
-      </td>
-    </tr>
+
+        {defect.status === 'RESOLVED' && defect.severity === 'BLOCKING' && (
+          <button
+            type="button"
+            onClick={() => returnToService.mutate(defect.equipmentId)}
+            disabled={!canReturnToService || returnToService.isPending}
+            className="rounded-lg bg-success px-4 py-2 text-sm font-bold text-success-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:opacity-40"
+          >
+            {defect.returnToServiceApprovedBy
+              ? 'Return to Service Approved'
+              : 'Approve Return to Service'}
+          </button>
+        )}
+
+        {(defect.status === 'RESOLVED' && defect.severity === 'WARNING') ||
+        defect.status === 'REJECTED' ? (
+          <p className="text-sm text-muted-foreground">No further action needed.</p>
+        ) : null}
+      </div>
+    </div>
   );
 };
 
 export const DefectsTable = (): ReactElement => {
   const { data: defects, isLoading } = useDefects();
-  const returnToService = useReturnToService();
+  const [statusFilter, setStatusFilter] = useState<DefectStatus | 'ALL'>('ALL');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const groups = useMemo(() => {
-    const visible = (defects ?? []).filter((d) => d.status !== 'REJECTED');
-    const byEquipment = new Map<string, Defect[]>();
+  const visibleDefects = useMemo(
+    () => (defects ?? []).filter((d) => d.status !== 'REJECTED'),
+    [defects],
+  );
 
-    for (const defect of visible) {
-      const list = byEquipment.get(defect.equipmentId) ?? [];
-      list.push(defect);
-      byEquipment.set(defect.equipmentId, list);
-    }
+  const filteredDefects = useMemo(
+    () =>
+      statusFilter === 'ALL'
+        ? visibleDefects
+        : visibleDefects.filter((d) => d.status === statusFilter),
+    [visibleDefects, statusFilter],
+  );
 
-    return [...byEquipment.entries()].map(([equipmentId, equipmentDefects]) => {
+  const equipmentCanReturnToService = useMemo(() => {
+    const result = new Map<string, boolean>();
+    for (const equipment of MOCK_EQUIPMENT) {
+      const equipmentDefects = visibleDefects.filter((d) => d.equipmentId === equipment.id);
       const hasOpenBlocking = equipmentDefects.some(
         (d) => d.severity === 'BLOCKING' && d.status !== 'RESOLVED',
       );
       const hasResolvedBlocking = equipmentDefects.some(
-        (d) => d.severity === 'BLOCKING' && d.status === 'RESOLVED',
+        (d) => d.severity === 'BLOCKING' && d.status === 'RESOLVED' && !d.returnToServiceApprovedBy,
       );
+      result.set(equipment.id, hasResolvedBlocking && !hasOpenBlocking);
+    }
+    return result;
+  }, [visibleDefects]);
 
-      return {
-        equipmentId,
-        defects: equipmentDefects,
-        canReturnToService: hasResolvedBlocking && !hasOpenBlocking,
-      };
-    });
-  }, [defects]);
+  const selectedDefect =
+    filteredDefects.find((d) => d.id === selectedId) ?? filteredDefects[0] ?? null;
 
   if (isLoading) {
     return <p className="p-8 text-center text-sm text-muted-foreground">Loading defects...</p>;
   }
 
-  if (groups.length === 0) {
-    return (
-      <div className="rounded-sm border border-border bg-card p-8 text-center shadow-card">
-        <p className="text-sm text-muted-foreground">No open defects.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {groups.map((group) => (
-        <div
-          key={group.equipmentId}
-          className="overflow-hidden rounded-sm border border-border bg-card shadow-card"
-        >
-          <div className="flex items-center justify-between border-b border-border p-4">
-            <h3 className="font-bold text-foreground">{equipmentName(group.equipmentId)}</h3>
-            <button
-              type="button"
-              onClick={() => returnToService.mutate(group.equipmentId)}
-              disabled={!group.canReturnToService || returnToService.isPending}
-              className="rounded-sm bg-success px-3 py-1.5 text-xs font-bold text-success-foreground disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Approve Return to Service
-            </button>
-          </div>
-
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                <th className="p-3">Defect</th>
-                <th className="p-3">Reported</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {group.defects.map((defect) => (
-                <DefectRow key={defect.id} defect={defect} />
-              ))}
-            </tbody>
-          </table>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_1.4fr]">
+      {/* Left: list */}
+      <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card">
+        <div className="flex items-center justify-between border-b border-border p-4">
+          <h2 className="font-bold text-foreground">Defects</h2>
+          <span className="rounded-lg bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground">
+            {visibleDefects.filter((d) => d.status !== 'RESOLVED').length} open
+          </span>
         </div>
-      ))}
+
+        <div className="flex gap-2 border-b border-border p-3">
+          {FILTERS.map((f) => (
+            <button
+              key={f.status}
+              type="button"
+              onClick={() => setStatusFilter(f.status)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                statusFilter === f.status
+                  ? 'bg-accent text-accent-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/70'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {filteredDefects.length === 0 ? (
+          <p className="p-8 text-center text-sm text-muted-foreground">
+            No defects matching this filter
+          </p>
+        ) : (
+          <div className="divide-y divide-border">
+            {filteredDefects.map((defect) => {
+              const equipment = equipmentFor(defect.equipmentId);
+              const isSelected = selectedDefect?.id === defect.id;
+
+              return (
+                <button
+                  key={defect.id}
+                  type="button"
+                  onClick={() => setSelectedId(defect.id)}
+                  className={`block w-full p-4 text-left transition-colors ${
+                    isSelected ? 'bg-muted' : 'hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-muted-foreground">
+                      {displayId(defect.id)}
+                    </span>
+                    <DefectStatusTag status={defect.status} />
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-foreground">{defect.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {equipment?.name ?? defect.equipmentId} · {defect.inspectionId}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Right: detail */}
+      <div>
+        {selectedDefect ? (
+          <DefectDetailPanel
+            defect={selectedDefect}
+            canReturnToService={
+              equipmentCanReturnToService.get(selectedDefect.equipmentId) ?? false
+            }
+          />
+        ) : (
+          <div className="rounded-sm border border-border bg-card p-8 text-center shadow-card">
+            <p className="text-sm text-muted-foreground">Select a defect to view details.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
