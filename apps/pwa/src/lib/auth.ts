@@ -33,7 +33,6 @@ export const acquireAccessToken = (
 export const ALLOWED_ROLES = ['operator', 'supervisor'] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
-// Add this helper to lib/auth.ts
 export const acquireMediaAccessToken = async (
   instance: IPublicClientApplication,
   accounts: AccountInfo[],
