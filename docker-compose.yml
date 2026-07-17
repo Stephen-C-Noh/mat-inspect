@@ -24,6 +24,48 @@ services:
     networks:
       - mat-internal
 
+  # Nightly pg_dump for dev staging (DEV-43, ARCHITECTURE.md 12.5 and 12.7). Runs no database:
+  # it reuses the postgres:16-alpine image only so pg_dump matches the server major version (a
+  # dump is not restorable into a server older than the pg_dump that wrote it) and no extra
+  # image is pulled. The scheduler runs one verified backup a day and rotates old dumps.
+  #
+  # Prod does not run this service: there the database is Azure Database for PostgreSQL with
+  # managed automated backups (ADR 0005). Verify those with infra/backup/verify-azure-backups.sh.
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      # libpq reads these; no credential is ever passed on a command line or logged.
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: postgres
+      # Schedule and retention. Overridable from .env; defaults match ADR 0005's 7-day prod
+      # window so dev staging and prod age dumps out on the same clock.
+      BACKUP_TIME: ${BACKUP_TIME:-02:00}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    entrypoint: ['/bin/sh', '/opt/backup/backup-scheduler.sh']
+    volumes:
+      - ./infra/backup/pg-backup.sh:/opt/backup/pg-backup.sh:ro
+      - ./infra/backup/backup-scheduler.sh:/opt/backup/backup-scheduler.sh:ro
+      # Separate named volume, not postgres_data: a backup on the same volume as the data it
+      # protects dies with it (DEV-43, "written to a separate volume"). The host owner's rsync
+      # job copies this volume off-host (ARCHITECTURE.md 12.5, 12.7).
+      - db_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The scheduler touches the heartbeat every 30s. If it is older than 2 min the loop is
+      # wedged. This proves the scheduler is alive, not that a dump is fresh: a nightly job is
+      # idle most of the day, so dump freshness is the wrong liveness signal.
+      test: ['CMD-SHELL', 'find /tmp/db-backup-heartbeat -mmin -2 2>/dev/null | grep -q .']
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - mat-internal
+
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:3.33.0
     # --skipApiVersionCheck: the @azure/storage-blob SDK (Media Service) sends a newer REST API
@@ -281,6 +323,9 @@ services:
 
 volumes:
   postgres_data:
+  # Nightly pg_dump target (DEV-43). Deliberately separate from postgres_data so a lost data
+  # volume does not take the backups with it.
+  db_backups:
   azurite_data:
   caddy_data:
   caddy_config:
