@@ -248,4 +248,89 @@ describe('checklist templates API', () => {
 
     expect(res.statusCode).toBe(400);
   });
+
+  it('rejects GET /checklists from a non-admin with 403', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/checklists',
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('GET /checklists lists all template versions, including retired ones', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/checklists',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const forkliftRows = body.filter((row: { id: string }) => [v1Id, v2Id].includes(row.id));
+    expect(forkliftRows).toHaveLength(2);
+    expect(forkliftRows.find((row: { id: string }) => row.id === v1Id)?.isActive).toBe(false);
+    expect(forkliftRows.find((row: { id: string }) => row.id === v2Id)?.isActive).toBe(true);
+  });
+
+  it('rejects GET /checklists/:id/diff/:otherId from a non-admin with 403', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/checklists/${v1Id}/diff/${v2Id}`,
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('GET /checklists/:id/diff/:otherId returns the item-level diff between two versions', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/checklists/${v1Id}/diff/${v2Id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.from.id).toBe(v1Id);
+    expect(body.to.id).toBe(v2Id);
+    expect(body.added).toEqual([
+      expect.objectContaining({ key: 'hydraulic-leaks', type: 'BOOLEAN_PHOTO_ON_FAIL' }),
+    ]);
+    expect(body.removed).toEqual([]);
+    expect(body.changed).toEqual([]);
+  });
+
+  it('GET /checklists/:id/diff/:otherId returns 404 with CHECKLIST_TEMPLATE_NOT_FOUND when the first id is unknown', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/checklists/00000000-0000-0000-0000-000000000000/diff/${v2Id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().title).toBe('CHECKLIST_TEMPLATE_NOT_FOUND');
+  });
+
+  it('GET /checklists/:id/diff/:otherId returns 404 with CHECKLIST_TEMPLATE_NOT_FOUND when the second id is unknown', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/checklists/${v1Id}/diff/00000000-0000-0000-0000-000000000000`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().title).toBe('CHECKLIST_TEMPLATE_NOT_FOUND');
+  });
+
+  it('GET /checklists/:id/diff/:otherId returns 400 when either id is not a uuid', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/checklists/${v1Id}/diff/not-a-uuid`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
 });
