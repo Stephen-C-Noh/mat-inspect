@@ -1,4 +1,10 @@
-import { createLoginRequest, createMsalConfig } from '@mat-inspect/shared-auth';
+import type { AccountInfo, IPublicClientApplication } from '@azure/msal-browser';
+import {
+  acquireApiToken,
+  createLoginRequest,
+  createMsalConfig,
+  createTokenRequest,
+} from '@mat-inspect/shared-auth';
 import type { UserRole } from '@mat-inspect/shared-types';
 
 // Next inlines NEXT_PUBLIC_* at build time, so the env reads stay in app code and the shared
@@ -9,9 +15,16 @@ const tenantId = process.env.NEXT_PUBLIC_AZURE_TENANT_ID ?? '';
 
 export const msalConfig = createMsalConfig({ clientId, tenantId });
 
-// The dashboard signs in for identity only. It makes no API call yet, so it does not ask for
-// the API scope. Add createTokenRequest here when it does.
-export const loginRequest = createLoginRequest(clientId);
+// The dashboard calls core-api (defects, equipment), so it collects consent for the API
+// scope at login, same as the PWA.
+export const loginRequest = createLoginRequest(clientId, { withApiScope: true });
+
+export const tokenRequest = createTokenRequest(clientId);
+
+export const acquireAccessToken = (
+  instance: IPublicClientApplication,
+  accounts: AccountInfo[],
+): Promise<string> => acquireApiToken(instance, accounts, tokenRequest);
 
 // Roles permitted to view the dashboard. Supervisor gets the team dashboard, Manager and
 // Admin get full read access. See ARCHITECTURE.md section 3 (roles). Values must match the

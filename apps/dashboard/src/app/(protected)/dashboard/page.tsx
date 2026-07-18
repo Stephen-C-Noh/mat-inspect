@@ -9,10 +9,10 @@ export default function DashboardPage() {
   const roles = getRolesFromAccount(account);
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
+    <main className="min-h-screen bg-muted p-8">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-1 text-2xl font-semibold text-gray-900">MAT-Inspect Dashboard</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="mb-1 text-2xl font-semibold text-foreground">MAT-Inspect Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
           {account?.username} &middot; {roles.join(', ')}
         </p>
       </div>

@@ -1,5 +1,11 @@
 import { AuthGuard } from '@/components/auth-guard';
+import { TopBar } from '@/components/ui/top-bar';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  return <AuthGuard>{children}</AuthGuard>;
+  return (
+    <AuthGuard>
+      <TopBar />
+      {children}
+    </AuthGuard>
+  );
 }

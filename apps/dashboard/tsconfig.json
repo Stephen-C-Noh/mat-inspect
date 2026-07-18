@@ -23,6 +23,7 @@
       // this, the bare import resolves via node_modules to dist/index.d.ts,
       // which is absent in the image, so next build fails to find the module.
       "@mat-inspect/shared-auth": ["../../packages/shared-auth/src"],
+      "@mat-inspect/shared-schemas": ["../../packages/shared-schemas/src"],
       "@mat-inspect/shared-types": ["../../packages/shared-types/src"]
     }
   },
