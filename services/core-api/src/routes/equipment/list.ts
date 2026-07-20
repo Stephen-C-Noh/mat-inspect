@@ -11,7 +11,7 @@ export const listEquipmentRoute: FastifyPluginAsync = async (app) => {
   app.get(
     '/equipment',
     {
-      preHandler: [requireRole('operator')],
+      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin')],
       schema: { response: { 200: z.array(equipmentSchema) } },
     },
     async (req, reply) => {

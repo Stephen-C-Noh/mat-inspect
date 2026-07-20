@@ -1,42 +1,25 @@
 'use client';
 
 import { useMemo, useState, type ReactElement } from 'react';
-import type { Defect } from '@mat-inspect/shared-schemas';
+import type { Defect, Equipment } from '@mat-inspect/shared-schemas';
 import type { DefectStatus } from '@mat-inspect/shared-types';
 import { useDefects } from '@/hooks/use-defects';
+import { useEquipment } from '@/hooks/use-equipment';
 import { useAcknowledgeDefect } from '@/hooks/use-acknowledge-defect';
 import { useStartRepairDefect } from '@/hooks/use-start-repair-defect';
 import { useResolveDefect } from '@/hooks/use-resolve-defect';
 import { useReturnToService } from '@/hooks/use-return-to-service';
-import { MOCK_EQUIPMENT } from '@/lib/mock-equipment';
+import {
+  isQueueOpen,
+  isPendingApproval,
+  formatDate,
+  shortCode,
+  categoryFor,
+} from '@/lib/defect-queue';
 import { DefectStatusTag } from './defect-status-tag';
 import { DefectSeverityTag } from './defect-severity-tag';
 
-// GET /api/v1/equipment is operator-only today (services/core-api/src/routes/equipment/list.ts),
-// so the dashboard can't fetch real equipment names/locations yet — out of scope for DEV-35.
-// MOCK_EQUIPMENT stands in for that join until a separate ticket opens that endpoint up.
-const equipmentFor = (equipmentId: string) => MOCK_EQUIPMENT.find((e) => e.id === equipmentId);
-
-const formatDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString('en-CA', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-// Cosmetic display id only (e.g. "DEF-0001"); the real id used for API calls is defect.id.
-const displayId = (id: string): string => {
-  const match = /(\d+)$/.exec(id);
-  return match ? `DEF-${match[1].padStart(4, '0')}` : id.slice(0, 8).toUpperCase();
-};
-
-const categoryFor = (itemKey: string): string =>
-  itemKey
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+const displayId = (id: string): string => shortCode('DEF', id);
 
 const FILTERS: { label: string; status: DefectStatus | 'ALL' }[] = [
   { label: 'All', status: 'ALL' },
@@ -45,9 +28,17 @@ const FILTERS: { label: string; status: DefectStatus | 'ALL' }[] = [
   { label: 'In Repair', status: 'IN_REPAIR' },
 ];
 
-type DetailPanelProps = { defect: Defect; canReturnToService: boolean };
+type DetailPanelProps = {
+  defect: Defect;
+  equipment: Equipment | undefined;
+  canReturnToService: boolean;
+};
 
-const DefectDetailPanel = ({ defect, canReturnToService }: DetailPanelProps): ReactElement => {
+const DefectDetailPanel = ({
+  defect,
+  equipment,
+  canReturnToService,
+}: DetailPanelProps): ReactElement => {
   const [resolving, setResolving] = useState(false);
   const [notes, setNotes] = useState('');
 
@@ -55,8 +46,6 @@ const DefectDetailPanel = ({ defect, canReturnToService }: DetailPanelProps): Re
   const startRepair = useStartRepairDefect();
   const resolve = useResolveDefect();
   const returnToService = useReturnToService();
-
-  const equipment = equipmentFor(defect.equipmentId);
 
   return (
     <div className="rounded-sm border border-border bg-card p-6 shadow-card">
@@ -195,15 +184,20 @@ const DefectDetailPanel = ({ defect, canReturnToService }: DetailPanelProps): Re
   );
 };
 
-export const DefectsTable = (): ReactElement => {
-  const { data: defects, isLoading } = useDefects();
-  const [statusFilter, setStatusFilter] = useState<DefectStatus | 'ALL'>('ALL');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+type DefectsTableProps = { initialDefectId?: string | null };
 
-  const visibleDefects = useMemo(
-    () => (defects ?? []).filter((d) => d.status !== 'REJECTED'),
-    [defects],
-  );
+export const DefectsTable = ({ initialDefectId = null }: DefectsTableProps): ReactElement => {
+  const { data: defects, isLoading } = useDefects();
+  const { data: equipmentList } = useEquipment();
+  const [statusFilter, setStatusFilter] = useState<DefectStatus | 'ALL'>('ALL');
+  const [selectedId, setSelectedId] = useState<string | null>(initialDefectId);
+
+  const equipmentFor = (equipmentId: string) =>
+    (equipmentList ?? []).find((e) => e.id === equipmentId);
+
+  // The queue only ever shows open failures: RESOLVED clears immediately unless the defect
+  // is BLOCKING and still awaiting a return-to-service approval (ADR 0006's watermark).
+  const visibleDefects = useMemo(() => (defects ?? []).filter(isQueueOpen), [defects]);
 
   const filteredDefects = useMemo(
     () =>
@@ -215,18 +209,16 @@ export const DefectsTable = (): ReactElement => {
 
   const equipmentCanReturnToService = useMemo(() => {
     const result = new Map<string, boolean>();
-    for (const equipment of MOCK_EQUIPMENT) {
+    for (const equipment of equipmentList ?? []) {
       const equipmentDefects = visibleDefects.filter((d) => d.equipmentId === equipment.id);
       const hasOpenBlocking = equipmentDefects.some(
         (d) => d.severity === 'BLOCKING' && d.status !== 'RESOLVED',
       );
-      const hasResolvedBlocking = equipmentDefects.some(
-        (d) => d.severity === 'BLOCKING' && d.status === 'RESOLVED' && !d.returnToServiceApprovedBy,
-      );
+      const hasResolvedBlocking = equipmentDefects.some(isPendingApproval);
       result.set(equipment.id, hasResolvedBlocking && !hasOpenBlocking);
     }
     return result;
-  }, [visibleDefects]);
+  }, [visibleDefects, equipmentList]);
 
   const selectedDefect =
     filteredDefects.find((d) => d.id === selectedId) ?? filteredDefects[0] ?? null;
@@ -304,6 +296,7 @@ export const DefectsTable = (): ReactElement => {
         {selectedDefect ? (
           <DefectDetailPanel
             defect={selectedDefect}
+            equipment={equipmentFor(selectedDefect.equipmentId)}
             canReturnToService={
               equipmentCanReturnToService.get(selectedDefect.equipmentId) ?? false
             }
