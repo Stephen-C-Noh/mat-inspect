@@ -12,6 +12,7 @@ import { useReturnToService } from '@/hooks/use-return-to-service';
 import {
   isQueueOpen,
   isPendingApproval,
+  findEquipment,
   formatDate,
   shortCode,
   categoryFor,
@@ -187,13 +188,19 @@ const DefectDetailPanel = ({
 type DefectsTableProps = { initialDefectId?: string | null };
 
 export const DefectsTable = ({ initialDefectId = null }: DefectsTableProps): ReactElement => {
-  const { data: defects, isLoading } = useDefects();
-  const { data: equipmentList } = useEquipment();
+  const {
+    data: defects,
+    isLoading: defectsLoading,
+    isError: defectsError,
+    refetch: refetchDefects,
+  } = useDefects();
+  const {
+    data: equipmentList,
+    isLoading: equipmentLoading,
+    isError: equipmentError,
+  } = useEquipment();
   const [statusFilter, setStatusFilter] = useState<DefectStatus | 'ALL'>('ALL');
   const [selectedId, setSelectedId] = useState<string | null>(initialDefectId);
-
-  const equipmentFor = (equipmentId: string) =>
-    (equipmentList ?? []).find((e) => e.id === equipmentId);
 
   // The queue only ever shows open failures: RESOLVED clears immediately unless the defect
   // is BLOCKING and still awaiting a return-to-service approval (ADR 0006's watermark).
@@ -220,21 +227,58 @@ export const DefectsTable = ({ initialDefectId = null }: DefectsTableProps): Rea
     return result;
   }, [visibleDefects, equipmentList]);
 
-  const selectedDefect =
-    filteredDefects.find((d) => d.id === selectedId) ?? filteredDefects[0] ?? null;
+  // A defect deep-linked from the Failure Queue (?id=), or one selected earlier, can leave the
+  // open queue before this renders (resolved and returned to service, or rejected). Treat that
+  // distinctly from "nothing selected yet": silently swapping in an unrelated defect could lead
+  // a supervisor to act on the wrong equipment.
+  const requestedDefectGone =
+    selectedId !== null && !visibleDefects.some((d) => d.id === selectedId);
 
-  if (isLoading) {
+  const selectedDefect = requestedDefectGone
+    ? null
+    : (filteredDefects.find((d) => d.id === selectedId) ?? filteredDefects[0] ?? null);
+
+  // Equipment gates the return-to-service action, so wait for both queries before rendering the
+  // list. Equipment is a small, fast query (about 10 rows) and this is the /defects page, not the
+  // always-visible dashboard, so the extra wait is acceptable here.
+  if (defectsLoading || equipmentLoading) {
     return <p className="p-8 text-center text-sm text-muted-foreground">Loading defects...</p>;
+  }
+
+  // A failed defect fetch is not an empty list: say so rather than showing "No defects".
+  if (defectsError) {
+    return (
+      <div className="rounded-sm border border-destructive/40 bg-destructive/10 p-8 text-center shadow-card">
+        <p className="text-sm font-bold text-destructive">Could not load defects</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The failure list is unavailable right now. This is not an empty queue.
+        </p>
+        <button
+          type="button"
+          onClick={() => refetchDefects()}
+          className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-foreground hover:opacity-90"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_1.4fr]">
+      {equipmentError && (
+        <div className="rounded-sm border border-warning/40 bg-warning/10 p-3 text-center text-xs text-warning lg:col-span-2">
+          Equipment details are unavailable: names may show as IDs, and return-to-service actions
+          are temporarily disabled.
+        </div>
+      )}
+
       {/* Left: list */}
       <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card">
         <div className="flex items-center justify-between border-b border-border p-4">
           <h2 className="font-bold text-foreground">Defects</h2>
           <span className="rounded-lg bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground">
-            {visibleDefects.filter((d) => d.status !== 'RESOLVED').length} open
+            {visibleDefects.length} open
           </span>
         </div>
 
@@ -262,7 +306,7 @@ export const DefectsTable = ({ initialDefectId = null }: DefectsTableProps): Rea
         ) : (
           <div className="divide-y divide-border">
             {filteredDefects.map((defect) => {
-              const equipment = equipmentFor(defect.equipmentId);
+              const equipment = findEquipment(equipmentList, defect.equipmentId);
               const isSelected = selectedDefect?.id === defect.id;
 
               return (
@@ -296,11 +340,27 @@ export const DefectsTable = ({ initialDefectId = null }: DefectsTableProps): Rea
         {selectedDefect ? (
           <DefectDetailPanel
             defect={selectedDefect}
-            equipment={equipmentFor(selectedDefect.equipmentId)}
+            equipment={findEquipment(equipmentList, selectedDefect.equipmentId)}
             canReturnToService={
               equipmentCanReturnToService.get(selectedDefect.equipmentId) ?? false
             }
           />
+        ) : requestedDefectGone ? (
+          <div className="rounded-sm border border-border bg-card p-8 text-center shadow-card">
+            <p className="text-sm font-bold text-foreground">
+              This defect is no longer in the active queue
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              It may have been resolved and returned to service, or rejected.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-foreground hover:opacity-90"
+            >
+              Back to queue
+            </button>
+          </div>
         ) : (
           <div className="rounded-sm border border-border bg-card p-8 text-center shadow-card">
             <p className="text-sm text-muted-foreground">Select a defect to view details.</p>

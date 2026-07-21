@@ -7,6 +7,7 @@ import { useDefects } from '@/hooks/use-defects';
 import { useEquipment } from '@/hooks/use-equipment';
 import {
   categoryFor,
+  findEquipment,
   formatAge,
   isActive,
   isNewToday,
@@ -37,12 +38,9 @@ const syncedLabel = (dataUpdatedAt: number): string => {
 // alert being seen (ADR 0013). "View" deep-links into DefectsTable's own detail panel rather
 // than duplicating the acknowledge/resolve/return-to-service actions here.
 export const FailureQueue = (): ReactElement => {
-  const { data: defects, isLoading, dataUpdatedAt, refetch, isFetching } = useDefects();
-  const { data: equipmentList } = useEquipment();
+  const { data: defects, isLoading, isError, dataUpdatedAt, refetch, isFetching } = useDefects();
+  const { data: equipmentList, isError: equipmentError } = useEquipment();
   const [filter, setFilter] = useState<QueueFilter>('ALL');
-
-  const equipmentFor = (equipmentId: string) =>
-    (equipmentList ?? []).find((e) => e.id === equipmentId);
 
   const openDefects = useMemo(() => (defects ?? []).filter(isQueueOpen), [defects]);
 
@@ -69,6 +67,32 @@ export const FailureQueue = (): ReactElement => {
     return (
       <div className="rounded-sm border border-border bg-card p-8 text-center shadow-card">
         <p className="text-sm text-muted-foreground">Loading failure queue...</p>
+      </div>
+    );
+  }
+
+  // A failed fetch must not look like an empty queue: this is the reliable channel (ADR 0013),
+  // so "0 open" has to mean genuinely zero, never "the request errored". Surface it distinctly.
+  if (isError) {
+    return (
+      <div className="rounded-sm border border-destructive/40 bg-destructive/10 p-8 text-center shadow-card">
+        <div className="flex items-center justify-center gap-2">
+          <ShieldAlert className="size-5 text-destructive" aria-hidden />
+          <p className="text-sm font-bold text-destructive">Failure queue unavailable</p>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The queue could not be loaded. Open failures may exist but cannot be shown right now. This
+          is not an empty queue.
+        </p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="mt-4 inline-flex items-center gap-1 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          <RefreshCw className={`size-3.5 ${isFetching ? 'animate-spin' : ''}`} aria-hidden />
+          Retry
+        </button>
       </div>
     );
   }
@@ -145,7 +169,7 @@ export const FailureQueue = (): ReactElement => {
             </thead>
             <tbody className="divide-y divide-border">
               {filteredDefects.map((defect) => {
-                const equipment = equipmentFor(defect.equipmentId);
+                const equipment = findEquipment(equipmentList, defect.equipmentId);
                 return (
                   <tr key={defect.id} className="align-top hover:bg-muted/50">
                     <td className="p-3">
@@ -185,6 +209,12 @@ export const FailureQueue = (): ReactElement => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {equipmentError && (
+        <p className="border-t border-warning/40 bg-warning/10 p-2 text-center text-xs text-warning">
+          Equipment names are temporarily unavailable and may show as IDs.
+        </p>
       )}
 
       <p className="border-t border-border p-3 text-center text-xs text-muted-foreground">

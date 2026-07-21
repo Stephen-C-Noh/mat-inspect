@@ -1,6 +1,14 @@
-import type { Defect } from '@mat-inspect/shared-schemas';
+import type { Defect, Equipment } from '@mat-inspect/shared-schemas';
 
 const LAB_TIMEZONE = 'America/Edmonton';
+
+// A resolved BLOCKING defect stays open until return-to-service is approved (ADR 0006's
+// watermark): resolution alone does not restore readiness, so the queue must keep showing it.
+// This is the single source of truth for that condition; isQueueOpen delegates to it.
+export const isPendingApproval = (defect: Defect): boolean =>
+  defect.status === 'RESOLVED' &&
+  defect.severity === 'BLOCKING' &&
+  defect.returnToServiceApprovedBy === null;
 
 // Mirrors the server's return-to-service watermark (ADR 0006): a defect leaves the queue
 // once it can no longer affect equipment readiness. WARNING defects clear on RESOLVED alone,
@@ -8,13 +16,16 @@ const LAB_TIMEZONE = 'America/Edmonton';
 export const isQueueOpen = (defect: Defect): boolean => {
   if (defect.status === 'REJECTED') return false;
   if (defect.status !== 'RESOLVED') return true;
-  return defect.severity === 'BLOCKING' && defect.returnToServiceApprovedBy === null;
+  return isPendingApproval(defect);
 };
 
-export const isPendingApproval = (defect: Defect): boolean =>
-  defect.status === 'RESOLVED' &&
-  defect.severity === 'BLOCKING' &&
-  defect.returnToServiceApprovedBy === null;
+// Shared equipment lookup for the defect views: the Failure Queue and the Defects table both
+// join equipment metadata (name, asset tag, location) onto a defect by id. Undefined until the
+// equipment query resolves, and for any id not in the fetched fleet.
+export const findEquipment = (
+  equipmentList: Equipment[] | undefined,
+  equipmentId: string,
+): Equipment | undefined => (equipmentList ?? []).find((e) => e.id === equipmentId);
 
 export const isActive = (defect: Defect): boolean =>
   defect.status === 'ACKNOWLEDGED' || defect.status === 'IN_REPAIR';
