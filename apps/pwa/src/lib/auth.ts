@@ -4,7 +4,6 @@ import {
   createLoginRequest,
   createMsalConfig,
   createTokenRequest,
-  apiScope,
 } from '@mat-inspect/shared-auth';
 import type { UserRole } from '@mat-inspect/shared-types';
 
@@ -32,13 +31,3 @@ export const acquireAccessToken = (
 // which are lowercase (see core-api requireRole and shared-types UserRole).
 export const ALLOWED_ROLES = ['operator', 'supervisor'] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
-
-export const acquireMediaAccessToken = async (
-  instance: IPublicClientApplication,
-  accounts: AccountInfo[],
-): Promise<string> => {
-  // This constructs the correct audience scope for the Media Service
-  return acquireApiToken(instance, accounts, {
-    scopes: [apiScope(clientId)],
-  });
-};

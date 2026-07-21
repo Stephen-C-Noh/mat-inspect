@@ -6,7 +6,7 @@ import { useState, useRef, useEffect, type ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { AuthGuard } from '@/components/auth-guard';
-import { acquireMediaAccessToken } from '@/lib/auth';
+import { acquireAccessToken } from '@/lib/auth';
 import {
   applyTextEdit,
   applyTranscript,
@@ -291,22 +291,20 @@ function FailuresContent(): ReactElement {
     Object.fromEntries(MOCK_FAILURES.map((f) => [f.id, emptyFailureEntry()])),
   );
 
-  // New state to manage the submission lifecycle per ADR 0020.
   const [isSubmitting, setIsSubmitting] = useState(false);
+  //New state for displaying the submit error on screen
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Requirement: block submission until every failure card has a corresponding photo.
   const allPhotosAttached = Object.values(entries).every((e) => e.photo !== null);
 
   const updateEntry = (id: string, update: (prev: FailureEntry) => FailureEntry) => {
     setEntries((prev) => ({ ...prev, [id]: update(prev[id]!) }));
   };
 
-  // Uploads evidence photos to the Media Service via the Gateway.
-  // This must complete successfully before we allow the inspection to transition to 'submitted'.
   const uploadPhoto = async (photoUrl: string) => {
     const response = await fetch(photoUrl);
     const blob = await response.blob();
-    const accessToken = await acquireMediaAccessToken(instance, accounts);
+    const accessToken = await acquireAccessToken(instance, accounts);
     const formData = new FormData();
     formData.append('file', blob, 'failure.jpg');
 
@@ -320,19 +318,39 @@ function FailuresContent(): ReactElement {
     return await res.json();
   };
 
-  // Handles the final submission workflow. Ensures all media is persisted
-  // before updating the inspection status to 'submitted'.
+  //Updated handleSubmit without alert() or console.error
+  // Handles the final submission workflow. Uploads photos, captures the returned
+  // media references per DEV-33 criteria, and updates the state before transitioning.
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      const uploadPromises = Object.values(entries).map((entry) => uploadPhoto(entry.photo!));
-      await Promise.all(uploadPromises);
+      // 1. Upload each photo and catch the server's reply (the photo reference ID)
+      const uploadPromises = Object.entries(entries).map(async ([id, entry]) => {
+        const result = await uploadPhoto(entry.photo!);
+        // We grab the reference ID sent back from the Media Service
+        return { id, mediaRef: result.reference || result.url || result.id };
+      });
+
+      const uploadedRefs = await Promise.all(uploadPromises);
+
+      // 2. We attach those returned photo IDs to our failure items
+      setEntries((prev) => {
+        const updated = { ...prev };
+        uploadedRefs.forEach(({ id, mediaRef }) => {
+          if (updated[id]) {
+            updated[id] = { ...updated[id]!, mediaRef };
+          }
+        });
+        return updated;
+      });
+
+      // 3. Go to the success screen!
       router.push(`/checklist/${params.equipmentId}/submitted/fail`);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Submission failed', err);
+    } catch {
+      setSubmitError('Failed to upload photos. Please try again.');
+    } finally {
       setIsSubmitting(false);
-      alert('Failed to upload photos. Please try again.');
     }
   };
 
@@ -371,8 +389,15 @@ function FailuresContent(): ReactElement {
         ))}
       </div>
 
-      <div className="relative mx-auto max-w-lg px-4 mt-6 space-y-2">
-        {/* Submit button now handles the async upload chain and state locking. */}
+      {/* Reverted back to fixed positioning to match DEV-100 */}
+      <div className="fixed inset-x-0 bottom-4 mx-auto max-w-lg px-4 space-y-2">
+        {/*Inline error display replacing the alert() */}
+        {submitError && (
+          <p role="status" className="mb-2 text-center text-xs font-semibold text-warning">
+            {submitError}
+          </p>
+        )}
+
         <button
           type="button"
           disabled={!allPhotosAttached || isSubmitting}
