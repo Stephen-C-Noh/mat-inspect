@@ -123,10 +123,5 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   // the clip to the AI Service, which is not reachable from the browser (ADR 0019).
   await app.register(transcribeRoute, { prefix: '/api/v1' });
 
-  if (process.env['NODE_ENV'] !== 'production') {
-    const { devTokenRoutes } = await import('./routes/dev-token.js');
-    await app.register(devTokenRoutes);
-  }
-
   return app;
 };
