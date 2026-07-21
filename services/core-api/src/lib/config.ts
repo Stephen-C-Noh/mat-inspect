@@ -188,8 +188,9 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   }
 
   // Entra auth config is required outside tests. Dev runs against the personal Entra tenant; a
-  // blank value would leave auth unconfigured, and in production the dev-token routes are not
-  // registered and the JWKS falls back to a localhost URL that does not exist.
+  // blank value would leave auth unconfigured, and the shared verifier cannot resolve a JWKS
+  // without ENTRA_TENANT_ID (it throws). The dev-token fallback that once covered a blank value
+  // was removed with the /dev/token endpoint (DEV-61, ADR 0021).
   if (requireAzure && !entraTenantId) {
     problems.push('ENTRA_TENANT_ID is required (only NODE_ENV=test may omit it)');
   }

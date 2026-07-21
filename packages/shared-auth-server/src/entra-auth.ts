@@ -37,11 +37,6 @@ export type EntraAuthDeps = {
   // raises. The package does not carry an error type of its own.
   httpError: (status: number, code: string, detail: string) => Error;
   logger: { warn: (obj: object, msg: string) => void };
-  // Where to fetch signing keys when ENTRA_TENANT_ID is blank, which is the dev-token
-  // fallback (ADR 0015). The default points at core-api's dev JWKS over the internal network,
-  // because core-api is the only service that mints dev tokens. core-api itself overrides this
-  // to its own port; a new service needs no override.
-  devJwksUri?: () => string;
 };
 
 export type EntraAuth = {
@@ -53,22 +48,21 @@ export type EntraAuth = {
   resetJwksForTest: () => void;
 };
 
-const defaultDevJwksUri = (): string =>
-  process.env['DEV_JWKS_URL'] ?? 'http://core-api:3000/dev/jwks';
-
-export const createEntraAuth = ({
-  httpError,
-  logger,
-  devJwksUri = defaultDevJwksUri,
-}: EntraAuthDeps): EntraAuth => {
+export const createEntraAuth = ({ httpError, logger }: EntraAuthDeps): EntraAuth => {
   let jwks: JWTVerifyGetKey | null = null;
 
   const resolveJwksUri = (): string => {
     const tenantId = process.env['ENTRA_TENANT_ID'];
-    if (tenantId) {
-      return `https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`;
+    if (!tenantId) {
+      // Each service validates ENTRA_TENANT_ID at boot (ADR 0015), so it is only ever blank
+      // under NODE_ENV=test, where setJwksForTest injects a local key set and this resolver is
+      // never reached. Reaching here with a blank tenant is a genuine misconfiguration; fail
+      // loudly rather than fetch keys from a host that does not exist. The dev-token fallback
+      // that once resolved to core-api's /dev/jwks was removed with the dev token (DEV-61,
+      // ADR 0021).
+      throw new Error('ENTRA_TENANT_ID is required to resolve the Entra JWKS URI');
     }
-    return devJwksUri();
+    return `https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`;
   };
 
   const getJwks = (): JWTVerifyGetKey => {
@@ -87,9 +81,9 @@ export const createEntraAuth = ({
     let payload;
     try {
       // ENTRA_* are read live (not from a cached config) so tests can toggle them per case.
-      // Each service validates them at boot: in production both are required and a placeholder
-      // is rejected. When genuinely blank, the dev-token fallback applies and the issuer and
-      // audience checks are skipped. See ADR 0015.
+      // Each service validates them at boot: in dev and production both are required and a
+      // placeholder is rejected (ADR 0015). They are blank only under NODE_ENV=test, where the
+      // issuer and audience checks are skipped and setJwksForTest supplies the key set.
       ({ payload } = await jwtVerify(token, getJwks(), {
         ...(process.env['ENTRA_TENANT_ID'] && {
           issuer: `https://login.microsoftonline.com/${process.env['ENTRA_TENANT_ID']}/v2.0`,
