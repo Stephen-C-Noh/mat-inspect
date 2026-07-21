@@ -34,7 +34,9 @@ describe('Caddyfile', () => {
     // upstreams out itself, the two origins could drift apart on where a path goes.
     const siteImports = caddyfile.match(/^\timport api$/gm) ?? [];
     expect(siteImports.length).toBeGreaterThanOrEqual(3);
-    expect(caddyfile.match(/reverse_proxy\s+core-api:3000/g)).toHaveLength(2); // api snippet + /dev/*
+    // core-api is reverse-proxied from one place: the api snippet. The /dev/* route that added a
+    // second occurrence was removed with the dev token (DEV-61, ADR 0021).
+    expect(caddyfile.match(/reverse_proxy\s+core-api:3000/g)).toHaveLength(1);
   });
 
   it('serves the apps from the gateway rather than a published container port', () => {
@@ -51,11 +53,10 @@ describe('Caddyfile', () => {
     expect(caddyfile).not.toMatch(/^\s*respond \/health/m);
   });
 
-  it('exposes the dev-token issuer on the dev listener only', () => {
-    // /dev/* is core-api's dev-only token and JWKS scaffolding (DEV-7). It must not be reachable
-    // from a site a browser can open.
-    const devListener = caddyfile.slice(caddyfile.indexOf(':8080 {'));
-    expect(devListener).toMatch(/handle \/dev\/\*/);
-    expect(caddyfile.slice(0, caddyfile.indexOf(':8080 {'))).not.toContain('/dev/*');
+  it('serves no dev-token scaffolding on any listener', () => {
+    // /dev/* was core-api's dev-only token and JWKS issuer (DEV-7). It was removed once real Entra
+    // auth was proven end to end (DEV-61, ADR 0021). No listener, including the dev listener, may
+    // route it; a reintroduced /dev/* handle would be an auth-bypass surface.
+    expect(caddyfile).not.toContain('/dev/*');
   });
 });

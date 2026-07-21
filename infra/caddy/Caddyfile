@@ -63,12 +63,9 @@ dashboard.mat-inspect.staging {
 # Plain HTTP, and matched on port rather than hostname, because the caller is the Next dev server on
 # the same host, not a browser. Compose publishes it on 127.0.0.1 only, so it is not reachable from
 # the LAN. It carries no authentication and needs none: the services behind it authenticate.
+#
+# The dev-token issuer and its JWKS (/dev/*) were served here while the PWA acquired local tokens.
+# They were removed once real Entra auth was proven end to end (DEV-61, ADR 0021).
 :8080 {
 	import api
-
-	# The dev-token issuer and its JWKS (core-api, non-production only). Reachable on this listener
-	# alone, never on a site a browser can open.
-	handle /dev/* {
-		reverse_proxy core-api:3000
-	}
 }
