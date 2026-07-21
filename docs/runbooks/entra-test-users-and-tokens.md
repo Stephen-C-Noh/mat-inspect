@@ -43,25 +43,24 @@ or Enterprise applications > Users and groups). No passwords or secrets go in th
 
 ## Getting a token per role
 
-### Local and CI: dev token endpoint
+### Automated tests: inject a local key set
 
-For local development and integration tests, core-api exposes `/dev/token` (registered only when
-`NODE_ENV !== 'production'`). It issues a signed JWT carrying the requested role, verifiable
-against the matching `/dev/jwks` endpoint. No real tenant needed.
-
-```
-GET /dev/token?role=operator&sub=<any-uuid>
-GET /dev/token?role=admin&sub=<any-uuid>
-```
+Integration tests do not call a token endpoint. Each suite generates an ephemeral RS256 keypair,
+injects the public key through `setJwksForTest` (from `@mat-inspect/shared-auth-server`), and signs
+its own JWT per role with `jose`'s `SignJWT`. Verification never reaches the network, and no real
+tenant is needed. This is the test-only JWKS stub; there is no `/dev/token` HTTP endpoint.
 
 The role-matrix integration test
 (`services/core-api/src/routes/role-authorization.integration.test.ts`) mints one such token per
-App Role and asserts the allow/deny outcome on representative endpoints.
+App Role this way and asserts the allow/deny outcome on representative endpoints.
 
-### Manual end-to-end: real Entra access token
+### Local manual and end-to-end: real Entra access token
 
-To prove the real login path, acquire an **access token** (not an ID token, ADR 0012) scoped to
-`api://{clientId}/access_as_user`:
+The dev-only `/dev/token` and `/dev/jwks` endpoints were removed once real Entra auth was proven
+end to end (DEV-61, ADR 0021). Local development uses the real "Sign in with Microsoft" (MSAL)
+flow: ADR 0015 requires real Entra config in dev, so a locally-minted token would not verify
+against the real Entra JWKS anyway. To call a gated endpoint by hand, acquire a real **access
+token** (not an ID token, ADR 0012) scoped to `api://{clientId}/access_as_user`:
 
 1. Sign in as the test user through the dashboard or PWA MSAL login.
 2. Capture the access token the SPA sends to core-api (browser dev tools, Network tab,

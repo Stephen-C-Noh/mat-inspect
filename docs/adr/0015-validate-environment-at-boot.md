@@ -3,6 +3,12 @@
 Date: 2026-06-16
 Status: Accepted
 
+Update (DEV-61, ADR 0021): the dev-token fallback referenced below (the behavior when
+`ENTRA_TENANT_ID` is blank) was removed with the `/dev/token` endpoint. The verifier now resolves
+the real Entra JWKS from `ENTRA_TENANT_ID` and throws if it is blank. The boot validation rules in
+this ADR, including the required `ENTRA_TENANT_ID` outside `NODE_ENV=test`, are unchanged and are
+what make that throw unreachable in a correctly configured runtime.
+
 ## Context
 
 Services read configuration from environment variables scattered across modules: the database

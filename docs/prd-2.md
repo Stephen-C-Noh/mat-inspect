@@ -221,9 +221,11 @@ the inspection answers (ADR 0007, ADR 0008). There is no per-record HMAC.
   `packages/shared-types/roles.ts` and the policy matrix in
   `core-api/src/auth/policy.ts`. Roles are not hierarchical; a user may hold
   several.
-- Local dev: when `ENTRA_TENANT_ID` and `ENTRA_CLIENT_ID` are blank, auth uses a
-  dev-token fallback. Non-blank placeholder values break it, so they stay blank in
-  `.env`.
+- Local dev: auth uses the real Entra tenant. `ENTRA_TENANT_ID` and
+  `ENTRA_CLIENT_ID` are required at boot (ADR 0015), and the PWA acquires a real
+  access token through MSAL. The dev-only `/dev/token` fallback was removed once
+  real auth was proven (DEV-61, ADR 0021); automated tests inject a local key set
+  with `setJwksForTest` instead.
 
 ### Inspection submit (the core write)
 

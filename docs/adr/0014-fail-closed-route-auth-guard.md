@@ -3,6 +3,10 @@
 Date: 2026-06-12
 Status: Accepted
 
+Update (DEV-61, ADR 0021): the `/dev/jwks` and `/dev/token` routes named in the public allowlist
+below were removed once real Entra auth was proven. `PUBLIC_ROUTES` now holds `/health` only. The
+guard and the allowlist mechanism are unchanged.
+
 ## Context
 
 CLAUDE.md (Auth) states the rule: "Endpoints without a declared role fail closed (return
