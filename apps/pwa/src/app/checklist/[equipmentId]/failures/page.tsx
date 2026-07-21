@@ -98,7 +98,7 @@ function FailureCard({
     setVoiceError(null);
 
     try {
-      const accessToken = await acquireMediaAccessToken(instance, accounts);
+      const accessToken = await acquireAccessToken(instance, accounts);
 
       const formData = new FormData();
       // The field name is fixed by the core-api contract. Content-Type is left to the browser: it
