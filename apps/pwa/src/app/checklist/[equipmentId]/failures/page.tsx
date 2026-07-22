@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect, type ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-react';
+import { mediaUploadResponseSchema } from '@mat-inspect/shared-schemas';
 import { AuthGuard } from '@/components/auth-guard';
 import { acquireAccessToken } from '@/lib/auth';
 import {
@@ -315,7 +316,7 @@ function FailuresContent(): ReactElement {
     });
 
     if (!res.ok) throw new Error('Upload failed');
-    return await res.json();
+    return mediaUploadResponseSchema.parse(await res.json());
   };
 
   //Updated handleSubmit without alert() or console.error
@@ -328,8 +329,7 @@ function FailuresContent(): ReactElement {
       // 1. Upload each photo and catch the server's reply (the photo reference ID)
       const uploadPromises = Object.entries(entries).map(async ([id, entry]) => {
         const result = await uploadPhoto(entry.photo!);
-        // We grab the reference ID sent back from the Media Service
-        return { id, mediaRef: result.reference || result.url || result.id };
+        return { id, mediaRef: result.photoId };
       });
 
       const uploadedRefs = await Promise.all(uploadPromises);
