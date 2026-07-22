@@ -9,6 +9,7 @@ export type FailureEntry = {
   notes: string;
   photo: string | null;
   notesSource: NotesSource;
+  mediaRef?: string | null;
   // The exact machine output, when the note is still exactly that. Null once the note is a mix of
   // typed and transcribed text, which no later edit can undo.
   rawTranscript: string | null;
