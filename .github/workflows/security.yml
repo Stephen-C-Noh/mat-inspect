@@ -42,9 +42,13 @@ jobs:
 
       - run: npm ci
 
-      # Blocks on high and critical CVEs; moderate and below are logged only.
-      - name: npm audit
-        run: npm audit --audit-level=high
+      # Blocks on high and critical CVEs; moderate and below are logged only. Unlike a raw
+      # `npm audit --audit-level=high`, this gate tolerates advisories whose only fix is younger
+      # than the .npmrc min-release-age cooldown, each with an expiry (see scripts/audit-gate.mjs
+      # and scripts/audit-allowlist.json). Once a fix ages past the cooldown its entry expires and
+      # the gate fails again until the fix is applied.
+      - name: npm audit (cooldown-aware gate)
+        run: npm run audit:ci
 
   semgrep:
     name: Static analysis (Semgrep)
@@ -73,6 +77,9 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: '1'
           ignore-unfixed: true
+          # Tolerates advisories whose fix is younger than the .npmrc min-release-age cooldown,
+          # each with an expiry (see .trivyignore.yaml). Mirrors scripts/audit-allowlist.json.
+          trivyignores: .trivyignore.yaml
 
       - name: Trivy Dockerfile config scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
