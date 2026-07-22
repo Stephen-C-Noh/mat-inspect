@@ -4,6 +4,7 @@ import { canonicalJson, sha256Hex, toCanonicalTimestamp } from '@mat-inspect/sha
 import type { AuditAction } from '@mat-inspect/shared-schemas';
 import { db, auditEvents } from '../db/index.js';
 import { isUniqueViolation } from './db-errors.js';
+import { httpError } from './http-error.js';
 
 // Documented genesis marker for the first row's prev_hash: a string the same length as a
 // SHA-256 hex digest, chosen so the genesis row is structurally indistinguishable from any
@@ -13,6 +14,25 @@ export const GENESIS_HASH = '0'.repeat(64);
 // The Postgres advisory lock key is a fixed string hashed into a lock id; one lock per chain,
 // shared by every appendAuditEvent caller (ARCHITECTURE.md 8.4 rule 5).
 const CHAIN_LOCK_KEY = 'audit_chain_v1';
+
+// Set when a full-chain verification (nightly job) discovers a break while the service is
+// already running (ARCHITECTURE.md 8.4 rule 7: "freezes new writes until manual review").
+// Startup verification achieves the same freeze by refusing to boot at all (server.ts); this
+// covers the case where the break is found later, in a live process. In-memory by design: there
+// is no unfreeze endpoint, a restart clears it, and if the underlying corruption is still there
+// startup verification will refuse to boot again (mirrors loadConfigOrExit's fail-fast-and-restart
+// philosophy elsewhere in this service).
+let writesFrozen: { reason: string } | undefined;
+
+export const isWritesFrozen = (): { reason: string } | undefined => writesFrozen;
+
+export const freezeWrites = (reason: string): void => {
+  writesFrozen = { reason };
+};
+
+export const resetWritesFrozenForTest = (): void => {
+  writesFrozen = undefined;
+};
 
 type HashInputFields = {
   id: string;
@@ -76,6 +96,14 @@ const findBySourceEventId = async (
 export const appendAuditEvent = async (
   input: AppendAuditEventInput,
 ): Promise<{ deduped: boolean; event: AppendedAuditEvent }> => {
+  if (writesFrozen) {
+    throw httpError(
+      503,
+      'CHAIN_FROZEN',
+      `audit chain writes are frozen pending manual review: ${writesFrozen.reason}`,
+    );
+  }
+
   try {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${CHAIN_LOCK_KEY}))`);

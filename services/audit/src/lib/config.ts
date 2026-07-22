@@ -18,6 +18,13 @@ const rawSchema = z.object({
   AUDIT_API_DB_URL: z.string().trim().optional(),
   AUDIT_INGEST_TOKEN: z.string().trim().optional(),
   APPLICATIONINSIGHTS_CONNECTION_STRING: z.string().trim().optional(),
+  // HH:MM, 24h, lab-local time. Nightly full-chain verification job (ARCHITECTURE.md 8.4 rule 7,
+  // DEV-40); distinct from the db-backup service's default 02:00 so the two don't compete for I/O.
+  CHAIN_VERIFY_TIME: z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be HH:MM in 24h format')
+    .default('02:30'),
 });
 
 export type AppConfig = {
@@ -28,6 +35,7 @@ export type AppConfig = {
   auditIngestToken: string | undefined;
   applicationInsightsConnectionString: string | undefined;
   telemetryEnabled: boolean;
+  chainVerifyTime: string;
 };
 
 export class EnvValidationError extends Error {
@@ -108,6 +116,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     auditIngestToken,
     applicationInsightsConnectionString: appInsights,
     telemetryEnabled: appInsights !== undefined,
+    chainVerifyTime: env.CHAIN_VERIFY_TIME,
   };
 };
 

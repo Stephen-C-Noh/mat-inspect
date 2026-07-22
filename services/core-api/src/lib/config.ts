@@ -32,6 +32,10 @@ const rawSchema = z.object({
   AUDIT_INGEST_TOKEN: z.string().trim().optional(),
   AI_SERVICE_URL: z.string().trim().optional(),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  // Outbox lag monitoring (ARCHITECTURE.md 8.4 rule 7, DEV-40 AC3): the poller logs at warn
+  // instead of info once the oldest unprocessed row is older than this, so a stalled poller
+  // surfaces in Azure Monitor without a separate alerting pipeline.
+  OUTBOX_LAG_WARN_MS: z.coerce.number().int().positive().default(300_000),
   SMTP_HOST: z.string().trim().optional(),
   // Treat a blank SMTP_PORT the same as unset, matching how orUndefined handles the other SMTP
   // vars. Without the preprocess, z.coerce turns '' into 0, which fails .positive() with a raw
@@ -92,6 +96,7 @@ export type AppConfig = {
   // under NODE_ENV=test.
   aiServiceUrl: string | undefined;
   outboxPollIntervalMs: number;
+  outboxLagWarnMs: number;
   // undefined when SMTP is not configured. The notifier treats this as "skip and warn",
   // not a boot failure: a missing relay must not block the service from starting, and the
   // email channel is fire-and-forget off the request path (DEV-21).
@@ -314,6 +319,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     auditIngestToken,
     aiServiceUrl,
     outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
+    outboxLagWarnMs: env.OUTBOX_LAG_WARN_MS,
     smtp,
     supervisorAlertEmails,
   };
