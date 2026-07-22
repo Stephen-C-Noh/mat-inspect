@@ -86,6 +86,27 @@ export const activeChecklistQuerySchema = z.object({
 
 export type ActiveChecklistQuery = z.infer<typeof activeChecklistQuerySchema>;
 
+// Response for GET /api/v1/checklists/:id/diff/:otherId. Items are matched by key: a key
+// present in both templates with identical field values is unchanged and omitted from every
+// list below.
+export const checklistTemplateItemChangeSchema = z.object({
+  key: z.string(),
+  before: checklistItemSchema,
+  after: checklistItemSchema,
+});
+
+export type ChecklistTemplateItemChange = z.infer<typeof checklistTemplateItemChangeSchema>;
+
+export const checklistTemplateDiffSchema = z.object({
+  from: checklistTemplateSchema,
+  to: checklistTemplateSchema,
+  added: z.array(checklistItemSchema),
+  removed: z.array(checklistItemSchema),
+  changed: z.array(checklistTemplateItemChangeSchema),
+});
+
+export type ChecklistTemplateDiff = z.infer<typeof checklistTemplateDiffSchema>;
+
 // Write-side schemas for POST /equipment and PATCH /equipment/:id.
 // manufacturerSpecsUrl is enforced as a URL here (DEV-24); the read schema stays
 // lenient so a malformed value already in the DB does not break the equipment list.
