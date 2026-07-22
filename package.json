@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run --passWithNoTests",
     "build": "tsc -b",
+    "audit:ci": "node scripts/audit-gate.mjs",
     "prepare": "husky"
   },
   "lint-staged": {
