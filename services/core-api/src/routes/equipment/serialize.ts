@@ -1,6 +1,7 @@
-import type { Equipment } from '@mat-inspect/shared-schemas';
+import type { Equipment, EquipmentWithLastInspection } from '@mat-inspect/shared-schemas';
 import type { EquipmentStatus } from '@mat-inspect/shared-types';
 import type { equipment } from '../../db/index.js';
+import type { LastInspectionSummary } from '../../lib/last-inspection.js';
 
 type EquipmentRow = typeof equipment.$inferSelect;
 
@@ -22,4 +23,16 @@ export const serializeEquipment = (row: EquipmentRow, status: EquipmentStatus): 
   manufacturerSpecsUrl: row.manufacturerSpecsUrl,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
+});
+
+// Fleet grid variant (DEV-37): the base contract plus the last-inspection summary. Only
+// GET /api/v1/equipment's list response uses this shape; create/update/get-by-id keep the
+// plain Equipment contract untouched.
+export const serializeEquipmentWithLastInspection = (
+  row: EquipmentRow,
+  status: EquipmentStatus,
+  lastInspection: LastInspectionSummary,
+): EquipmentWithLastInspection => ({
+  ...serializeEquipment(row, status),
+  ...lastInspection,
 });
