@@ -19,3 +19,12 @@ vulnerabilities:
   - id: GHSA-f88m-g3jw-g9cj
     expired_at: 2026-07-29
     statement: 'sharp 0.35.0 fix is published but next 15.5.19 cannot resolve its 0.35.x binaries cleanly under min-release-age. Transitive via next image optimization (dashboard).'
+  - id: CVE-2026-64641
+    expired_at: 2026-07-28
+    statement: 'next 15.5.21 fix (Denial of Service in App Router using Server Actions) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+  - id: CVE-2026-64645
+    expired_at: 2026-07-28
+    statement: 'next 15.5.21 fix (SSRF in rewrites via attacker-controlled destination hostname) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+  - id: CVE-2026-64649
+    expired_at: 2026-07-28
+    statement: 'next 15.5.21 fix (SSRF in Server Actions on custom servers) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
