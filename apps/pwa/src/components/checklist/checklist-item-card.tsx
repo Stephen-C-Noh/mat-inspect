@@ -147,16 +147,6 @@ export const ChecklistItemCard = ({
               />
             </div>
           )}
-
-          <button
-            type="button"
-            disabled
-            title="Voice notes are coming in a later sprint"
-            className="mt-3 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-sm bg-muted py-3 text-sm font-bold text-muted-foreground"
-          >
-            <span aria-hidden>🎤</span>
-            Add Voice Note
-          </button>
         </div>
       )}
     </div>
