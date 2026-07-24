@@ -105,9 +105,10 @@ const HistoryEntry = ({ inspection, isExpanded, onToggle }: HistoryEntryProps): 
               ))}
             </ul>
           )}
-          {/* Photo evidence is not shown yet: inspection_responses has no photo reference of its
-              own today (only BLOCKING defects carry photoIds), and there is no retrieval route.
-              Tracked as an open decision from DEV-37 planning, not silently dropped. */}
+          {/* Photo evidence is not shown yet. The capture-to-persistence path is broken: the PWA
+              captures and uploads a photo (DEV-32/DEV-33) but submit never stores the returned
+              photoId, so neither inspection_responses nor defects.photo_ids carries a reference,
+              and there is no retrieval route. Tracked in DEV-104, not silently dropped. */}
         </div>
       )}
     </li>

@@ -9,7 +9,8 @@ import { serializeInspectionDetail } from './serialize.js';
 const paramsSchema = z.object({ id: uuidSchema });
 
 // Backs the fleet drilldown's full-history view (DEV-37): one inspection's responses, in
-// checklist order, including photo references and voice-transcript text.
+// checklist order, including voice-transcript text. Photo references are not returned yet: the
+// capture-to-persistence path is not wired (DEV-104), so no response or defect carries a photoId.
 export const getInspectionByIdRoute: FastifyPluginAsync = async (app) => {
   app.get(
     '/inspections/:id',
