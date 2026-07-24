@@ -8,8 +8,12 @@
     "reason": "brace-expansion 2.1.2 fix is available, but npm 11's version-scoped override does not apply cleanly (leaves a mix of 2.1.1/2.1.2). Dev/test-only (eslint, testcontainers), no runtime surface. Resolve in the DEV-102 batch with a consistent override."
   },
   "GHSA-8r6m-32jq-jx6q": {
-    "expires": "2026-07-24",
-    "reason": "fast-xml-parser 5.10.1 fix published 2026-07-16; blocked by .npmrc min-release-age=7 until ~2026-07-23. Transitive via the @azure SDKs. Tracked in DEV-102."
+    "expires": "2026-07-28",
+    "reason": "fast-xml-parser 5.10.1 fix (published 2026-07-16) has aged past min-release-age and is installable, but the override is held for the DEV-102 batch regen on ~2026-07-28 so a lockfile rewrite does not land mid sprint-5 demo. Transitive via the @azure SDKs. Tracked in DEV-102."
+  },
+  "GHSA-c96f-x56v-gq3h": {
+    "expires": "2026-07-28",
+    "reason": "find-my-way 9.7.0 fix (DDoS with HTTP2) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Transitive via fastify (router). Disclosed after the first DEV-102 batch, so it was not yet allowlisted. Tracked in DEV-102."
   },
   "GHSA-4c8g-83qw-93j6": {
     "expires": "2026-07-27",
