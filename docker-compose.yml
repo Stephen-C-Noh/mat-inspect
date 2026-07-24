@@ -154,6 +154,16 @@ services:
       # Transcription proxy target (ADR 0019). Internal address only: the AI Service is not
       # published to the browser, and core-api is the only client that authenticates in front of it.
       AI_SERVICE_URL: 'http://ai:8000'
+      # Failure notifications (DEV-39 Teams, DEV-21 email; ADR 0013). All optional: core-api reads
+      # them in config.ts and falls back to the dashboard failure queue (the guaranteed channel)
+      # when unset. Without these mappings the values in .env never reach the container, so the
+      # Teams card and the supervisor email never fire.
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SUPERVISOR_ALERT_EMAILS: ${SUPERVISOR_ALERT_EMAILS}
     depends_on:
       postgres:
         condition: service_healthy
