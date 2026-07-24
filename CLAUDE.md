@@ -50,7 +50,8 @@ Pinned versions as of project start. Match these when generating code.
 
 - Python 3.12
 - FastAPI
-- faster-whisper (small.en model)
+- faster-whisper (small.en model) for transcription
+- llama-cpp-python (on-prem SLM runtime for the assistive Advisory Check; ADR 0017, ADR 0018)
 - Pydantic v2
 
 **Frontend:**
@@ -60,9 +61,8 @@ Pinned versions as of project start. Match these when generating code.
 - TypeScript strict
 - Tailwind CSS
 - shadcn/ui components
-- Zustand for state
-- TanStack Table for grids
-- Recharts for dashboards
+- TanStack Query for server state; React local state elsewhere (no client state library)
+- Hand-rolled shadcn/ui tables and dashboard components (TanStack Table and Recharts are not installed)
 - html5-qrcode for QR scanning
 
 **Infra:**
@@ -80,7 +80,7 @@ Pinned versions as of project start. Match these when generating code.
 
 - Express (we use Fastify)
 - Prisma (we use Drizzle)
-- Redux (we use Zustand)
+- Redux or Zustand (we use TanStack Query plus React local state; neither is installed)
 - Material UI (we use shadcn/ui)
 - TypeORM, Sequelize, or raw `pg` client (use Drizzle)
 - Keycloak (replaced by Entra ID; see ADR 0002)
@@ -111,7 +111,7 @@ Pinned versions as of project start. Match these when generating code.
 ### Validation
 
 - Every API endpoint validates input with Zod.
-- Schemas live in `schemas/*.ts` and are shared between server (validation) and client (form validation).
+- Shared schemas live in `packages/shared-schemas` and are used by both server (validation) and client (form validation). Route-specific schemas live next to the route file.
 - OpenAPI spec generation from Zod schemas is planned but not yet implemented. The intended tool is `zod-to-json-schema` (already a core-api dependency, currently unused). There is no generation script yet; do not look for one.
 
 ### Auth
@@ -157,19 +157,21 @@ mat-inspect/
 │   ├── core-api/             # Node.js + Fastify, main business logic
 │   ├── media/                # Node.js + Fastify, Azure Blob Storage uploads
 │   ├── audit/                # Node.js + Fastify, hash-chained audit + PDF reports
-│   └── ai/                   # Python + FastAPI, Whisper transcription
+│   └── ai/                   # Python + FastAPI, Whisper transcription + Advisory Check
 ├── packages/
+│   ├── design-tokens/        # Design tokens shared by pwa and dashboard (from Figma)
 │   ├── shared-auth/          # Browser: MSAL config, token acquisition, role helpers
 │   ├── shared-auth-server/   # Services: Entra token verification (verifyToken, requireRole)
+│   ├── shared-crypto/        # Canonical JSON hashing helpers (audit chain, digests)
 │   ├── shared-schemas/       # Zod schemas shared between client and server
 │   └── shared-types/         # TypeScript types shared across services
-├── db/
+├── db/                       # Workspace package @mat-inspect/db
 │   ├── schema/               # Drizzle schema files
-│   └── migrations/           # Generated migration files
-├── docker/
-│   ├── compose.dev.yml
-│   ├── compose.staging.yml
-│   └── compose.prod.yml
+│   ├── migrations/           # Generated migration files
+│   ├── migrate.ts            # Migration runner
+│   └── seed.ts               # Synthetic seed data
+├── infra/                    # Caddy config, backup and retention scripts, Azure workbooks
+├── docker-compose.yml        # Single compose file (dev and staging)
 ├── docs/
 │   ├── ARCHITECTURE.md       # The Capstone Plan
 │   ├── AI_USAGE_GUIDE.md     # Human-facing AI policy
@@ -320,7 +322,7 @@ A: Check `package.json` first. If a dependency is already in the project that do
 A: `packages/shared-types/` for types, `packages/shared-schemas/` for Zod schemas. For runtime helpers, create a new package under `packages/` and add it to the monorepo workspaces. Do not import across service directories directly.
 
 **Q: How do I add a new role or permission?**
-A: Update the role enum in `packages/shared-types/roles.ts`. Update the Entra ID app registration (add the role in the Azure portal under App roles). Update the permission matrix in `services/core-api/src/auth/policy.ts`. Add tests covering the new role. Document in an ADR if the role represents a new actor type (not just a permission tweak).
+A: Update the `UserRole` union in `packages/shared-types/src/index.ts`. Update the Entra ID app registration (add the role in the Azure portal under App roles; values are lowercase). Update the browser role helpers in `packages/shared-auth/src/roles.ts` and each app's allowed-roles list (PWA: operator, supervisor; dashboard: supervisor, manager, admin). Server-side enforcement stays in `requireRole` (each service's auth middleware, built from `packages/shared-auth-server`); there is no central permission matrix file. Add tests covering the new role. Document in an ADR if the role represents a new actor type (not just a permission tweak).
 
 **Q: How do I write a database migration?**
 A: Change the Drizzle schema file. Run `npm run db:generate` to create the migration. Read the generated SQL. If it does what you expected, commit both the schema change and the migration. Never edit the generated SQL directly except to add `IF NOT EXISTS` guards if needed; if you need to edit it, the schema is probably wrong.
