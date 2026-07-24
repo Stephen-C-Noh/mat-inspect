@@ -131,8 +131,11 @@ describe('role-to-permission authorization matrix', () => {
     }
   });
 
-  // GET /api/v1/equipment allows all four App Roles (DEV-36 widened it from operator-only so
-  // the dashboard's Failure Queue can join equipment names/locations onto defects).
+  // GET /api/v1/equipment allows the original four App Roles (DEV-36 widened it from
+  // operator-only so the dashboard's Failure Queue can join equipment names/locations onto
+  // defects). auditor (DEV-38, ADR 0021) postdates that widening and was never added to it -
+  // it is scoped to the Audit Service's export routes only - so this asserts 403 for it, same
+  // as the non-matching branch on the routes above.
   it.each(ALL_ROLES)('GET /equipment: %s', async (role) => {
     const res = await app.inject({
       method: 'GET',
@@ -140,7 +143,12 @@ describe('role-to-permission authorization matrix', () => {
       headers: { authorization: `Bearer ${tokens[role]}` },
     });
 
-    expect(res.statusCode).toBe(200);
+    if (role === 'auditor') {
+      expect(res.statusCode).toBe(403);
+      expect(res.json().title).toBe('FORBIDDEN');
+    } else {
+      expect(res.statusCode).toBe(200);
+    }
   });
 
   // GET /api/v1/checklists/active accepts the original four App Roles (requireRole('operator',
