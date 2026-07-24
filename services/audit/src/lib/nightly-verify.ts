@@ -44,11 +44,14 @@ export const startNightlyVerification = (): { stop: () => void } => {
   // (mirrors services/core-api/src/outbox/poller.ts's startOutboxPoller pattern).
   const scheduleNext = (): void => {
     if (stopped) return;
-    timer = setTimeout(() => {
-      void runNightlyVerification()
-        .catch((err: unknown) => logger.error({ err }, 'nightly chain verification run failed'))
-        .finally(scheduleNext);
-    }, msUntilNext(config().chainVerifyTime));
+    timer = setTimeout(
+      () => {
+        void runNightlyVerification()
+          .catch((err: unknown) => logger.error({ err }, 'nightly chain verification run failed'))
+          .finally(scheduleNext);
+      },
+      msUntilNext(config().chainVerifyTime, config().labTimeZone),
+    );
   };
 
   scheduleNext();

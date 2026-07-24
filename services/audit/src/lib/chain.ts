@@ -69,7 +69,10 @@ export type AppendAuditEventInput = {
   resourceType: string;
   resourceId: string;
   occurredAt: Date;
-  payloadSummary: Record<string, string | number | boolean | null>;
+  // No numbers: payloadSummary is a jsonb hash-input column, and jsonb numeric normalization
+  // would make the append-time hash (raw JS input) diverge from the verify-time hash (value
+  // re-read from jsonb), freezing the chain on a false positive. See auditEventIngestSchema.
+  payloadSummary: Record<string, string | boolean | null>;
 };
 
 export type AppendedAuditEvent = {

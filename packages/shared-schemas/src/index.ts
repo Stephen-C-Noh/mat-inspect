@@ -264,6 +264,14 @@ export type AuditAction = z.infer<typeof auditActionSchema>;
 // Body for POST /api/v1/events on the Audit Service (internal, core-api outbox poller only).
 // payloadSummary is restricted to flat scalar values: the audit log carries ids, enums, and
 // hashes, never free text or nested structures (no PII, ADR 0008 "a hash is not PII").
+//
+// Numbers are deliberately excluded from the value union. payloadSummary is part of the hash
+// chain input, but it is stored in a jsonb column and re-read from that column when verifyChain
+// recomputes each row's this_hash. jsonb normalizes numeric values (scale, float representation),
+// so a number could hash differently on append (raw JS input) than on verify (jsonb round-trip),
+// which would flag a healthy row as broken and freeze all audit writes. Strings, booleans, and
+// null round-trip through jsonb byte-identically, so they are safe. A caller that needs a number
+// in the summary must send it as a string.
 export const auditEventIngestSchema = z.object({
   sourceEventId: uuidSchema,
   action: auditActionSchema,
@@ -271,7 +279,7 @@ export const auditEventIngestSchema = z.object({
   resourceType: z.string().min(1),
   resourceId: uuidSchema,
   occurredAt: z.string().datetime(),
-  payloadSummary: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  payloadSummary: z.record(z.string(), z.union([z.string(), z.boolean(), z.null()])),
 });
 
 export type AuditEventIngest = z.infer<typeof auditEventIngestSchema>;

@@ -147,5 +147,13 @@ describe('audit_events role privileges', () => {
         suPool.query(`DELETE FROM audit_events WHERE seq = (SELECT max(seq) FROM audit_events)`),
       ).rejects.toThrow(/append-only/i);
     });
+
+    // TRUNCATE is not a DELETE: row-level triggers never fire on it, so without the dedicated
+    // statement-level trigger it would empty the whole chain unnoticed. Superuser here for the
+    // same reason as above: prove the trigger fires independent of the role GRANT.
+    it('rejects TRUNCATE even for a superuser connection', async () => {
+      await insertOne();
+      await expect(suPool.query(`TRUNCATE audit_events`)).rejects.toThrow(/append-only/i);
+    });
   });
 });

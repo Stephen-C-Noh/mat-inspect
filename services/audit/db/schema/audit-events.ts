@@ -34,9 +34,10 @@ export const auditEvents = pgTable('audit_events', {
   action: auditActionEnum('action').notNull(),
   resourceType: text('resource_type').notNull(),
   resourceId: uuid('resource_id').notNull(),
-  // Flat scalar values only (string | number | boolean | null), enforced by
-  // auditEventIngestSchema: a hash is not PII (ADR 0008), so this carries ids, enums, and
-  // digests, never free text.
+  // Flat scalar values only (string | boolean | null), enforced by auditEventIngestSchema: a
+  // hash is not PII (ADR 0008), so this carries ids, enums, and digests, never free text. Numbers
+  // are excluded: this column is part of the hash input, and jsonb numeric normalization would
+  // make verifyChain's recomputed hash diverge from the stored one (see auditEventIngestSchema).
   payloadSummary: jsonb('payload_summary').notNull(),
   // Ops/debug only; excluded from the hash input (rule 3 enumerates the input fields exactly,
   // and created_at is not one of them).
