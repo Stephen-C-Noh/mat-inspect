@@ -22,6 +22,9 @@ export const TopBar = function (): ReactElement | null {
           <Link href="/dashboard" className="hover:opacity-80">
             Dashboard
           </Link>
+          <Link href="/fleet" className="hover:opacity-80">
+            Fleet
+          </Link>
           <Link href="/defects" className="hover:opacity-80">
             Defects
           </Link>
