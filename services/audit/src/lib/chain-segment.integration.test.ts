@@ -155,14 +155,32 @@ describe('chain-segment (DEV-38 export-time verification)', () => {
 
   it('surfaces a broken chain rather than reporting false confidence', async () => {
     const { buildChainSegmentForInspections } = await import('./chain-segment.js');
-    const { db } = await import('../db/index.js');
-    const { sql } = await import('drizzle-orm');
+    const { db, auditEvents } = await import('../db/index.js');
+    const { desc } = await import('drizzle-orm');
     const inspection = makeInspectionDetail();
     await sealInspectionEvent(inspection);
 
-    await db.execute(
-      sql`UPDATE audit_events SET this_hash = ${'0'.repeat(64)} WHERE seq = (SELECT max(seq) FROM audit_events)`,
-    );
+    // The DEV-40 immutability trigger blocks UPDATE/DELETE/TRUNCATE on audit_events, so a chain
+    // can no longer be broken in place. The residual break is a direct INSERT that bypasses
+    // appendAuditEvent's hashing: prev_hash links to the tail correctly, but this_hash is not the
+    // recomputed value, so verifyChainSegment must catch it at this seq, not report false
+    // confidence. resource_id points at this inspection so the export path walks up to this event.
+    const [tail] = await db
+      .select({ thisHash: auditEvents.thisHash })
+      .from(auditEvents)
+      .orderBy(desc(auditEvents.seq))
+      .limit(1);
+    await db.insert(auditEvents).values({
+      sourceEventId: randomUUID(),
+      prevHash: tail!.thisHash,
+      thisHash: '0'.repeat(64),
+      occurredAt: new Date(),
+      actorId: OPERATOR_ID,
+      action: 'INSPECTION_SUBMITTED',
+      resourceType: 'INSPECTION',
+      resourceId: inspection.id,
+      payloadSummary: {},
+    });
 
     const result = await buildChainSegmentForInspections([inspection]);
 

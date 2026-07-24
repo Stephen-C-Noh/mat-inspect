@@ -91,16 +91,12 @@
         "audit_events_id_unique": {
           "name": "audit_events_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "audit_events_source_event_id_unique": {
           "name": "audit_events_source_event_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "source_event_id"
-          ]
+          "columns": ["source_event_id"]
         }
       },
       "policies": {},
@@ -286,19 +282,12 @@
     "public.report_format": {
       "name": "report_format",
       "schema": "public",
-      "values": [
-        "PDF",
-        "CSV"
-      ]
+      "values": ["PDF", "CSV"]
     },
     "public.report_job_status": {
       "name": "report_job_status",
       "schema": "public",
-      "values": [
-        "PROCESSING",
-        "READY",
-        "FAILED"
-      ]
+      "values": ["PROCESSING", "READY", "FAILED"]
     }
   },
   "schemas": {},
