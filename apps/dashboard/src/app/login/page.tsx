@@ -22,10 +22,13 @@ export default function LoginPage() {
 
   const handleSignIn = async () => {
     try {
-      const result = await instance.loginPopup(loginRequest);
-      instance.setActiveAccount(result.account);
+      // Redirect, not popup: iOS runs every browser on WebKit and blocks or drops the
+      // popup-to-opener handshake, so loginPopup silently fails on iPhone. Matches the PWA.
+      // MsalProvider processes the redirect response; consumers read accounts[0], so no
+      // setActiveAccount is needed here.
+      await instance.loginRedirect(loginRequest);
     } catch {
-      // User cancelled popup or popup was blocked; stay on login page.
+      // Redirect failed to start; stay on login page.
     }
   };
 

@@ -157,6 +157,16 @@ services:
       # Guards POST /internal/reports-data (DEV-38); the Audit Service's report generator is the
       # only intended caller, over the internal network, never through the gateway.
       CORE_API_INTERNAL_TOKEN: ${CORE_API_INTERNAL_TOKEN}
+      # Failure notifications (DEV-39 Teams, DEV-21 email; ADR 0013). All optional: core-api reads
+      # them in config.ts and falls back to the dashboard failure queue (the guaranteed channel)
+      # when unset. Without these mappings the values in .env never reach the container, so the
+      # Teams card and the supervisor email never fire.
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SUPERVISOR_ALERT_EMAILS: ${SUPERVISOR_ALERT_EMAILS}
     depends_on:
       postgres:
         condition: service_healthy
