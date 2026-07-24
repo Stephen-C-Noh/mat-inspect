@@ -8,8 +8,12 @@
     "reason": "brace-expansion 2.1.2 fix is available, but npm 11's version-scoped override does not apply cleanly (leaves a mix of 2.1.1/2.1.2). Dev/test-only (eslint, testcontainers), no runtime surface. Resolve in the DEV-102 batch with a consistent override."
   },
   "GHSA-8r6m-32jq-jx6q": {
-    "expires": "2026-07-24",
-    "reason": "fast-xml-parser 5.10.1 fix published 2026-07-16; blocked by .npmrc min-release-age=7 until ~2026-07-23. Transitive via the @azure SDKs. Tracked in DEV-102."
+    "expires": "2026-07-28",
+    "reason": "fast-xml-parser 5.10.1 fix (published 2026-07-16) has aged past min-release-age and is installable, but the override is held for the DEV-102 batch regen on ~2026-07-28 so a lockfile rewrite does not land mid sprint-5 demo. Transitive via the @azure SDKs. Tracked in DEV-102."
+  },
+  "GHSA-c96f-x56v-gq3h": {
+    "expires": "2026-07-28",
+    "reason": "find-my-way 9.7.0 fix (DDoS with HTTP2) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Transitive via fastify (router). Disclosed after the first DEV-102 batch, so it was not yet allowlisted. Tracked in DEV-102."
   },
   "GHSA-4c8g-83qw-93j6": {
     "expires": "2026-07-27",
@@ -26,5 +30,37 @@
   "GHSA-f88m-g3jw-g9cj": {
     "expires": "2026-07-29",
     "reason": "sharp 0.35.0 fix (libvips CVEs) is published but next 15.5.19 cannot resolve its 0.35.x binary sub-packages cleanly under min-release-age, so npm keeps 0.34.5. Transitive via next image optimization (dashboard). Apply with the batch in DEV-102 once the 0.35.x binaries age in."
+  },
+  "GHSA-m99w-x7hq-7vfj": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (Denial of Service in App Router using Server Actions) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-89xv-2m56-2m9x": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (SSRF in Server Actions on custom servers) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-68g3-v927-f742": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (cache confusion of response bodies for requests with bodies) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-4633-3j49-mh5q": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (cache confusion of response bodies for requests with invalid UTF-8 byte sequences) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-4c39-4ccg-62r3": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (unbounded Server Action payload in Edge runtime) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-p9j2-gv94-2wf4": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (SSRF in rewrites via attacker-controlled destination hostname) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-q8wf-6r8g-63ch": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (Denial of Service in the Image Optimization API using SVGs) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-955p-x3mx-jcvp": {
+    "expires": "2026-07-28",
+    "reason": "next 15.5.21 fix (unauthenticated disclosure of internal Server Function endpoints) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
   }
 }

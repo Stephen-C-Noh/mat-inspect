@@ -125,7 +125,8 @@ describe('role-to-permission authorization matrix', () => {
     }
   });
 
-  // GET /api/v1/equipment is operator-only (requireRole('operator')).
+  // GET /api/v1/equipment allows all four App Roles (DEV-36 widened it from operator-only so
+  // the dashboard's Failure Queue can join equipment names/locations onto defects).
   it.each(ALL_ROLES)('GET /equipment: %s', async (role) => {
     const res = await app.inject({
       method: 'GET',
@@ -133,12 +134,7 @@ describe('role-to-permission authorization matrix', () => {
       headers: { authorization: `Bearer ${tokens[role]}` },
     });
 
-    if (role === 'operator') {
-      expect(res.statusCode).toBe(200);
-    } else {
-      expect(res.statusCode).toBe(403);
-      expect(res.json().title).toBe('FORBIDDEN');
-    }
+    expect(res.statusCode).toBe(200);
   });
 
   // GET /api/v1/checklists/active accepts all four App Roles.

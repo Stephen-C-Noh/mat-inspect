@@ -192,6 +192,50 @@ services:
     networks:
       - mat-internal
 
+  # Daily raw voice-audio retention purge for dev staging (DEV-41, ARCHITECTURE.md 8.4). Reuses the
+  # already-built media image (no build block of its own) and overrides the entrypoint to the
+  # scheduler, which invokes the compiled purge job in that image. The job deletes only raw clips
+  # past the 90-day window from the voice Blob Storage container; it never touches the transcript,
+  # the inspection record, or any database row (it opens no database connection).
+  #
+  # Prod does not run this service: there the 90-day purge is a container lifecycle-management
+  # policy on the Azure Storage account (ADR 0004), the same way the 7-day pg backup window is
+  # managed by Azure in prod (see db-backup).
+  voice-retention:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/media:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      # Storage is the only dependency the job uses. Entra and Application Insights are required by
+      # the shared media config loader (ADR 0015) but unused by the job; passed through so the boot
+      # validation passes with the same values the media service already uses.
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+      # Schedule and window. Defaults match ARCHITECTURE.md 8.4 (90 days) and run in the small hours
+      # after the 02:00 db backup so the two jobs do not overlap. Overridable from .env.
+      RETENTION_TIME: ${VOICE_RETENTION_TIME:-03:30}
+      MEDIA_VOICE_RETENTION_DAYS: ${MEDIA_VOICE_RETENTION_DAYS:-90}
+      # Set true to preview a run (log what would be purged) without deleting. Use on first deploy.
+      RETENTION_DRY_RUN: ${VOICE_RETENTION_DRY_RUN:-false}
+    entrypoint: ['/bin/sh', '/opt/retention/voice-retention-scheduler.sh']
+    volumes:
+      - ./infra/retention/voice-retention-scheduler.sh:/opt/retention/voice-retention-scheduler.sh:ro
+    depends_on:
+      azurite:
+        condition: service_healthy
+    healthcheck:
+      # The scheduler touches the heartbeat every 30s. If it is older than 2 min the loop is wedged.
+      # This proves the scheduler is alive, not that a purge is fresh: a daily job is idle most of
+      # the day, so purge freshness is the wrong liveness signal (same rule as db-backup).
+      test: ['CMD-SHELL', 'find /tmp/voice-retention-heartbeat -mmin -2 2>/dev/null | grep -q .']
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - mat-internal
+
   audit:
     image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/audit:${TAG:-latest}
     build:
