@@ -112,7 +112,7 @@ Pinned versions as of project start. Match these when generating code.
 
 - Every API endpoint validates input with Zod.
 - Schemas live in `schemas/*.ts` and are shared between server (validation) and client (form validation).
-- OpenAPI spec is generated from Zod schemas via `zod-to-openapi`.
+- OpenAPI spec generation from Zod schemas is planned but not yet implemented. The intended tool is `zod-to-json-schema` (already a core-api dependency, currently unused). There is no generation script yet; do not look for one.
 
 ### Auth
 

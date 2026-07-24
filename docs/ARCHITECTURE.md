@@ -586,7 +586,7 @@ POST   /api/v1/reports/export                     Generate a PDF report (async)
 GET    /api/v1/reports/:job_id                    Poll report job status
 ```
 
-All endpoints have OpenAPI specs generated from Zod schemas (`zod-to-openapi`).
+All endpoints validate input with Zod schemas. Generating an OpenAPI spec from those schemas (via `zod-to-json-schema`) is planned but not yet implemented; the dependency is present in core-api but no generation step exists.
 
 ---
 
@@ -1017,7 +1017,7 @@ Bundled with the source code at handover.
 1. **README.md**: One-page overview, quick start.
 2. **SETUP.md**: Run locally, prerequisites, troubleshooting.
 3. **ARCHITECTURE.md**: This document, kept current.
-4. **API_REFERENCE.md**: Generated from OpenAPI spec.
+4. **API_REFERENCE.md**: Generated from the OpenAPI spec, once spec generation is implemented (planned; see section 11).
 5. **DEPLOYMENT.md**: Production deployment, TLS, backup, restore.
 6. **SECURITY.md**: Threat model, controls, incident response contacts.
 7. **OPERATIONS_RUNBOOK.md**: Common incidents and responses.
@@ -1118,7 +1118,7 @@ A feature is done when:
 1. Code merged to `main` via PR with at least one review.
 2. Unit and integration tests cover the new behavior; CI green.
 3. Trivy and Semgrep show no high or critical issues introduced.
-4. OpenAPI spec updated.
+4. OpenAPI spec updated. (Not an active gate yet: spec generation is planned but not implemented. This item applies once the pipeline exists.)
 5. User-facing docs updated if the feature is user-visible.
 6. Deployed to staging and verified by a non-author team member.
 7. Demoed to the sponsor at end-of-sprint review.
