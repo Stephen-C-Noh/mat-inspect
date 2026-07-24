@@ -547,7 +547,7 @@ This isolation is enforced by the fact that AI Service is a separate container w
 - Checklists are cached on first load via standard HTTP caching (1 hour TTL), not via service worker, to keep the implementation simple.
 - QR scanner: `html5-qrcode` via `getUserMedia`.
 - Audio capture: `MediaRecorder` API, webm/opus codec.
-- State: Zustand.
+- State: TanStack Query for server state; React local state elsewhere. No client state library is installed.
 - Styling: Tailwind CSS.
 - Components: shadcn/ui.
 
@@ -555,9 +555,8 @@ This isolation is enforced by the fact that AI Service is a separate container w
 
 - Framework: Next.js 15+ App Router, same monorepo, separate route group.
 - Server-side rendering for initial load; client-side for interactive grids.
-- Charts: Recharts.
-- Tables: TanStack Table.
-- Auth: same Entra ID app registration, different client ID or scope with elevated permissions.
+- Charts and tables: hand-rolled components on shadcn/ui primitives. Recharts and TanStack Table are not installed; adopt them only if a grid or chart outgrows the hand-rolled versions.
+- Auth: the same single Entra ID app registration serves both the PWA and the dashboard. Access is separated by App Roles (dashboard: supervisor, manager, admin), not by client ID or scope.
 
 ### 10.3 Accessibility
 
@@ -586,7 +585,7 @@ POST   /api/v1/reports/export                     Generate a PDF report (async)
 GET    /api/v1/reports/:job_id                    Poll report job status
 ```
 
-All endpoints have OpenAPI specs generated from Zod schemas (`zod-to-openapi`).
+All endpoints validate input with Zod schemas. Generating an OpenAPI spec from those schemas (via `zod-to-json-schema`) is planned but not yet implemented; the dependency is present in core-api but no generation step exists.
 
 ---
 
@@ -630,7 +629,7 @@ The capstone scope cannot deliver active-active high availability. The architect
 | Core API               | Equipment registry, checklists, inspection submissions, defect workflow |
 | Media Service          | Photo and voice clip uploads, Azure Blob Storage client, SAS tokens     |
 | Audit / Report Service | Hash-chained audit log, PDF generation, CSV export                      |
-| AI Service             | Whisper `small.en` voice-to-text transcription                          |
+| AI Service             | Whisper `small.en` transcription; Advisory Check SLM (ADR 0017, 0018)   |
 | Operator PWA           | Mobile-first Next.js app for Lab Techs                                  |
 | Manager Dashboard      | Next.js app for supervisors and managers                                |
 | PostgreSQL 16          | Core and audit schemas (dev/dev-staging only; prod uses Azure Database) |
@@ -640,6 +639,8 @@ The capstone scope cannot deliver active-active high availability. The architect
 **Memory budget — Production (Azure VM, 8 GB):**
 
 PostgreSQL and Blob Storage are managed Azure services; no containers for them in prod.
+
+Note: the AI Service estimates below predate the Advisory Check model (ADR 0017, ADR 0018). The advisory model adds resident memory when loaded; revise these tables with measured figures from the ADR 0017 benchmark setup.
 
 | Component                                  | Est. RAM    |
 | ------------------------------------------ | ----------- |
@@ -1017,7 +1018,7 @@ Bundled with the source code at handover.
 1. **README.md**: One-page overview, quick start.
 2. **SETUP.md**: Run locally, prerequisites, troubleshooting.
 3. **ARCHITECTURE.md**: This document, kept current.
-4. **API_REFERENCE.md**: Generated from OpenAPI spec.
+4. **API_REFERENCE.md**: Maintained by hand today. Generate it from the OpenAPI spec once spec generation is implemented (planned; see section 11).
 5. **DEPLOYMENT.md**: Production deployment, TLS, backup, restore.
 6. **SECURITY.md**: Threat model, controls, incident response contacts.
 7. **OPERATIONS_RUNBOOK.md**: Common incidents and responses.
@@ -1118,7 +1119,7 @@ A feature is done when:
 1. Code merged to `main` via PR with at least one review.
 2. Unit and integration tests cover the new behavior; CI green.
 3. Trivy and Semgrep show no high or critical issues introduced.
-4. OpenAPI spec updated.
+4. OpenAPI spec updated. (Not an active gate yet: spec generation is planned but not implemented. This item applies once the pipeline exists.)
 5. User-facing docs updated if the feature is user-visible.
 6. Deployed to staging and verified by a non-author team member.
 7. Demoed to the sponsor at end-of-sprint review.
