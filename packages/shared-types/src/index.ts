@@ -1,4 +1,6 @@
-export type UserRole = 'operator' | 'supervisor' | 'manager' | 'admin';
+// 'auditor' is read-only and time-boxed (ADR 0021): it is never inherited by manager/admin, and
+// no route should treat it as equivalent to manager.
+export type UserRole = 'operator' | 'supervisor' | 'manager' | 'admin' | 'auditor';
 
 export type EquipmentType = 'OVERHEAD_CRANE' | 'TRUCK' | 'ELECTRIC_PALLET_JACK' | 'FORKLIFT';
 

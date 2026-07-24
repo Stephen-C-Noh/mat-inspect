@@ -16,6 +16,7 @@ const fullDev = (overrides: Record<string, string | undefined> = {}): NodeJS.Pro
   AUDIT_SERVICE_URL: 'http://audit:3000',
   AUDIT_INGEST_TOKEN: 'a-real-shared-secret',
   AI_SERVICE_URL: 'http://ai:8000',
+  CORE_API_INTERNAL_TOKEN: 'a-real-internal-secret',
   ...overrides,
 });
 
@@ -115,6 +116,7 @@ describe('loadConfig', () => {
       AUDIT_SERVICE_URL: 'http://audit:3000',
       AUDIT_INGEST_TOKEN: 'a-real-shared-secret',
       AI_SERVICE_URL: 'http://ai:8000',
+      CORE_API_INTERNAL_TOKEN: 'a-real-internal-secret',
     });
     expect(cfg.nodeEnv).toBe('production');
     expect(cfg.telemetryEnabled).toBe(true);
@@ -157,6 +159,21 @@ describe('loadConfig', () => {
 
   it('rejects a non-http(s) AI_SERVICE_URL', () => {
     expectProblem(fullDev({ AI_SERVICE_URL: 'ai:8000' }), /AI_SERVICE_URL must be an http\(s\)/);
+  });
+
+  it('requires CORE_API_INTERNAL_TOKEN in development', () => {
+    // Guards POST /internal/reports-data (DEV-38), the Audit Service's only path to
+    // inspection/defect/operator data.
+    const env = fullDev();
+    delete env['CORE_API_INTERNAL_TOKEN'];
+    expectProblem(env, /CORE_API_INTERNAL_TOKEN is required/);
+  });
+
+  it('rejects a placeholder CORE_API_INTERNAL_TOKEN', () => {
+    expectProblem(
+      fullDev({ CORE_API_INTERNAL_TOKEN: 'REPLACE_ME' }),
+      /CORE_API_INTERNAL_TOKEN is an unfilled placeholder/,
+    );
   });
 
   it('defaults OUTBOX_POLL_INTERVAL_MS to 2000', () => {

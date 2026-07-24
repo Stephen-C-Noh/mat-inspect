@@ -6,25 +6,28 @@ manual end-to-end verification. It contains no secrets.
 
 ## App Roles
 
-core-api authorizes requests from the `roles` claim on the access token (ADR 0012). The Entra
-app registration defines four App Roles. Values are lowercase to match `UserRole` in
-`packages/shared-types`.
+core-api and the Audit Service authorize requests from the `roles` claim on the access token
+(ADR 0012). The Entra app registration defines five App Roles. Values are lowercase to match
+`UserRole` in `packages/shared-types`.
 
-| App Role   | `roles` claim value | Example gated endpoint              |
-| ---------- | ------------------- | ----------------------------------- |
-| Operator   | `operator`          | `GET /api/v1/equipment`             |
-| Supervisor | `supervisor`        | return-to-service approval (future) |
-| Manager    | `manager`           | dashboard read endpoints (future)   |
-| Admin      | `admin`             | `POST /api/v1/checklists`           |
+| App Role   | `roles` claim value | Example gated endpoint                    |
+| ---------- | ------------------- | ----------------------------------------- |
+| Operator   | `operator`          | `GET /api/v1/equipment`                   |
+| Supervisor | `supervisor`        | return-to-service approval (future)       |
+| Manager    | `manager`           | dashboard read endpoints (future)         |
+| Admin      | `admin`             | `POST /api/v1/checklists`                 |
+| Auditor    | `auditor`           | `POST /api/v1/reports/export` (Audit Svc) |
 
-A user may hold more than one App Role; the `roles` claim is an array.
+A user may hold more than one App Role; the `roles` claim is an array. Roles are not
+hierarchical: `auditor` is read-only and is never inherited by, or treated as equivalent to,
+`manager` or `admin`.
 
-### Auditor is a reporting persona, not an App Role
+### Auditor was briefly a reporting persona, not an App Role — this reversed
 
-Auditor is not an Entra App Role and does not appear in `UserRole` or in any `requireRole(...)`
-call. An auditor consumes the PDF audit reports the audit service produces from the append-only
-audit chain; they do not authenticate to a role-gated core-api endpoint. This was settled in
-DEV-30. Do not add an `auditor` App Role without an ADR reversing that decision.
+An earlier note here (DEV-25 era) said Auditor was not an Entra App Role, per a decision recorded
+against DEV-30, and that adding one needed an ADR reversing that. DEV-38 needed a read-only,
+scoped export role and added it: see **ADR 0021** for the reversal and its reasoning. This
+section is the update that ADR asked for; the App Roles table above is now current.
 
 ## Test users
 
@@ -39,6 +42,7 @@ or Enterprise applications > Users and groups). No passwords or secrets go in th
 | Supervisor | REPLACE_ME    | REPLACE_ME               | supervisor           |
 | Manager    | REPLACE_ME    | REPLACE_ME               | manager              |
 | Admin      | REPLACE_ME    | REPLACE_ME               | admin                |
+| Auditor    | REPLACE_ME    | REPLACE_ME               | auditor              |
 | Multi-role | REPLACE_ME    | REPLACE_ME               | operator, supervisor |
 
 ## Getting a token per role

@@ -11,11 +11,15 @@ import { serializeInspectionListItem } from './serialize.js';
 // by operatorId/from/to for the fleet-wide filter bar. limit keeps the page flat as history
 // accumulates (NFR: drilldown under 500ms); there is no cursor yet since the capstone's fleet
 // and inspection volume do not need one (same reasoning as the equipment list, DEV-24).
+//
+// Dashboard-only route (apps/dashboard use-inspections.ts is the sole caller). operator is
+// deliberately excluded, same as GET /inspections/:id: this list lets a caller enumerate every
+// operator's inspections by operatorId, and the detail it links to exposes voice-transcript PII.
 export const listInspectionsRoute: FastifyPluginAsync = async (app) => {
   app.get(
     '/inspections',
     {
-      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin')],
+      preHandler: [requireRole('supervisor', 'manager', 'admin')],
       schema: {
         querystring: listInspectionsQuerySchema,
         response: { 200: z.array(inspectionListItemSchema) },

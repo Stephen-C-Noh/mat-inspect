@@ -10,6 +10,7 @@ FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-auth-server/package.json packages/shared-auth-server/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
@@ -27,7 +28,8 @@ COPY packages packages
 COPY services/audit/tsconfig.json services/audit/
 COPY services/audit/src services/audit/src
 COPY services/audit/db services/audit/db
-# tsc -b walks the project references (shared-schemas, shared-crypto) in dependency order.
+# tsc -b walks the project references (shared-types, shared-auth-server, shared-schemas,
+# shared-crypto) in dependency order.
 RUN npx tsc -b services/audit/tsconfig.json
 
 # ---- prod-deps: install only production deps for the runtime image ----
@@ -35,6 +37,7 @@ FROM node:${NODE_VERSION}-alpine AS prod-deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-auth-server/package.json packages/shared-auth-server/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
@@ -51,6 +54,10 @@ WORKDIR /repo
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=prod-deps /repo/package.json ./
+COPY --from=build /repo/packages/shared-types/package.json packages/shared-types/
+COPY --from=build /repo/packages/shared-types/dist packages/shared-types/dist
+COPY --from=build /repo/packages/shared-auth-server/package.json packages/shared-auth-server/
+COPY --from=build /repo/packages/shared-auth-server/dist packages/shared-auth-server/dist
 COPY --from=build /repo/packages/shared-schemas/package.json packages/shared-schemas/
 COPY --from=build /repo/packages/shared-schemas/dist packages/shared-schemas/dist
 COPY --from=build /repo/packages/shared-crypto/package.json packages/shared-crypto/

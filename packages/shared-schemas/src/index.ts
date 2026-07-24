@@ -152,9 +152,19 @@ export const patchEquipmentSchema = z
 
 export type PatchEquipment = z.infer<typeof patchEquipmentSchema>;
 
+// A checklist response value is restricted to jsonb-round-trip-stable scalars: string, boolean,
+// or null. A number is rejected on purpose. inspection_responses.value is a jsonb column, and the
+// audit export re-reads it from that column to recompute each inspection's content digest
+// (services/audit chain-segment.ts, ADR 0008). jsonb normalizes numeric values, so a number hashed
+// from the raw submit body could diverge from the same field re-read from jsonb and flag a healthy
+// inspection as MISMATCH (tampering). Strings, booleans, and null round-trip byte-identically.
+// This is the same rule and the same reason as auditEventIngestSchema's payloadSummary. A numeric
+// reading (a gauge or meter value) must be sent as a string.
+export const inspectionResponseValueSchema = z.union([z.string(), z.boolean(), z.null()]);
+
 export const inspectionResponseSchema = z.object({
   itemKey: z.string(),
-  value: z.unknown(),
+  value: inspectionResponseValueSchema,
   passed: z.boolean(),
   notes: z.string().optional(),
   notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),
@@ -368,3 +378,164 @@ export const mediaUploadResponseSchema = z.object({
 });
 
 export type MediaUploadResponse = z.infer<typeof mediaUploadResponseSchema>;
+
+// ---------------------------------------------------------------------------------------------
+// Reports and exports (DEV-38). Human-facing routes live on the Audit Service
+// (POST/GET /api/v1/reports/*, published at the gateway per ADR 0020 because they carry
+// requireRole). The filters shape below is shared by that request body and, unwrapped, by the
+// body of core-api's internal-only /internal/reports-data endpoint that the Audit Service calls
+// to read equipment/inspection data it does not own (ADR 0001: no cross-service SQL).
+// ---------------------------------------------------------------------------------------------
+
+export const reportFormatSchema = z.enum(['PDF', 'CSV']);
+
+export type ReportFormat = z.infer<typeof reportFormatSchema>;
+
+export const reportFiltersSchema = z.object({
+  equipmentIds: z.array(uuidSchema).min(1),
+  dateFrom: z.string().datetime(),
+  dateTo: z.string().datetime(),
+  result: inspectionResultSchema.optional(),
+});
+
+export type ReportFilters = z.infer<typeof reportFiltersSchema>;
+
+// All three default true: the documented use case (ARCHITECTURE.md 7.4) is a full auditor
+// export, so an auditor who does not pass `options` at all still gets everything.
+export const reportExportOptionsSchema = z
+  .object({
+    includePhotos: z.boolean().default(true),
+    includeVoiceTranscripts: z.boolean().default(true),
+    includeAuditChainSegment: z.boolean().default(true),
+  })
+  .default({});
+
+export type ReportExportOptions = z.infer<typeof reportExportOptionsSchema>;
+
+// Body for POST /api/v1/reports/export (Audit Service).
+export const reportExportRequestSchema = z.object({
+  format: reportFormatSchema,
+  filters: reportFiltersSchema,
+  options: reportExportOptionsSchema,
+});
+
+export type ReportExportRequest = z.infer<typeof reportExportRequestSchema>;
+
+export const reportJobStatusSchema = z.enum(['PROCESSING', 'READY', 'FAILED']);
+
+export type ReportJobStatus = z.infer<typeof reportJobStatusSchema>;
+
+// Response for POST /api/v1/reports/export (202) and the PROCESSING branch of
+// GET /api/v1/reports/:jobId.
+export const reportJobAcceptedSchema = z.object({
+  jobId: uuidSchema,
+  status: z.literal('PROCESSING'),
+  estimatedSeconds: z.number().int().positive(),
+});
+
+export type ReportJobAccepted = z.infer<typeof reportJobAcceptedSchema>;
+
+// Discriminated on status so a client (and this schema) cannot see a downloadUrl on a job that
+// is not READY, or an errorDetail on one that did not fail.
+export const reportJobResponseSchema = z.discriminatedUnion('status', [
+  reportJobAcceptedSchema,
+  z.object({
+    jobId: uuidSchema,
+    status: z.literal('READY'),
+    downloadUrl: z.string().url(),
+    expiresAt: z.string().datetime(),
+    format: reportFormatSchema,
+    inspectionCount: z.number().int().nonnegative(),
+    fileBytes: z.number().int().nonnegative(),
+    sha256: z.string().length(64),
+    signature: z.string().min(1),
+    signingKeyFingerprint: z.string().length(64),
+  }),
+  z.object({
+    jobId: uuidSchema,
+    status: z.literal('FAILED'),
+    errorDetail: z.string().min(1),
+  }),
+]);
+
+export type ReportJobResponse = z.infer<typeof reportJobResponseSchema>;
+
+// Row shape for GET /api/v1/reports/me/exports. No downloadUrl: a SAS URL is generated fresh
+// only when a caller polls the single-job endpoint, never handed out in a list.
+export const reportJobSummarySchema = z.object({
+  jobId: uuidSchema,
+  format: reportFormatSchema,
+  status: reportJobStatusSchema,
+  filters: reportFiltersSchema,
+  inspectionCount: z.number().int().nonnegative().nullable(),
+  createdAt: z.string().datetime(),
+  readyAt: z.string().datetime().nullable(),
+});
+
+export type ReportJobSummary = z.infer<typeof reportJobSummarySchema>;
+
+// One inspection response as returned to the report generator, with the checklist item's
+// prompt text joined in (the raw inspection_responses row only has itemKey; the PDF needs the
+// question text a human asked, not just its key).
+export const reportInspectionResponseSchema = z.object({
+  itemKey: z.string(),
+  prompt: z.string(),
+  value: z.unknown(),
+  passed: z.boolean(),
+  notes: z.string().nullable(),
+  notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).nullable(),
+  // Reserved for DEV-104 (per-response photo evidence, inspection_responses.photo_ids). core-api
+  // returns [] until that column exists; the shape is added now so DEV-104 does not need a second
+  // shared-schemas change to land its data.
+  photoIds: z.array(uuidSchema).default([]),
+});
+
+export type ReportInspectionResponse = z.infer<typeof reportInspectionResponseSchema>;
+
+export const reportDefectSchema = z.object({
+  id: uuidSchema,
+  itemKey: z.string(),
+  severity: failSeveritySchema,
+  description: z.string(),
+  photoIds: z.array(uuidSchema),
+  status: defectStatusSchema,
+  resolvedAt: z.string().datetime().nullable(),
+  resolutionNotes: z.string().nullable(),
+});
+
+export type ReportDefect = z.infer<typeof reportDefectSchema>;
+
+export const reportInspectionDetailSchema = z.object({
+  id: uuidSchema,
+  equipmentId: uuidSchema,
+  operatorId: uuidSchema,
+  operatorDisplayName: z.string(),
+  templateId: uuidSchema,
+  templateVersion: z.number().int().positive(),
+  result: inspectionResultSchema,
+  submittedAt: z.string().datetime(),
+  responses: z.array(reportInspectionResponseSchema),
+  defects: z.array(reportDefectSchema),
+});
+
+export type ReportInspectionDetail = z.infer<typeof reportInspectionDetailSchema>;
+
+export const reportEquipmentSummarySchema = z.object({
+  id: uuidSchema,
+  assetTag: z.string(),
+  name: z.string(),
+  type: equipmentTypeSchema,
+  location: z.string().nullable(),
+  status: equipmentStatusSchema,
+});
+
+export type ReportEquipmentSummary = z.infer<typeof reportEquipmentSummarySchema>;
+
+// Response body for core-api's POST /internal/reports-data (service-to-service only, never
+// published at the gateway; guarded by a shared bearer secret, not requireRole).
+export const reportsInternalDataSchema = z.object({
+  equipment: z.array(reportEquipmentSummarySchema),
+  inspections: z.array(reportInspectionDetailSchema),
+});
+
+export type ReportsInternalData = z.infer<typeof reportsInternalDataSchema>;

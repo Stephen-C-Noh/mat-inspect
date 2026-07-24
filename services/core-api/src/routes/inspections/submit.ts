@@ -16,7 +16,7 @@ import { config } from '../../lib/config.js';
 import { httpError } from '../../lib/http-error.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { requestDigest } from '../../lib/request-digest.js';
-import { computeInspectionContentHash } from '../../lib/content-hash.js';
+import { computeInspectionContentHash } from '@mat-inspect/shared-crypto';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';

@@ -273,7 +273,7 @@ describe('inspections API', () => {
 
     // Recompute from the actually-persisted rows to prove a later verifier can reproduce the
     // same hash from core_db — the whole mechanism for detecting a post-hoc edit (ADR 0008).
-    const { computeInspectionContentHash } = await import('../../lib/content-hash.js');
+    const { computeInspectionContentHash } = await import('@mat-inspect/shared-crypto');
     const recomputed = computeInspectionContentHash({
       inspectionId: inspRow!.id,
       equipmentId: inspRow!.equipmentId,

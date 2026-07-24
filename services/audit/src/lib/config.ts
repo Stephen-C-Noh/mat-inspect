@@ -20,6 +20,17 @@ const isValidTimeZone = (tz: string): boolean => {
 
 const CONNECTION_STRING_MARKER = 'InstrumentationKey=';
 
+// Same shape check media's config.ts uses for AZURE_STORAGE_CONNECTION_STRING: an Azure Storage
+// connection string always identifies its endpoint one of these ways.
+const STORAGE_MARKERS = ['AccountName=', 'BlobEndpoint=', 'UseDevelopmentStorage=true'];
+
+// Report exports get their own container; the default matches media's MEDIA_BLOB_CONTAINER
+// default so dev environments read/write the right containers with no extra .env entries.
+const DEFAULT_REPORTS_BLOB_CONTAINER = 'mat-inspect-reports';
+const DEFAULT_MEDIA_BLOB_CONTAINER = 'mat-inspect-media';
+const DEFAULT_CORE_API_INTERNAL_URL = 'http://core-api:3000';
+const DEFAULT_SAS_EXPIRY_MINUTES = 60;
+
 const rawSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -29,6 +40,21 @@ const rawSchema = z.object({
   AUDIT_API_DB_URL: z.string().trim().optional(),
   AUDIT_INGEST_TOKEN: z.string().trim().optional(),
   APPLICATIONINSIGHTS_CONNECTION_STRING: z.string().trim().optional(),
+  // Entra auth for the human-facing report routes (DEV-38). Same treatment as core-api/media: a
+  // blank tenant id selects the dev-JWKS fallback.
+  ENTRA_TENANT_ID: z.string().trim().optional(),
+  ENTRA_CLIENT_ID: z.string().trim().optional(),
+  AZURE_STORAGE_CONNECTION_STRING: z.string().trim().optional(),
+  REPORTS_BLOB_CONTAINER: z.string().trim().default(DEFAULT_REPORTS_BLOB_CONTAINER),
+  // Read-only from the Audit Service's point of view: it never writes here, only fetches a
+  // defect's evidence photo by photoId when building a PDF.
+  MEDIA_BLOB_CONTAINER: z.string().trim().default(DEFAULT_MEDIA_BLOB_CONTAINER),
+  REPORT_SAS_EXPIRY_MINUTES: z.coerce.number().int().positive().default(DEFAULT_SAS_EXPIRY_MINUTES),
+  // PEM. May arrive with literal "\n" two-character sequences (common for secrets stored as a
+  // single-line env value); normalized before use in report-signing.ts.
+  REPORT_SIGNING_PRIVATE_KEY: z.string().trim().optional(),
+  CORE_API_INTERNAL_URL: z.string().trim().default(DEFAULT_CORE_API_INTERNAL_URL),
+  CORE_API_INTERNAL_TOKEN: z.string().trim().optional(),
   // HH:MM, 24h, lab-local time. Nightly full-chain verification job (ARCHITECTURE.md 8.4 rule 7,
   // DEV-40); distinct from the db-backup service's default 02:00 so the two don't compete for I/O.
   // "Lab-local" is resolved against LAB_TIMEZONE, not the container's ambient TZ (which is UTC on
@@ -55,6 +81,20 @@ export type AppConfig = {
   auditIngestToken: string | undefined;
   applicationInsightsConnectionString: string | undefined;
   telemetryEnabled: boolean;
+  entraTenantId: string | undefined;
+  entraClientId: string | undefined;
+  // Non-null asserted at the call site outside tests, same convention as media's
+  // azureStorageConnectionString: the required-value check below guarantees a value outside
+  // NODE_ENV=test.
+  azureStorageConnectionString: string;
+  reportsBlobContainer: string;
+  mediaBlobContainer: string;
+  reportSasExpiryMinutes: number;
+  // Normalized PEM (literal "\n" already converted to real newlines), or undefined only under
+  // NODE_ENV=test.
+  reportSigningPrivateKey: string | undefined;
+  coreApiInternalUrl: string;
+  coreApiInternalToken: string | undefined;
   chainVerifyTime: string;
   labTimeZone: string;
 };
@@ -85,14 +125,62 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
 
   const appInsights = orUndefined(env.APPLICATIONINSIGHTS_CONNECTION_STRING);
   const auditIngestToken = orUndefined(env.AUDIT_INGEST_TOKEN);
+  const entraTenantId = orUndefined(env.ENTRA_TENANT_ID);
+  const entraClientId = orUndefined(env.ENTRA_CLIENT_ID);
+  const storage = orUndefined(env.AZURE_STORAGE_CONNECTION_STRING);
+  const reportSigningPrivateKeyRaw = orUndefined(env.REPORT_SIGNING_PRIVATE_KEY);
+  const coreApiInternalToken = orUndefined(env.CORE_API_INTERNAL_TOKEN);
 
   for (const [name, value] of [
     ['APPLICATIONINSIGHTS_CONNECTION_STRING', appInsights],
     ['AUDIT_INGEST_TOKEN', auditIngestToken],
+    ['ENTRA_TENANT_ID', entraTenantId],
+    ['ENTRA_CLIENT_ID', entraClientId],
+    ['AZURE_STORAGE_CONNECTION_STRING', storage],
+    ['REPORT_SIGNING_PRIVATE_KEY', reportSigningPrivateKeyRaw],
+    ['CORE_API_INTERNAL_TOKEN', coreApiInternalToken],
   ] as const) {
     if (value && isPlaceholder(value)) {
       problems.push(`${name} is an unfilled placeholder; replace it with the real value`);
     }
+  }
+
+  if (requireExternal && !entraTenantId) {
+    problems.push('ENTRA_TENANT_ID is required (only NODE_ENV=test may omit it)');
+  }
+  if (requireExternal && !entraClientId) {
+    problems.push('ENTRA_CLIENT_ID is required (only NODE_ENV=test may omit it)');
+  }
+
+  if (storage && !isPlaceholder(storage) && !STORAGE_MARKERS.some((m) => storage.includes(m))) {
+    problems.push(
+      'AZURE_STORAGE_CONNECTION_STRING is set but does not look like a storage connection string ' +
+        '(expected AccountName=, BlobEndpoint=, or UseDevelopmentStorage=true)',
+    );
+  }
+  if (requireExternal && !storage) {
+    problems.push('AZURE_STORAGE_CONNECTION_STRING is required (only NODE_ENV=test may omit it)');
+  }
+
+  // Normalize literal "\n" to real newlines before the shape check, so a key pasted as a single
+  // env-file line still matches -----BEGIN. crypto.createPrivateKey (report-signing.ts) needs
+  // the real newlines regardless of how the value arrived.
+  const reportSigningPrivateKey = reportSigningPrivateKeyRaw?.replace(/\\n/g, '\n');
+  if (
+    reportSigningPrivateKey &&
+    !isPlaceholder(reportSigningPrivateKeyRaw!) &&
+    !reportSigningPrivateKey.includes('-----BEGIN')
+  ) {
+    problems.push('REPORT_SIGNING_PRIVATE_KEY is set but does not look like a PEM private key');
+  }
+  if (requireExternal && !reportSigningPrivateKey) {
+    problems.push('REPORT_SIGNING_PRIVATE_KEY is required (only NODE_ENV=test may omit it)');
+  }
+
+  // Shared secret presented to core-api's POST /internal/reports-data (DEV-38); see
+  // services/core-api/src/middleware/internal-auth.ts.
+  if (requireExternal && !coreApiInternalToken) {
+    problems.push('CORE_API_INTERNAL_TOKEN is required (only NODE_ENV=test may omit it)');
   }
 
   const databaseUrl =
@@ -137,6 +225,15 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     auditIngestToken,
     applicationInsightsConnectionString: appInsights,
     telemetryEnabled: appInsights !== undefined,
+    entraTenantId,
+    entraClientId,
+    azureStorageConnectionString: storage ?? '',
+    reportsBlobContainer: env.REPORTS_BLOB_CONTAINER,
+    mediaBlobContainer: env.MEDIA_BLOB_CONTAINER,
+    reportSasExpiryMinutes: env.REPORT_SAS_EXPIRY_MINUTES,
+    reportSigningPrivateKey,
+    coreApiInternalUrl: env.CORE_API_INTERNAL_URL,
+    coreApiInternalToken,
     chainVerifyTime: env.CHAIN_VERIFY_TIME,
     labTimeZone: env.LAB_TIMEZONE,
   };

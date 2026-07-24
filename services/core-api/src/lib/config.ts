@@ -31,6 +31,7 @@ const rawSchema = z.object({
   AUDIT_SERVICE_URL: z.string().trim().optional(),
   AUDIT_INGEST_TOKEN: z.string().trim().optional(),
   AI_SERVICE_URL: z.string().trim().optional(),
+  CORE_API_INTERNAL_TOKEN: z.string().trim().optional(),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   // Outbox lag monitoring (ARCHITECTURE.md 8.4 rule 7, DEV-40 AC3): the poller logs at warn
   // instead of info once the oldest unprocessed row is older than this, so a stalled poller
@@ -95,6 +96,10 @@ export type AppConfig = {
   // the only route to it; the AI Service is not published to the browser (ADR 0019). undefined only
   // under NODE_ENV=test.
   aiServiceUrl: string | undefined;
+  // Shared secret the Audit Service's report generator presents to POST /internal/reports-data
+  // (DEV-38). Mirrors auditIngestToken's role for the reverse direction: this endpoint answers
+  // with inspection/defect/operator data, so it is not left to network isolation alone.
+  coreApiInternalToken: string | undefined;
   outboxPollIntervalMs: number;
   outboxLagWarnMs: number;
   // undefined when SMTP is not configured. The notifier treats this as "skip and warn",
@@ -149,6 +154,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   const auditServiceUrl = orUndefined(env.AUDIT_SERVICE_URL);
   const auditIngestToken = orUndefined(env.AUDIT_INGEST_TOKEN);
   const aiServiceUrl = orUndefined(env.AI_SERVICE_URL);
+  const coreApiInternalToken = orUndefined(env.CORE_API_INTERNAL_TOKEN);
 
   // Reject placeholders for every secret. A half-filled .env (the value copied from
   // .env.example) fails at boot with a clear message, not later with an opaque client error.
@@ -157,6 +163,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     ['ENTRA_CLIENT_ID', entraClientId],
     ['APPLICATIONINSIGHTS_CONNECTION_STRING', appInsights],
     ['AUDIT_INGEST_TOKEN', auditIngestToken],
+    ['CORE_API_INTERNAL_TOKEN', coreApiInternalToken],
   ] as const) {
     if (value && isPlaceholder(value)) {
       problems.push(`${name} is an unfilled placeholder; replace it with the real value`);
@@ -220,6 +227,13 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
   }
   if (requireAzure && !auditIngestToken) {
     problems.push('AUDIT_INGEST_TOKEN is required (only NODE_ENV=test may omit it)');
+  }
+
+  // Guards POST /internal/reports-data (DEV-38), the Audit Service's only path to
+  // inspection/defect/operator data. Required outside tests for the same reason
+  // AUDIT_INGEST_TOKEN is: a blank value is a setup mistake, not a valid "off" mode.
+  if (requireAzure && !coreApiInternalToken) {
+    problems.push('CORE_API_INTERNAL_TOKEN is required (only NODE_ENV=test may omit it)');
   }
 
   // core-api is the only way the PWA can reach transcription (ADR 0019). Without this, the voice
@@ -318,6 +332,7 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     auditServiceUrl,
     auditIngestToken,
     aiServiceUrl,
+    coreApiInternalToken,
     outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
     outboxLagWarnMs: env.OUTBOX_LAG_WARN_MS,
     smtp,
