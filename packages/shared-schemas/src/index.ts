@@ -189,6 +189,60 @@ export const inspectionSchema = z.object({
 
 export type Inspection = z.infer<typeof inspectionSchema>;
 
+// Query for GET /api/v1/inspections?equipmentId=&operatorId=&from=&to=&limit=. All filters
+// optional; from/to bound submittedAt (inclusive). limit caps the page size so the fleet
+// drilldown history stays flat as an equipment's inspection count grows over time (DEV-37 NFR).
+export const listInspectionsQuerySchema = z.object({
+  equipmentId: uuidSchema.optional(),
+  operatorId: uuidSchema.optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  limit: z.coerce.number().int().positive().max(200).default(50),
+});
+
+export type ListInspectionsQuery = z.infer<typeof listInspectionsQuerySchema>;
+
+// List/detail responses add the operator's display name: Inspection only stores operatorId,
+// and the fleet grid (DEV-37) needs "who performed it" without a second round trip per row.
+export const inspectionListItemSchema = inspectionSchema.extend({
+  operatorDisplayName: z.string(),
+});
+
+export type InspectionListItem = z.infer<typeof inspectionListItemSchema>;
+
+// A single checklist item's response, read back for the drilldown history (DEV-37). value stays
+// z.unknown(): it is opaque per-item-type data (see inspectionResponseSchema), not re-validated
+// on read. notes carries the voice transcript text when notesSource is VOICE_TRANSCRIBED or
+// VOICE_EDITED (ADR: transcripts are stored as text, not re-fetched from the AI Service).
+export const inspectionResponseRecordSchema = z.object({
+  id: uuidSchema,
+  itemKey: z.string(),
+  value: z.unknown(),
+  passed: z.boolean(),
+  notes: z.string().nullable(),
+  notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).nullable(),
+});
+
+export type InspectionResponseRecord = z.infer<typeof inspectionResponseRecordSchema>;
+
+export const inspectionDetailSchema = inspectionListItemSchema.extend({
+  responses: z.array(inspectionResponseRecordSchema),
+});
+
+export type InspectionDetail = z.infer<typeof inspectionDetailSchema>;
+
+// Extends the equipment contract with the fleet grid's "last inspection" summary (DEV-37). Kept
+// separate from equipmentSchema (used by create/update/get-by-id) so those routes are unaffected;
+// only GET /api/v1/equipment's list response uses this shape. Null fields mean the equipment has
+// no inspection yet.
+export const equipmentWithLastInspectionSchema = equipmentSchema.extend({
+  lastInspectionAt: z.string().datetime().nullable(),
+  lastInspectionResult: inspectionResultSchema.nullable(),
+  lastInspectionOperatorDisplayName: z.string().nullable(),
+});
+
+export type EquipmentWithLastInspection = z.infer<typeof equipmentWithLastInspectionSchema>;
+
 export const defectStatusSchema = z.enum([
   'OPEN',
   'ACKNOWLEDGED',

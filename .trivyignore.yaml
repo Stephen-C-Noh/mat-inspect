@@ -14,8 +14,20 @@ vulnerabilities:
     expired_at: 2026-07-27
     statement: 'fast-uri 3.1.4 fix published 2026-07-19; blocked by min-release-age until ~2026-07-26. Transitive via fastify/ajv.'
   - id: GHSA-8r6m-32jq-jx6q
-    expired_at: 2026-07-24
-    statement: 'fast-xml-parser 5.10.1 fix published 2026-07-16; blocked by min-release-age until ~2026-07-23. Transitive via the @azure SDKs.'
+    expired_at: 2026-07-28
+    statement: 'fast-xml-parser 5.10.1 fix (published 2026-07-16) is installable but the override is held for the DEV-102 batch regen on ~2026-07-28 so a lockfile rewrite does not land mid sprint-5 demo. Transitive via the @azure SDKs.'
+  - id: CVE-2026-47219
+    expired_at: 2026-07-28
+    statement: 'find-my-way 9.7.0 fix (DDoS with HTTP2) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Transitive via fastify (router). Disclosed after the first DEV-102 batch.'
   - id: GHSA-f88m-g3jw-g9cj
     expired_at: 2026-07-29
     statement: 'sharp 0.35.0 fix is published but next 15.5.19 cannot resolve its 0.35.x binaries cleanly under min-release-age. Transitive via next image optimization (dashboard).'
+  - id: CVE-2026-64641
+    expired_at: 2026-07-28
+    statement: 'next 15.5.21 fix (Denial of Service in App Router using Server Actions) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+  - id: CVE-2026-64645
+    expired_at: 2026-07-28
+    statement: 'next 15.5.21 fix (SSRF in rewrites via attacker-controlled destination hostname) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+  - id: CVE-2026-64649
+    expired_at: 2026-07-28
+    statement: 'next 15.5.21 fix (SSRF in Server Actions on custom servers) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'

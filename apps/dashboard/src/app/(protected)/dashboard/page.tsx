@@ -2,6 +2,7 @@
 
 import { useMsal } from '@azure/msal-react';
 import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import { FailureQueue } from '@/components/dashboard/failure-queue';
 
 export default function DashboardPage() {
   const { accounts } = useMsal();
@@ -15,6 +16,10 @@ export default function DashboardPage() {
         <p className="text-sm text-muted-foreground">
           {account?.username} &middot; {roles.join(', ')}
         </p>
+
+        <div className="mt-6">
+          <FailureQueue />
+        </div>
       </div>
     </main>
   );

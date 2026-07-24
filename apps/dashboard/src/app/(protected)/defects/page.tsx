@@ -1,10 +1,16 @@
 'use client';
 
-import type { ReactElement } from 'react';
+import { Suspense, type ReactElement } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AuthGuard } from '@/components/auth-guard';
 import { DefectsTable } from '@/components/defects/defects-table';
 
 function DefectsContent(): ReactElement {
+  // Populated when arriving via the dashboard Failure Queue's "View" link
+  // (/defects?id=<defectId>), so that entry opens straight into its detail panel.
+  const searchParams = useSearchParams();
+  const initialDefectId = searchParams.get('id');
+
   return (
     <main className="min-h-screen bg-muted px-6 py-8">
       <div className="mx-auto max-w-4xl">
@@ -14,7 +20,7 @@ function DefectsContent(): ReactElement {
         </p>
 
         <div className="mt-6">
-          <DefectsTable />
+          <DefectsTable initialDefectId={initialDefectId} />
         </div>
       </div>
     </main>
@@ -24,7 +30,9 @@ function DefectsContent(): ReactElement {
 export default function DefectsPage(): ReactElement {
   return (
     <AuthGuard allowedRoles={['supervisor', 'manager']}>
-      <DefectsContent />
+      <Suspense fallback={null}>
+        <DefectsContent />
+      </Suspense>
     </AuthGuard>
   );
 }
