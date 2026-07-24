@@ -25,8 +25,11 @@ export const reportJobs = pgTable('report_jobs', {
   inspectionCount: integer('inspection_count'),
   fileBytes: integer('file_bytes'),
   sha256: text('sha256'),
-  // Base64 RSA signature over the file's sha256 digest (ADR 0022), and a fingerprint of the
-  // public key that verifies it, for display. Both null until the job reaches READY.
+  // Base64 detached RSA-SHA256 signature over the report file's raw bytes (ADR 0022), and a
+  // fingerprint of the public key that verifies it, for display. Verify with the standard
+  // RSA-SHA256 verify over the file bytes (crypto.verify('RSA-SHA256', fileBytes, key, sig)); the
+  // sha256 column is the same file's digest, for a quick byte-integrity check, not the sign input.
+  // Both signature columns null until the job reaches READY.
   signature: text('signature'),
   signingKeyFingerprint: text('signing_key_fingerprint'),
   blobName: text('blob_name'),

@@ -37,7 +37,7 @@ export const generateReport = async (
       contentType = 'application/pdf';
     } else {
       fileBuffer = Buffer.from(
-        buildInspectionsCsv(data.equipment, data.inspections, chainSegment.digestChecks),
+        buildInspectionsCsv(data.equipment, data.inspections, chainSegment),
         'utf-8',
       );
       contentType = 'text/csv';

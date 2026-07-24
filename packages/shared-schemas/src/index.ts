@@ -152,9 +152,19 @@ export const patchEquipmentSchema = z
 
 export type PatchEquipment = z.infer<typeof patchEquipmentSchema>;
 
+// A checklist response value is restricted to jsonb-round-trip-stable scalars: string, boolean,
+// or null. A number is rejected on purpose. inspection_responses.value is a jsonb column, and the
+// audit export re-reads it from that column to recompute each inspection's content digest
+// (services/audit chain-segment.ts, ADR 0008). jsonb normalizes numeric values, so a number hashed
+// from the raw submit body could diverge from the same field re-read from jsonb and flag a healthy
+// inspection as MISMATCH (tampering). Strings, booleans, and null round-trip byte-identically.
+// This is the same rule and the same reason as auditEventIngestSchema's payloadSummary. A numeric
+// reading (a gauge or meter value) must be sent as a string.
+export const inspectionResponseValueSchema = z.union([z.string(), z.boolean(), z.null()]);
+
 export const inspectionResponseSchema = z.object({
   itemKey: z.string(),
-  value: z.unknown(),
+  value: inspectionResponseValueSchema,
   passed: z.boolean(),
   notes: z.string().optional(),
   notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),

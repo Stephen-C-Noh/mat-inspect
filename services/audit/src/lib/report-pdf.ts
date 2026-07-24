@@ -34,8 +34,13 @@ export const buildInspectionsPdf = async (params: BuildReportPdfParams): Promise
   const doc = new PDFDocument({ margin: 50 });
   const chunks: Buffer[] = [];
   doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-  const finished = new Promise<Buffer>((resolve) => {
+  // Reject on a stream 'error' as well as resolve on 'end'. Without the error handler a PDFKit
+  // stream failure (e.g. an internal encoder fault) would leave this promise pending forever, so
+  // generateReport's await never settles and the report_jobs row stays PROCESSING with no FAILED
+  // transition. Rejecting routes the failure into generateReport's catch, which writes FAILED.
+  const finished = new Promise<Buffer>((resolve, reject) => {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
   });
 
   const equipmentById = new Map(params.equipment.map((row) => [row.id, row]));
@@ -167,10 +172,11 @@ export const buildInspectionsPdf = async (params: BuildReportPdfParams): Promise
   doc
     .fontSize(9)
     .text(
-      'This file has no embedded PDF signature (ADR 0022). Its SHA-256 and a detached RSA ' +
-        'signature over that hash are recorded on the export job and returned by ' +
-        "GET /api/v1/reports/:jobId. Verify by recomputing this file's SHA-256 and checking the " +
-        'signature against the published signing key fingerprint.',
+      'This file has no embedded PDF signature (ADR 0022). Its SHA-256 and a detached RSA-SHA256 ' +
+        "signature over this file's bytes are recorded on the export job and returned by " +
+        'GET /api/v1/reports/:jobId. Verify by running an RSA-SHA256 verify of the signature over ' +
+        "this file's bytes with the public key whose fingerprint is published there; the SHA-256 " +
+        'is a separate byte-integrity check, not the value the signature is computed over.',
     );
 
   doc.end();

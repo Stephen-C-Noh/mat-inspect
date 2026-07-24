@@ -7,11 +7,13 @@ import {
 } from 'node:crypto';
 import { config } from './config.js';
 
-// Detached signature over a report file's bytes (ADR 0022). Deliberately not an embedded PAdES
-// PDF signature: see the ADR for why a self-signed certificate would render worse than no
-// signature at all in a PDF viewer. Verification is: recompute sha256(file), verify the
-// signature against the recorded public key, both of which are handed back by signReportFile
-// below and returned in the GET /reports/:jobId response.
+// Detached RSA-SHA256 signature over a report file's bytes (ADR 0022). Deliberately not an
+// embedded PAdES PDF signature: see the ADR for why a self-signed certificate would render worse
+// than no signature at all in a PDF viewer. Verification is a standard RSA-SHA256 verify of the
+// signature over the file's bytes against the recorded public key (crypto.verify('RSA-SHA256',
+// fileBytes, publicKey, signature)). The sha256 returned alongside is the same file's digest for
+// a quick byte-integrity check, not the input the signature is computed over. Both are handed
+// back by signReportFile below and returned in the GET /reports/:jobId response.
 
 let cachedPrivateKey: KeyObject | undefined;
 

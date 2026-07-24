@@ -78,6 +78,46 @@ export const storeReportFile = async (
   return { blobName, container: container.containerName };
 };
 
+// Azurite's well-known development account (public, documented Azurite defaults, not a secret).
+// UseDevelopmentStorage=true is shorthand for a full connection string against this account, so
+// resolve it to the same name/key a SAS signature needs.
+const AZURITE_DEV_ACCOUNT_NAME = 'devstoreaccount1';
+const AZURITE_DEV_ACCOUNT_KEY =
+  'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==';
+
+// Parses an Azure Storage connection string into its key=value pairs. The pair order is not
+// fixed (config.ts accepts AccountName=, BlobEndpoint=, or UseDevelopmentStorage=true in any
+// arrangement), so a positional regex is wrong; split on ';' instead and read fields by name.
+const parseConnectionString = (connectionString: string): Map<string, string> => {
+  const pairs = new Map<string, string>();
+  for (const segment of connectionString.split(';')) {
+    const eq = segment.indexOf('=');
+    if (eq === -1) continue;
+    // Value may itself contain '=' (base64 keys are padded with it), so split on the first only.
+    pairs.set(segment.slice(0, eq).trim(), segment.slice(eq + 1).trim());
+  }
+  return pairs;
+};
+
+// Resolves the shared-key credential a SAS signature needs, regardless of field order or the
+// UseDevelopmentStorage=true Azurite shorthand. Throws only when no shared key is present at all
+// (e.g. a managed-identity connection string), which cannot sign a SAS this way.
+const sharedKeyCredentialFrom = (connectionString: string): StorageSharedKeyCredential => {
+  const fields = parseConnectionString(connectionString);
+  if (fields.get('UseDevelopmentStorage')?.toLowerCase() === 'true') {
+    return new StorageSharedKeyCredential(AZURITE_DEV_ACCOUNT_NAME, AZURITE_DEV_ACCOUNT_KEY);
+  }
+  const accountName = fields.get('AccountName');
+  const accountKey = fields.get('AccountKey');
+  if (!accountName || !accountKey) {
+    throw new Error(
+      'AZURE_STORAGE_CONNECTION_STRING has no AccountName/AccountKey pair (or ' +
+        'UseDevelopmentStorage=true); cannot sign a SAS URL with a shared key',
+    );
+  }
+  return new StorageSharedKeyCredential(accountName, accountKey);
+};
+
 // A short-lived, read-only SAS URL for a generated report. Generated fresh on every call rather
 // than stored, so a client that polls GET /reports/:jobId after a delay never receives a link
 // that already expired.
@@ -91,14 +131,7 @@ export const generateReportDownloadUrl = async (
   const container = await getReportsContainer();
   const blockBlob = container.getBlockBlobClient(blobName);
 
-  const match = cfg.azureStorageConnectionString.match(/AccountName=([^;]+);AccountKey=([^;]+)/);
-  if (!match) {
-    throw new Error(
-      'AZURE_STORAGE_CONNECTION_STRING has no AccountName/AccountKey pair; cannot sign a SAS URL',
-    );
-  }
-  const [, accountName, accountKey] = match;
-  const credential = new StorageSharedKeyCredential(accountName!, accountKey!);
+  const credential = sharedKeyCredentialFrom(cfg.azureStorageConnectionString);
 
   const expiresAt = new Date(Date.now() + cfg.reportSasExpiryMinutes * 60 * 1000);
   const sas = generateBlobSASQueryParameters(
