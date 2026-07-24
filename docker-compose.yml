@@ -250,6 +250,11 @@ services:
       DATABASE_URL: ${AUDIT_API_DB_URL}
       AUDIT_INGEST_TOKEN: ${AUDIT_INGEST_TOKEN}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+      # Nightly full-chain verification (DEV-40). CHAIN_VERIFY_TIME is HH:MM in LAB_TIMEZONE, not
+      # the container's ambient TZ (UTC on the alpine image); the service resolves the zone via
+      # ICU, so no tzdata package is needed. Default 02:30 stays clear of db-backup's 02:00.
+      CHAIN_VERIFY_TIME: ${CHAIN_VERIFY_TIME:-02:30}
+      LAB_TIMEZONE: ${LAB_TIMEZONE:-America/Edmonton}
     depends_on:
       postgres:
         condition: service_healthy

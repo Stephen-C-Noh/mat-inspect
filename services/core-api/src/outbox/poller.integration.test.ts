@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -70,7 +70,11 @@ describe('outbox poller', () => {
     await container.stop();
   });
 
-  const insertOutboxRow = async (operatorId = randomUUID(), inspectionId = randomUUID()) => {
+  const insertOutboxRow = async (
+    operatorId = randomUUID(),
+    inspectionId = randomUUID(),
+    createdAt?: Date,
+  ) => {
     const { db, outbox } = await import('../db/index.js');
     const [row] = await db
       .insert(outbox)
@@ -83,6 +87,7 @@ describe('outbox poller', () => {
           result: 'PASS',
           contentHash: 'a'.repeat(64),
         },
+        ...(createdAt && { createdAt }),
       })
       .returning();
     return row!;
@@ -112,6 +117,38 @@ describe('outbox poller', () => {
     const { eq } = await import('drizzle-orm');
     const [updated] = await db.select().from(outbox).where(eq(outbox.id, row.id));
     expect(updated?.processedAt).toBeNull();
+  });
+
+  it('logs a warn when the oldest unprocessed row exceeds the lag threshold', async () => {
+    // try/finally: if an assertion throws mid-test, OUTBOX_LAG_WARN_MS must still be cleared,
+    // or it leaks into every later test in this file (all of which use the real, unset default).
+    try {
+      stubStatusCode = 503; // leave the row unprocessed so lag is observable
+      process.env['OUTBOX_LAG_WARN_MS'] = '1000';
+      const { resetConfigForTest } = await import('../lib/config.js');
+      resetConfigForTest();
+
+      // Backdate createdAt deterministically rather than relying on real-time drift during the
+      // test (which could be a few ms either side of any threshold and flake).
+      await insertOutboxRow(undefined, undefined, new Date(Date.now() - 60_000));
+
+      const { logger } = await import('../lib/logger.js');
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      const { runOutboxPollTick } = await import('./poller.js');
+      await runOutboxPollTick();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ oldestLagMs: expect.any(Number) }),
+        'outbox backlog exceeds lag threshold',
+      );
+
+      warnSpy.mockRestore();
+    } finally {
+      delete process.env['OUTBOX_LAG_WARN_MS'];
+      const { resetConfigForTest } = await import('../lib/config.js');
+      resetConfigForTest();
+    }
   });
 
   it('sends the correct payload to the audit stub', async () => {

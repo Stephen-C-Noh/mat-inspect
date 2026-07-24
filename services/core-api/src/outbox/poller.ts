@@ -72,9 +72,16 @@ export const runOutboxPollTick = async (): Promise<void> => {
   if (rows.length > 0) {
     // Outbox lag: how stale the oldest undelivered row is. ARCHITECTURE.md calls out that a
     // stalled poller must be noticed; this is the observable signal for that (Pino -> Azure
-    // Monitor), without building a separate alerting pipeline.
+    // Monitor), without building a separate alerting pipeline. Escalating to warn past the
+    // threshold (DEV-40 AC3) is what actually makes a stalled poller noticed, rather than just
+    // logged alongside every routine tick.
     const oldestLagMs = Date.now() - rows[0]!.createdAt.getTime();
-    logger.info({ unprocessed: rows.length, oldestLagMs }, 'outbox poll tick');
+    const fields = { unprocessed: rows.length, oldestLagMs };
+    if (oldestLagMs > cfg.outboxLagWarnMs) {
+      logger.warn(fields, 'outbox backlog exceeds lag threshold');
+    } else {
+      logger.info(fields, 'outbox poll tick');
+    }
   }
 
   for (const row of rows) {

@@ -103,9 +103,11 @@ describe('chain integrity at scale (10,000 events)', () => {
     const result = await verifyChain();
     const elapsedMs = performance.now() - start;
 
-    // Log so the wall-clock time is visible in the test report without failing on a specific
-    // threshold — the AC asks for integrity, not a perf benchmark.
     process.stdout.write(`verifyChain(${TOTAL} events): ${elapsedMs.toFixed(0)} ms\n`);
+
+    // AC5: verification must complete "within time budget", not just be logged. 10s is generous
+    // headroom over observed local runtime for a full 10k-row table walk with hash recomputation.
+    expect(elapsedMs).toBeLessThan(10_000);
 
     expect(result.ok).toBe(true);
     if (result.ok) {

@@ -3,6 +3,7 @@ import { buildApp } from './app.js';
 import { logger } from './lib/logger.js';
 import { config } from './lib/config.js';
 import { verifyChain } from './lib/chain.js';
+import { startNightlyVerification } from './lib/nightly-verify.js';
 
 // instrumentation.js has already validated the environment at this point; config() returns
 // the cached, validated values.
@@ -34,3 +35,7 @@ try {
   logger.error(err, 'Failed to start server');
   process.exit(1);
 }
+
+// Started here, not from buildApp(), so app-only tests don't also start a background job
+// (ARCHITECTURE.md 8.4 rule 7, DEV-40 AC2).
+startNightlyVerification();
