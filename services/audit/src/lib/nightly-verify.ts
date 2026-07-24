@@ -15,6 +15,25 @@ export const runNightlyVerification = async (): Promise<void> => {
   const result = await verifyChain();
   const elapsedMs = Math.round(performance.now() - startedAt);
 
+  // Freeze (and log) on a detected break BEFORE recording the run. The freeze is the
+  // safety-critical action; gating it on the chain_verifications insert would leave writes open
+  // on a chain already known to be broken if that bookkeeping insert throws. A failed insert
+  // still propagates to the scheduler's catch and is logged there.
+  if (result.ok) {
+    logger.info({ checked: result.checked, elapsedMs }, 'nightly chain verification passed');
+  } else {
+    logger.error(
+      {
+        checked: result.checked,
+        brokenAtSeq: result.brokenAtSeq,
+        reason: result.reason,
+        elapsedMs,
+      },
+      'nightly chain verification failed; freezing audit writes pending manual review',
+    );
+    freezeWrites(result.reason);
+  }
+
   await db.insert(chainVerifications).values({
     ok: result.ok,
     checked: result.checked,
@@ -22,17 +41,6 @@ export const runNightlyVerification = async (): Promise<void> => {
     reason: result.ok ? null : result.reason,
     elapsedMs,
   });
-
-  if (result.ok) {
-    logger.info({ checked: result.checked, elapsedMs }, 'nightly chain verification passed');
-    return;
-  }
-
-  logger.error(
-    { checked: result.checked, brokenAtSeq: result.brokenAtSeq, reason: result.reason, elapsedMs },
-    'nightly chain verification failed; freezing audit writes pending manual review',
-  );
-  freezeWrites(result.reason);
 };
 
 export const startNightlyVerification = (): { stop: () => void } => {
