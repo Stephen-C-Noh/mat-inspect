@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import canonicalize from 'canonicalize';
+import type { InspectionResult, NotesSource } from '@mat-inspect/shared-types';
 
 // RFC 8785 (JSON Canonicalization Scheme): fixed key order, fixed number formatting, no
 // whitespace. The same logical record always produces the same byte sequence, which is what
@@ -25,3 +26,35 @@ export const sha256Hex = (input: string): string =>
 // fixed regardless of resolution, which is what determinism actually requires here.
 export const toCanonicalTimestamp = (date: Date): string =>
   `${date.toISOString().slice(0, -1)}000Z`;
+
+export type ContentHashResponse = {
+  itemKey: string;
+  value: unknown;
+  passed: boolean;
+  notes: string | null;
+  notesSource: NotesSource | null;
+};
+
+export type ContentHashInput = {
+  inspectionId: string;
+  equipmentId: string;
+  operatorId: string;
+  templateId: string;
+  templateVersion: number;
+  result: InspectionResult;
+  submittedAt: string;
+  responses: ContentHashResponse[];
+};
+
+// ADR 0008: content_hash = sha256(canonical_json(inspection + ordered responses + result)).
+// Sorting by itemKey makes the hash independent of read/insert order, which matters because a
+// later verifier reconstructs this same input by querying inspection_responses fresh (Postgres
+// makes no order guarantee on a plain SELECT). Sealed once at submit time (core-api) into the
+// outbox payload; recomputing this same function from core_db data and comparing it to the value
+// sealed in the chain (audit service, DEV-38) is how a bypass of the immutability triggers would
+// be detected. Lives here, not in one service's lib/, because both core-api (the sealer) and
+// audit (the verifier) must run byte-identical logic or the comparison is meaningless.
+export const computeInspectionContentHash = (input: ContentHashInput): string => {
+  const orderedResponses = [...input.responses].sort((a, b) => a.itemKey.localeCompare(b.itemKey));
+  return sha256Hex(canonicalJson({ ...input, responses: orderedResponses }));
+};

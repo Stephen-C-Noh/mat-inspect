@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeInspectionContentHash, type ContentHashInput } from './content-hash.js';
+import { computeInspectionContentHash, type ContentHashInput } from './index';
 
 const baseInput: ContentHashInput = {
   inspectionId: 'b1f9b9b0-0000-4000-8000-000000000001',

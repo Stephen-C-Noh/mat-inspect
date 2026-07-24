@@ -98,4 +98,25 @@ describe('audit_events role privileges', () => {
       writerPool.query(`DELETE FROM audit_events WHERE seq = (SELECT max(seq) FROM audit_events)`),
     ).rejects.toThrow(/permission denied/i);
   });
+
+  // report_jobs (DEV-38) deliberately does NOT inherit the audit_events append-only property: it
+  // is a mutable job-status table, not an evidentiary record, and its migration adds an explicit
+  // table-scoped GRANT UPDATE rather than widening the ALTER DEFAULT PRIVILEGES above (which would
+  // have silently loosened audit_events too, and every future table). This asserts that grant
+  // actually took effect, the same way the tests above assert audit_events' privileges did.
+  const insertJob = () =>
+    writerPool.query(
+      `INSERT INTO report_jobs (id, requested_by, format, filters, options)
+       VALUES ($1, $2, 'PDF', '{}', '{}')`,
+      [randomUUID(), randomUUID()],
+    );
+
+  it('audit_writer can INSERT and UPDATE report_jobs', async () => {
+    await expect(insertJob()).resolves.toBeDefined();
+    await expect(
+      writerPool.query(
+        `UPDATE report_jobs SET status = 'READY' WHERE id = (SELECT id FROM report_jobs ORDER BY created_at DESC LIMIT 1)`,
+      ),
+    ).resolves.toBeDefined();
+  });
 });

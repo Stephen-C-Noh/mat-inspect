@@ -22,6 +22,7 @@ import { startRepairDefectRoute } from './routes/defects/start-repair.js';
 import { resolveDefectRoute } from './routes/defects/resolve.js';
 import { rejectDefectRoute } from './routes/defects/reject.js';
 import { transcribeRoute } from './routes/ai/transcribe.js';
+import { reportsDataRoute } from './routes/internal/reports-data.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
@@ -122,6 +123,9 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   // Transcription is proxied, not implemented here: core-api authenticates the operator and passes
   // the clip to the AI Service, which is not reachable from the browser (ADR 0019).
   await app.register(transcribeRoute, { prefix: '/api/v1' });
+  // Internal only (DEV-38): no /api/v1 prefix, never reachable through the Caddy gateway. The
+  // Audit Service's report generator is the sole caller; see requireInternalReportsToken.
+  await app.register(reportsDataRoute);
 
   if (process.env['NODE_ENV'] !== 'production') {
     const { devTokenRoutes } = await import('./routes/dev-token.js');

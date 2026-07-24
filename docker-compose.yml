@@ -154,6 +154,9 @@ services:
       # Transcription proxy target (ADR 0019). Internal address only: the AI Service is not
       # published to the browser, and core-api is the only client that authenticates in front of it.
       AI_SERVICE_URL: 'http://ai:8000'
+      # Guards POST /internal/reports-data (DEV-38); the Audit Service's report generator is the
+      # only intended caller, over the internal network, never through the gateway.
+      CORE_API_INTERNAL_TOKEN: ${CORE_API_INTERNAL_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
@@ -201,11 +204,27 @@ services:
     environment:
       PORT: '3000'
       OTEL_SERVICE_NAME: audit
-      # Runtime connection: audit_writer (INSERT + SELECT only on audit_events; DEV-23). Migrations
-      # run separately via AUDIT_MIGRATOR_DB_URL (see services/audit/db/migrate.ts), never this one.
+      # Runtime connection: audit_writer (INSERT + SELECT on audit_events; INSERT + SELECT + UPDATE
+      # on report_jobs, DEV-38). Migrations run separately via AUDIT_MIGRATOR_DB_URL (see
+      # services/audit/db/migrate.ts), never this one.
       DATABASE_URL: ${AUDIT_API_DB_URL}
       AUDIT_INGEST_TOKEN: ${AUDIT_INGEST_TOKEN}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+      # Report routes are the first human-facing (requireRole) routes on this service (DEV-38);
+      # same Entra verification as core-api and media.
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+      # Same storage account media uses. REPORTS_BLOB_CONTAINER is this service's own container
+      # (generated PDFs/CSVs); MEDIA_BLOB_CONTAINER is read-only here, must match media's value,
+      # for embedding defect evidence photos in a PDF.
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+      REPORTS_BLOB_CONTAINER: ${REPORTS_BLOB_CONTAINER:-mat-inspect-reports}
+      MEDIA_BLOB_CONTAINER: ${MEDIA_BLOB_CONTAINER:-mat-inspect-media}
+      # Detached report signature (ADR 0022), not an embedded PDF signature.
+      REPORT_SIGNING_PRIVATE_KEY: ${REPORT_SIGNING_PRIVATE_KEY}
+      # The report generator's only path to core_db data (ADR 0001: no cross-service SQL).
+      CORE_API_INTERNAL_URL: 'http://core-api:3000'
+      CORE_API_INTERNAL_TOKEN: ${CORE_API_INTERNAL_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy

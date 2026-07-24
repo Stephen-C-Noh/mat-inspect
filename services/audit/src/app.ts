@@ -4,6 +4,9 @@ import { logger } from './lib/logger.js';
 import { setupZodValidation } from './lib/zod-validation.js';
 import { registerAuthRouteGuard } from './middleware/auth-route-guard.js';
 import { ingestEventRoute } from './routes/events/ingest.js';
+import { exportReportRoute } from './routes/reports/export.js';
+import { getReportJobRoute } from './routes/reports/get-job.js';
+import { listMyReportExportsRoute } from './routes/reports/list-mine.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
@@ -53,6 +56,12 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   app.get('/health', async () => ({ status: 'ok', service: 'audit' }));
 
   await app.register(ingestEventRoute, { prefix: '/api/v1' });
+  // Human-facing report routes (DEV-38), first ones on this service to carry requireRole rather
+  // than the service-to-service requireIngestToken above. Published at the Caddy gateway per
+  // ADR 0020's rule ("published if it validates Entra tokens itself").
+  await app.register(exportReportRoute, { prefix: '/api/v1' });
+  await app.register(getReportJobRoute, { prefix: '/api/v1' });
+  await app.register(listMyReportExportsRoute, { prefix: '/api/v1' });
 
   return app;
 };
