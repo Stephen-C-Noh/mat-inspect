@@ -128,12 +128,23 @@ jobs:
           - name: ai
             context: services/ai
             dockerfile: services/ai/Dockerfile
+          # NEXT_PUBLIC_* are inlined into the client bundle at build time (DEV-110). Without
+          # these, the published image ships an empty client_id and Entra login fails with
+          # AADSTS900144. Tenant id and client id are public identifiers, so plain repo Variables,
+          # not Secrets. Only the two Next apps declare these ARGs; the other images have no
+          # build_args and so get none.
           - name: pwa
             context: .
             dockerfile: apps/pwa/Dockerfile
+            build_args: |
+              NEXT_PUBLIC_AZURE_TENANT_ID=${{ vars.ENTRA_TENANT_ID }}
+              NEXT_PUBLIC_AZURE_CLIENT_ID=${{ vars.ENTRA_CLIENT_ID }}
           - name: dashboard
             context: .
             dockerfile: apps/dashboard/Dockerfile
+            build_args: |
+              NEXT_PUBLIC_AZURE_TENANT_ID=${{ vars.ENTRA_TENANT_ID }}
+              NEXT_PUBLIC_AZURE_CLIENT_ID=${{ vars.ENTRA_CLIENT_ID }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -158,6 +169,8 @@ jobs:
           file: ${{ matrix.dockerfile }}
           target: runtime
           push: ${{ github.event_name == 'push' }}
+          # Empty for every image except pwa and dashboard (see the matrix comment).
+          build-args: ${{ matrix.build_args }}
           tags: |
             ghcr.io/${{ env.OWNER }}/mat-inspect/${{ matrix.name }}:latest
             ghcr.io/${{ env.OWNER }}/mat-inspect/${{ matrix.name }}:sha-${{ github.sha }}
