@@ -24,6 +24,26 @@ describe('loadConfig', () => {
     expect(cfg.telemetryEnabled).toBe(false);
   });
 
+  it('defaults the voice container and retention window (DEV-41)', () => {
+    const cfg = loadConfig({ NODE_ENV: 'test' });
+    // ADR 0004 container name and the 90-day raw-audio window (ARCHITECTURE.md 8.4).
+    expect(cfg.voiceBlobContainer).toBe('mat-inspect-voice');
+    expect(cfg.voiceRetentionDays).toBe(90);
+  });
+
+  it('accepts an overridden voice retention window', () => {
+    const cfg = loadConfig({ NODE_ENV: 'test', MEDIA_VOICE_RETENTION_DAYS: '30' });
+    expect(cfg.voiceRetentionDays).toBe(30);
+  });
+
+  it('rejects a non-positive MEDIA_VOICE_RETENTION_DAYS', () => {
+    // A zero or negative window would purge every clip, including brand-new audio still inside the
+    // 90-day window. Fail the boot rather than delete audio that should be kept.
+    expect(() => loadConfig({ NODE_ENV: 'test', MEDIA_VOICE_RETENTION_DAYS: '0' })).toThrow(
+      EnvValidationError,
+    );
+  });
+
   it('omits required external vars under NODE_ENV=test', () => {
     // Tests run against a throwaway Azurite container and mock the JWKS fetch, so none of the
     // external vars are required. This must not throw.

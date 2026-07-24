@@ -29,6 +29,15 @@ const DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 // name inside it is the returned photoId, so the container plus the id fully locate an object.
 const DEFAULT_BLOB_CONTAINER = 'mat-inspect-media';
 
+// Voice-clip container per ADR 0004. Raw audio is biometric PII under FOIP, so it lives in its own
+// container and is purged on a shorter clock than photos and records (the retention job, DEV-41).
+const DEFAULT_VOICE_BLOB_CONTAINER = 'mat-inspect-voice';
+
+// Raw voice audio is kept 90 days; the transcript and the inspection record are kept the full 7
+// years (ARCHITECTURE.md 8.4, 9.x). The retention job deletes a raw clip once it passes this age.
+// Configurable so a deployment can tighten or loosen the window without a code change.
+const DEFAULT_VOICE_RETENTION_DAYS = 90;
+
 const rawSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -37,6 +46,14 @@ const rawSchema = z.object({
   AZURE_STORAGE_CONNECTION_STRING: z.string().trim().optional(),
   MEDIA_BLOB_CONTAINER: z.string().trim().default(DEFAULT_BLOB_CONTAINER),
   MEDIA_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(DEFAULT_MAX_UPLOAD_BYTES),
+  // Read by the voice-audio retention job (DEV-41). The upload path does not use these yet;
+  // keeping them in the shared config means the job boots through the same validated loader.
+  MEDIA_VOICE_BLOB_CONTAINER: z.string().trim().default(DEFAULT_VOICE_BLOB_CONTAINER),
+  MEDIA_VOICE_RETENTION_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_VOICE_RETENTION_DAYS),
   // Entra auth config used by verifyToken (ADR 0002, ADR 0012). Same treatment as core-api: a
   // present tenant id selects the real Entra JWKS; a blank one selects the dev-JWKS fallback.
   ENTRA_TENANT_ID: z.string().trim().optional(),
@@ -51,6 +68,8 @@ export type AppConfig = {
   telemetryEnabled: boolean;
   azureStorageConnectionString: string;
   blobContainer: string;
+  voiceBlobContainer: string;
+  voiceRetentionDays: number;
   maxUploadBytes: number;
   entraTenantId: string | undefined;
   entraClientId: string | undefined;
@@ -147,6 +166,8 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     // tests the caller sets it before building the app (there is nothing to store without it).
     azureStorageConnectionString: storage ?? '',
     blobContainer: env.MEDIA_BLOB_CONTAINER,
+    voiceBlobContainer: env.MEDIA_VOICE_BLOB_CONTAINER,
+    voiceRetentionDays: env.MEDIA_VOICE_RETENTION_DAYS,
     maxUploadBytes: env.MEDIA_MAX_UPLOAD_BYTES,
     entraTenantId,
     entraClientId,
