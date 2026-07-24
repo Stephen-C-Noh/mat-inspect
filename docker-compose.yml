@@ -269,6 +269,11 @@ services:
       # The report generator's only path to core_db data (ADR 0001: no cross-service SQL).
       CORE_API_INTERNAL_URL: 'http://core-api:3000'
       CORE_API_INTERNAL_TOKEN: ${CORE_API_INTERNAL_TOKEN}
+      # Nightly full-chain verification (DEV-40). CHAIN_VERIFY_TIME is HH:MM in LAB_TIMEZONE, not
+      # the container's ambient TZ (UTC on the alpine image); the service resolves the zone via
+      # ICU, so no tzdata package is needed. Default 02:30 stays clear of db-backup's 02:00.
+      CHAIN_VERIFY_TIME: ${CHAIN_VERIFY_TIME:-02:30}
+      LAB_TIMEZONE: ${LAB_TIMEZONE:-America/Edmonton}
     depends_on:
       postgres:
         condition: service_healthy

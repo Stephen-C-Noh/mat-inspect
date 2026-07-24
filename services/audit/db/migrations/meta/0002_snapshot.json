@@ -1,6 +1,6 @@
 {
-  "id": "b0575597-b990-4753-b78e-131bd1a9d6d2",
-  "prevId": "cc73ca09-1007-4db4-88c4-6ab319be3867",
+  "id": "7764779c-4045-4de3-96d2-25e04e4baa0f",
+  "prevId": "b0575597-b990-4753-b78e-131bd1a9d6d2",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -90,15 +90,71 @@
       "uniqueConstraints": {
         "audit_events_id_unique": {
           "name": "audit_events_id_unique",
-          "columns": ["id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id"]
         },
         "audit_events_source_event_id_unique": {
           "name": "audit_events_source_event_id_unique",
-          "columns": ["source_event_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["source_event_id"]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.chain_verifications": {
+      "name": "chain_verifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ran_at": {
+          "name": "ran_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "ok": {
+          "name": "ok",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked": {
+          "name": "checked",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "broken_at_seq": {
+          "name": "broken_at_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "elapsed_ms": {
+          "name": "elapsed_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -117,10 +173,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

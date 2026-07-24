@@ -119,4 +119,62 @@ describe('audit_events role privileges', () => {
       ),
     ).resolves.toBeDefined();
   });
+
+  describe('CHECK constraint on hash format (DEV-40, migration 0001)', () => {
+    const insertWithThisHash = (thisHash: string) =>
+      writerPool.query(
+        `INSERT INTO audit_events
+           (id, source_event_id, prev_hash, this_hash, occurred_at, actor_id, action,
+            resource_type, resource_id, payload_summary)
+         VALUES ($1, $2, $3, $4, now(),
+                 $5, 'INSPECTION_SUBMITTED', 'INSPECTION', $6, '{}')`,
+        [randomUUID(), randomUUID(), '0'.repeat(64), thisHash, randomUUID(), randomUUID()],
+      );
+
+    it('rejects a non-hex this_hash', async () => {
+      await expect(insertWithThisHash('x'.repeat(64))).rejects.toThrow(
+        /violates check constraint/i,
+      );
+    });
+
+    it('rejects a too-short this_hash', async () => {
+      await expect(insertWithThisHash('a'.repeat(10))).rejects.toThrow(
+        /violates check constraint/i,
+      );
+    });
+
+    it('rejects an uppercase this_hash', async () => {
+      await expect(insertWithThisHash('A'.repeat(64))).rejects.toThrow(
+        /violates check constraint/i,
+      );
+    });
+  });
+
+  describe('immutability trigger (DEV-40, migration 0001)', () => {
+    // Run as suPool, not writerPool: the role GRANT already blocks writerPool (tested above).
+    // This proves the trigger itself fires, independent of role privileges.
+    it('rejects UPDATE even for a superuser connection', async () => {
+      await insertOne();
+      await expect(
+        suPool.query(
+          `UPDATE audit_events SET this_hash = '${'0'.repeat(64)}' WHERE seq = (SELECT max(seq) FROM audit_events)`,
+        ),
+      ).rejects.toThrow(/append-only/i);
+    });
+
+    it('rejects DELETE even for a superuser connection', async () => {
+      await insertOne();
+      await expect(
+        suPool.query(`DELETE FROM audit_events WHERE seq = (SELECT max(seq) FROM audit_events)`),
+      ).rejects.toThrow(/append-only/i);
+    });
+
+    // TRUNCATE is not a DELETE: row-level triggers never fire on it, so without the dedicated
+    // statement-level trigger it would empty the whole chain unnoticed. Superuser here for the
+    // same reason as above: prove the trigger fires independent of the role GRANT.
+    it('rejects TRUNCATE even for a superuser connection', async () => {
+      await insertOne();
+      await expect(suPool.query(`TRUNCATE audit_events`)).rejects.toThrow(/append-only/i);
+    });
+  });
 });

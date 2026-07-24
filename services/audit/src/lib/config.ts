@@ -7,6 +7,17 @@ import { z } from 'zod';
 const PLACEHOLDER = /^(replace_me|x{4,}|changeme|your[-_].*)$/i;
 const isPlaceholder = (v: string): boolean => PLACEHOLDER.test(v.trim());
 
+// Validated against ICU's tz database (bundled in the Node binary), so this works on the alpine
+// runtime image without an OS tzdata package.
+const isValidTimeZone = (tz: string): boolean => {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const CONNECTION_STRING_MARKER = 'InstrumentationKey=';
 
 // Same shape check media's config.ts uses for AZURE_STORAGE_CONNECTION_STRING: an Azure Storage
@@ -44,6 +55,22 @@ const rawSchema = z.object({
   REPORT_SIGNING_PRIVATE_KEY: z.string().trim().optional(),
   CORE_API_INTERNAL_URL: z.string().trim().default(DEFAULT_CORE_API_INTERNAL_URL),
   CORE_API_INTERNAL_TOKEN: z.string().trim().optional(),
+  // HH:MM, 24h, lab-local time. Nightly full-chain verification job (ARCHITECTURE.md 8.4 rule 7,
+  // DEV-40); distinct from the db-backup service's default 02:00 so the two don't compete for I/O.
+  // "Lab-local" is resolved against LAB_TIMEZONE, not the container's ambient TZ (which is UTC on
+  // the alpine image), so the job actually fires overnight and keeps its spacing from the backup.
+  CHAIN_VERIFY_TIME: z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be HH:MM in 24h format')
+    .default('02:30'),
+  // IANA zone the nightly verification time is interpreted in. Default is SAIT Main Campus's zone;
+  // overridable so a future multi-campus deployment can set its own (CLAUDE.md scalability note).
+  LAB_TIMEZONE: z
+    .string()
+    .trim()
+    .default('America/Edmonton')
+    .refine(isValidTimeZone, 'must be a valid IANA time zone (e.g. America/Edmonton)'),
 });
 
 export type AppConfig = {
@@ -68,6 +95,8 @@ export type AppConfig = {
   reportSigningPrivateKey: string | undefined;
   coreApiInternalUrl: string;
   coreApiInternalToken: string | undefined;
+  chainVerifyTime: string;
+  labTimeZone: string;
 };
 
 export class EnvValidationError extends Error {
@@ -205,6 +234,8 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     reportSigningPrivateKey,
     coreApiInternalUrl: env.CORE_API_INTERNAL_URL,
     coreApiInternalToken,
+    chainVerifyTime: env.CHAIN_VERIFY_TIME,
+    labTimeZone: env.LAB_TIMEZONE,
   };
 };
 

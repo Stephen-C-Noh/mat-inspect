@@ -180,6 +180,10 @@ describe('loadConfig', () => {
     expect(loadConfig(fullDev()).outboxPollIntervalMs).toBe(2000);
   });
 
+  it('defaults OUTBOX_LAG_WARN_MS to 300000', () => {
+    expect(loadConfig(fullDev()).outboxLagWarnMs).toBe(300_000);
+  });
+
   it('exempts NODE_ENV=test from requiring audit delivery config', () => {
     const cfg = loadConfig({
       NODE_ENV: 'test',
