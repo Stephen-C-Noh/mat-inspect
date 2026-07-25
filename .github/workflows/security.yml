@@ -89,6 +89,73 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: '1'
 
+  trivy-image:
+    name: Image scan (Trivy) - ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core-api
+            context: .
+            dockerfile: services/core-api/Dockerfile
+          - name: media
+            context: .
+            dockerfile: services/media/Dockerfile
+          - name: audit
+            context: .
+            dockerfile: services/audit/Dockerfile
+          - name: ai
+            context: services/ai
+            dockerfile: services/ai/Dockerfile
+          # The two Next apps need the public Entra identifiers baked in at build time, same as the
+          # ci.yml build matrix. They are public ids, so plain repo Variables, not Secrets.
+          - name: pwa
+            context: .
+            dockerfile: apps/pwa/Dockerfile
+            build_args: |
+              NEXT_PUBLIC_AZURE_TENANT_ID=${{ vars.ENTRA_TENANT_ID }}
+              NEXT_PUBLIC_AZURE_CLIENT_ID=${{ vars.ENTRA_CLIENT_ID }}
+          - name: dashboard
+            context: .
+            dockerfile: apps/dashboard/Dockerfile
+            build_args: |
+              NEXT_PUBLIC_AZURE_TENANT_ID=${{ vars.ENTRA_TENANT_ID }}
+              NEXT_PUBLIC_AZURE_CLIENT_ID=${{ vars.ENTRA_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Build the runtime image into the local docker daemon (no push). Reuses the same gha cache
+      # scope ci.yml populates, so this rarely rebuilds from scratch.
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: runtime
+          load: true
+          push: false
+          build-args: ${{ matrix.build_args }}
+          tags: mat-inspect/${{ matrix.name }}:scan
+          cache-from: type=gha,scope=${{ matrix.name }}
+
+      # Scans the built image. ignore-unfixed drops CVEs with no upstream fix (nothing to do).
+      # The shared .trivyignore.yaml suppresses only cooldown-blocked dependency fixes, each with an
+      # expiry, mirroring the fs scan and scripts/audit-allowlist.json (DEV-102). exit-code 1 fails
+      # the job on any surviving HIGH or CRITICAL.
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: mat-inspect/${{ matrix.name }}:scan
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+
   hadolint:
     name: Dockerfile lint (Hadolint)
     runs-on: ubuntu-24.04
