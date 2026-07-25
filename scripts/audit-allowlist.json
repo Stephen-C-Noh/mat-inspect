@@ -62,5 +62,13 @@
   "GHSA-955p-x3mx-jcvp": {
     "expires": "2026-07-28",
     "reason": "next 15.5.21 fix (unauthenticated disclosure of internal Server Function endpoints) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa. Tracked in DEV-102."
+  },
+  "GHSA-r28c-9q8g-f849": {
+    "expires": "2026-07-28",
+    "reason": "postcss 8.5.18 fix (path traversal via source map auto-loading) is installable, but postcss is pinned to 8.5.15 by a root override and is held for the DEV-102 batch regen on ~2026-07-28 so a lockfile rewrite does not land mid sprint-5 demo. Build-time only (next/tailwind/autoprefixer), not reachable at runtime. Tracked in DEV-102."
+  },
+  "GHSA-mh99-v99m-4gvg": {
+    "expires": "2026-07-28",
+    "reason": "brace-expansion DoS (unbounded expansion length). Fix is available but shares the npm 11 version-scoped override quirk of GHSA-3jxr-9vmj-r5cp (mixed 2.1.1/2.1.2). Dev/test-only (eslint, testcontainers), no runtime surface. Resolve in the DEV-102 batch with a consistent override."
   }
 }

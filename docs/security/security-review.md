@@ -51,8 +51,9 @@ Both changes live in one `RUN` per Dockerfile: `services/core-api`, `services/me
 image reports 0 HIGH or CRITICAL under `.trivyignore.yaml`, and the only findings left
 without the ignore file are the tracked app-dependency CVEs below.
 
-The AI image (`python:3.12-slim`) had 0 fixable HIGH or CRITICAL OS findings, so it is
-unchanged.
+The AI image (`python:3.12-slim`) had 0 fixable HIGH or CRITICAL OS findings, so the base
+is unchanged. The image scan did surface 3 HIGH in the `starlette` pip package (see
+Accepted below); those need a framework upgrade, tracked separately.
 
 ## Accepted findings
 
@@ -70,6 +71,22 @@ Nine HIGH CVEs are accepted this way as of 2026-07-24, expiring between 2026-07-
 (CVE-2026-47219), `sharp` (GHSA-f88m-g3jw-g9cj), and `next` (CVE-2026-64641,
 CVE-2026-64645, CVE-2026-64649). The DEV-102 phase-2 override batch applies the real
 fixes once they age in. See `.trivyignore.yaml` for the per-CVE rationale.
+
+Two more were disclosed on 2026-07-24 and are deferred to the same DEV-102 batch
+(expiry 2026-07-28): `postcss` (GHSA-r28c-9q8g-f849, path traversal, build-time only)
+and `brace-expansion` (GHSA-mh99-v99m-4gvg, DoS, dev/test only). Both fixes are
+installable but held so a lockfile rewrite does not land mid sprint-5 demo.
+
+### AI image: starlette (tracked in DEV-118)
+
+The AI image ships `starlette` 0.37.2 (transitive via `fastapi==0.111.0`), with 3 HIGH:
+CVE-2024-47874 (DoS), CVE-2026-48818 (SSRF and NTLM credential theft via UNC),
+CVE-2026-54283 (form limits ignored). Clearing all three needs starlette >= 1.3.1, a
+fastapi 0.111 to ~0.140 major jump that also re-ports the FOIP multipart disk-spool guard
+(`max_file_size` moved to `spool_max_size`, plus a new 1 MB `max_part_size` cap). That is
+tracked in DEV-118. Accepted meanwhile (expiry 2026-08-22): the AI Service has no
+unauthenticated browser path and is reached only by core-api over the internal network
+(ADR 0020).
 
 No secrets were accepted. Gitleaks found none.
 

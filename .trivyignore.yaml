@@ -31,3 +31,20 @@ vulnerabilities:
   - id: CVE-2026-64649
     expired_at: 2026-07-28
     statement: 'next 15.5.21 fix (SSRF in Server Actions on custom servers) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+  - id: GHSA-r28c-9q8g-f849
+    expired_at: 2026-07-28
+    statement: 'postcss 8.5.18 fix (path traversal via source map auto-loading) is installable, but postcss is pinned to 8.5.15 by a root override and is held for the DEV-102 batch regen on ~2026-07-28 so a lockfile rewrite does not land mid sprint-5 demo. Build-time only (next/tailwind/autoprefixer), not reachable at runtime.'
+  # starlette CVEs in the AI image (fastapi 0.111.0 pulls starlette 0.37.2). Clearing them needs
+  # starlette >= 1.3.1, a fastapi 0.111 -> ~0.140 major jump that also re-ports the FOIP multipart
+  # disk-spool guard (max_file_size -> spool_max_size, plus the new 1 MB max_part_size cap). Tracked
+  # as DEV-118. Accepted meanwhile: the AI Service has no unauthenticated browser path and is reached
+  # only by core-api over the internal network (ADR 0020). Expiry set past sprint 5 for the upgrade.
+  - id: CVE-2024-47874
+    expired_at: 2026-08-22
+    statement: 'starlette 0.40.0 fix (DoS via multipart). AI image only; internal-only service (ADR 0020). Upgrade tracked in DEV-118.'
+  - id: CVE-2026-48818
+    expired_at: 2026-08-22
+    statement: 'starlette 1.1.0 fix (SSRF and NTLM credential theft via UNC). AI image only; internal-only service (ADR 0020). Upgrade tracked in DEV-118.'
+  - id: CVE-2026-54283
+    expired_at: 2026-08-22
+    statement: 'starlette 1.3.1 fix (request.form limits silently ignored). AI image only; internal-only service (ADR 0020). Upgrade tracked in DEV-118.'
