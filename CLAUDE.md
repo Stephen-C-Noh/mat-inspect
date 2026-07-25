@@ -16,6 +16,8 @@ The capstone therefore delivers two things: a self-contained containerized artif
 
 The Azure services in the stack below stay in the design (Azure Blob Storage, Azure Monitor, Azure Database for PostgreSQL; ADRs 0003 to 0005). Their production halves are deferred, not cancelled: dev and dev-staging run against Azurite and self-hosted Postgres.
 
+For the live capstone demo, the team stands up these managed Azure services on a team-owned Azure tenant and runs the same container images on Azure Container Apps with Azure Front Door, on synthetic data, torn down at handover (ADR 0024). This exercises the managed Azure path once before handover. It is a team-owned demo, not a SAIT-hosted production deployment; ADR 0016 still holds (the capstone does not depend on SAIT hosting). The Compose stack on the mini-PC remains the baseline artifact and the demo fallback.
+
 The architectural source of truth is `docs/ARCHITECTURE.md` (also called the Capstone Plan). Read it before suggesting structural changes.
 
 ---
