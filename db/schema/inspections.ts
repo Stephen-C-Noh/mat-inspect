@@ -71,4 +71,8 @@ export const inspectionResponses = pgTable('inspection_responses', {
   passed: boolean('passed').notNull(),
   notes: text('notes'),
   notesSource: notesSourceEnum('notes_source'),
+  // Per-response references to Media blobs (photo evidence for this checklist item; ADR 0023).
+  // Set once at INSERT; the UPDATE/DELETE-blocking trigger above keeps them immutable. Sealed
+  // into the inspection content hash, so a swapped or removed reference is tamper-evident.
+  photoIds: uuid('photo_ids').array().notNull().default([]),
 });

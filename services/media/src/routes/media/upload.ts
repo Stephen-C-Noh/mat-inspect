@@ -8,9 +8,10 @@ import { logger } from '../../lib/logger.js';
 
 // POST /api/v1/media/upload (DEV-32). Stores a failed-checklist-item photo in Azure Blob Storage
 // and returns its reference. The operator PWA calls this before submitting an inspection, then
-// puts the returned photoId in the InspectionResponse.photo_ids array; the submit endpoint
-// (DEV-18) enforces that a failed BOOLEAN_PHOTO_ON_FAIL item carries a photo. This service only
-// stores the object and returns the id; it writes no core_db row.
+// puts the returned photoId in the InspectionResponse.photo_ids array (ADR 0023, DEV-104). submit
+// stores whatever references it is sent; it does not require a photo on a failed
+// BOOLEAN_PHOTO_ON_FAIL item. This service only stores the object and returns the id; it writes
+// no core_db row.
 //
 // Body: multipart/form-data with a single file field. The file's declared Content-Type is not
 // trusted; the type is decided by sniffing the bytes.

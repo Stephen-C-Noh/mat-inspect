@@ -188,6 +188,10 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
             passed: response.passed,
             notes: response.notes ?? null,
             notesSource: response.notesSource ?? null,
+            // Sealed into the content hash and stored on the immutable row (ADR 0023). Order is
+            // the operator's capture order and is preserved through the uuid[] column, so a later
+            // verifier reconstructs the same bytes.
+            photoIds: response.photoIds,
           }));
 
           if (normalizedResponses.length > 0) {

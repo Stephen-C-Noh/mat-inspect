@@ -288,6 +288,7 @@ describe('inspections API', () => {
         passed: r.passed,
         notes: r.notes ?? null,
         notesSource: r.notesSource ?? null,
+        photoIds: r.photoIds,
       })),
     });
     expect(recomputed).toBe(payload['contentHash']);

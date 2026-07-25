@@ -104,10 +104,10 @@ export const reportsDataRoute: FastifyPluginAsync = async (app) => {
           passed: row.passed,
           notes: row.notes,
           notesSource: row.notesSource,
-          // inspection_responses has no photo_ids column yet (DEV-104 adds it and seals it into
-          // the content hash); always empty until that lands, so the report generator has
-          // nothing to embed today.
-          photoIds: [],
+          // Per-response photo references (ADR 0023). audit reconstructs the content hash from
+          // these, so they must be the real column, not a placeholder, or export-time digest
+          // verification fails.
+          photoIds: row.photoIds,
           // Falls back to the item key when a template was edited or deleted such that the key
           // no longer resolves; the PDF still shows something identifiable rather than throwing.
           prompt: promptByTemplateAndKey.get(`${templateId}:${row.itemKey}`) ?? row.itemKey,

@@ -38,6 +38,7 @@ export const serializeInspectionResponse = (
   passed: row.passed,
   notes: row.notes,
   notesSource: row.notesSource,
+  photoIds: row.photoIds,
 });
 
 export const serializeInspectionDetail = (

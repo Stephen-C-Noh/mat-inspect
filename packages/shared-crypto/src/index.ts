@@ -33,6 +33,11 @@ export type ContentHashResponse = {
   passed: boolean;
   notes: string | null;
   notesSource: NotesSource | null;
+  // Media blob references for this item (ADR 0023). Kept in the array order the operator
+  // captured them; Postgres preserves that order in the uuid[] column, so the seal side
+  // (submit) and the verify side (audit, reading it back) hash the same bytes. Not sorted, for
+  // the same reason value/notes are not: only the multi-row response set needs itemKey sorting.
+  photoIds: string[];
 };
 
 export type ContentHashInput = {

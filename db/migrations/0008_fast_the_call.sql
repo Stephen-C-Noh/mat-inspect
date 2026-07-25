@@ -1,0 +1,1 @@
+ALTER TABLE "inspection_responses" ADD COLUMN "photo_ids" uuid[] DEFAULT '{}' NOT NULL;

@@ -168,6 +168,10 @@ export const inspectionResponseSchema = z.object({
   passed: z.boolean(),
   notes: z.string().optional(),
   notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).optional(),
+  // Media blob references the PWA uploaded for this item before submitting (ADR 0023). Stored
+  // as-is; submit does not require a photo on a failed BOOLEAN_PHOTO_ON_FAIL item and does not
+  // check that the ids resolve. Capped so one response cannot carry an unbounded array.
+  photoIds: z.array(uuidSchema).max(10).default([]),
 });
 
 export const submitInspectionSchema = z.object({
@@ -231,6 +235,8 @@ export const inspectionResponseRecordSchema = z.object({
   passed: z.boolean(),
   notes: z.string().nullable(),
   notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).nullable(),
+  // Media blob references for this item (ADR 0023). Empty array when the operator took no photo.
+  photoIds: z.array(uuidSchema),
 });
 
 export type InspectionResponseRecord = z.infer<typeof inspectionResponseRecordSchema>;
@@ -364,7 +370,8 @@ export type PhotoContentType = z.infer<typeof photoContentTypeSchema>;
 
 // Response for POST /api/v1/media/upload (Media Service, DEV-32). photoId is the stable
 // reference the operator PWA stores in an InspectionResponse.photo_ids array at submit time
-// (DEV-18); it is also the blob name inside the container, so the id alone locates the object.
+// (ADR 0023, DEV-104); it is also the blob name inside the container, so the id alone locates the
+// object.
 // The Media Service writes no core_db row: the association between a photo and an inspection
 // response lives in core_db and is created by the submit endpoint, not here. sha256 is the
 // content hash recorded on the blob for later integrity checks (report/audit export path).
@@ -484,9 +491,9 @@ export const reportInspectionResponseSchema = z.object({
   passed: z.boolean(),
   notes: z.string().nullable(),
   notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).nullable(),
-  // Reserved for DEV-104 (per-response photo evidence, inspection_responses.photo_ids). core-api
-  // returns [] until that column exists; the shape is added now so DEV-104 does not need a second
-  // shared-schemas change to land its data.
+  // Per-response photo evidence, from inspection_responses.photo_ids (ADR 0023, DEV-104). audit
+  // reconstructs the content hash from this field, so core-api returns the real column; the
+  // .default([]) tolerates an older core-api that has not yet been redeployed.
   photoIds: z.array(uuidSchema).default([]),
 });
 
