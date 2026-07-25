@@ -83,12 +83,17 @@ done
 az storage share-rm create -g "$RG" --storage-account "$SA" -n "$AI_SHARE" --quota 5 -o none
 
 echo ">> PostgreSQL Flexible Server (TLS enforced by default)"
-az postgres flexible-server create -g "$RG" -n "$PG" -l "$LOC" \
-  --admin-user "$PG_ADMIN_USER" --admin-password "$PG_ADMIN_PASSWORD" \
-  --tier Burstable --sku-name Standard_B1ms --version 16 --storage-size 32 --yes -o none
+if az postgres flexible-server show -g "$RG" -n "$PG" >/dev/null 2>&1; then
+  echo "   reusing existing server: $PG"
+else
+  az postgres flexible-server create -g "$RG" -n "$PG" -l "$LOC" \
+    --admin-user "$PG_ADMIN_USER" --admin-password "$PG_ADMIN_PASSWORD" \
+    --tier Burstable --sku-name Standard_B1ms --version 16 --storage-size 32 --yes -o none
+fi
 # Allow other Azure services (the special 0.0.0.0 rule) so the Container Apps can reach the server.
-az postgres flexible-server firewall-rule create -g "$RG" -n "$PG" \
-  --rule-name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 -o none
+# firewall-rule create takes the server via --server-name and the rule via --name (re-run safe).
+az postgres flexible-server firewall-rule create -g "$RG" --server-name "$PG" \
+  --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 -o none
 PG_FQDN="${PG}.postgres.database.azure.com"
 
 echo ">> Databases and least-privilege audit roles (mirrors infra/docker/postgres-init.sh)"
@@ -173,19 +178,27 @@ az containerapp create -g "$RG" -n audit --environment "$ACA_ENV" --image "$(img
     "CHAIN_VERIFY_TIME=02:30" "LAB_TIMEZONE=America/Edmonton" -o none
 
 echo ">> core-api"
+# ACA rejects a secret with an empty value. The notification channels are optional (ADR 0013): add
+# their secrets and secretref env-vars only when set, so a blank TEAMS_WEBHOOK_URL / SMTP_PASS leaves
+# the channel silent instead of failing app creation.
+CORE_SECRETS=("coredb=$CORE_API_DB_URL" "ingest=$AUDIT_INGEST_TOKEN" \
+  "appinsights=$APPLICATIONINSIGHTS_CONNECTION_STRING" "internaltoken=$CORE_API_INTERNAL_TOKEN")
+CORE_ENV=("DATABASE_URL=secretref:coredb" \
+  "ENTRA_TENANT_ID=$ENTRA_TENANT_ID" "ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID" \
+  "APPLICATIONINSIGHTS_CONNECTION_STRING=secretref:appinsights" \
+  "AUDIT_INGEST_TOKEN=secretref:ingest" "CORE_API_INTERNAL_TOKEN=secretref:internaltoken" \
+  "SMTP_HOST=$SMTP_HOST" "SMTP_PORT=$SMTP_PORT" "SMTP_USER=$SMTP_USER" \
+  "SUPERVISOR_ALERT_EMAILS=$SUPERVISOR_ALERT_EMAILS")
+if [ -n "$TEAMS_WEBHOOK_URL" ]; then
+  CORE_SECRETS+=("teams=$TEAMS_WEBHOOK_URL"); CORE_ENV+=("TEAMS_WEBHOOK_URL=secretref:teams")
+fi
+if [ -n "$SMTP_PASS" ]; then
+  CORE_SECRETS+=("smtppass=$SMTP_PASS"); CORE_ENV+=("SMTP_PASS=secretref:smtppass")
+fi
 az containerapp create -g "$RG" -n core-api --environment "$ACA_ENV" --image "$(img core-api)" "${REG_ARGS[@]}" \
   --ingress external --target-port 3000 --min-replicas 1 \
-  --secrets "coredb=$CORE_API_DB_URL" "ingest=$AUDIT_INGEST_TOKEN" \
-    "appinsights=$APPLICATIONINSIGHTS_CONNECTION_STRING" "internaltoken=$CORE_API_INTERNAL_TOKEN" \
-    "teams=$TEAMS_WEBHOOK_URL" "smtppass=$SMTP_PASS" \
-  --env-vars \
-    "DATABASE_URL=secretref:coredb" \
-    "ENTRA_TENANT_ID=$ENTRA_TENANT_ID" "ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID" \
-    "APPLICATIONINSIGHTS_CONNECTION_STRING=secretref:appinsights" \
-    "AUDIT_INGEST_TOKEN=secretref:ingest" "CORE_API_INTERNAL_TOKEN=secretref:internaltoken" \
-    "TEAMS_WEBHOOK_URL=secretref:teams" \
-    "SMTP_HOST=$SMTP_HOST" "SMTP_PORT=$SMTP_PORT" "SMTP_USER=$SMTP_USER" "SMTP_PASS=secretref:smtppass" \
-    "SUPERVISOR_ALERT_EMAILS=$SUPERVISOR_ALERT_EMAILS" -o none
+  --secrets "${CORE_SECRETS[@]}" \
+  --env-vars "${CORE_ENV[@]}" -o none
 
 echo ">> pwa and dashboard"
 az containerapp create -g "$RG" -n pwa --environment "$ACA_ENV" --image "$(img pwa)" "${REG_ARGS[@]}" \
