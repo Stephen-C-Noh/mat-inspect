@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { MsalProviderWrapper } from '@/components/msal-provider-wrapper';
 import { ReactQueryProvider } from '@/components/query-provider';
+import { InspectionDraftProvider } from '@/components/inspection-draft-provider';
 import { TopBar } from '@/components/ui/top-bar';
 import { AuthGuard } from '@/components/auth-guard';
 import '@mat-inspect/design-tokens/tokens.css';
@@ -25,8 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <MsalProviderWrapper>
           <ReactQueryProvider>
-            <TopBar />
-            <AuthGuard>{children}</AuthGuard>
+            <InspectionDraftProvider>
+              <TopBar />
+              <AuthGuard>{children}</AuthGuard>
+            </InspectionDraftProvider>
           </ReactQueryProvider>
         </MsalProviderWrapper>
       </body>

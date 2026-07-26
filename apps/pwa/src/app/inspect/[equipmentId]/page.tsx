@@ -1,12 +1,15 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useRef, useState, type ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
 import { useActiveChecklist } from '@/hooks/use-active-checklist';
+import { useSubmitInspection } from '@/hooks/use-submit-inspection';
+import { useInspectionDraft } from '@/components/inspection-draft-provider';
 import { ChecklistItemCard } from '@/components/checklist/checklist-item-card';
 import { InspectionProgressCard } from '@/components/checklist/inspection-progress-card';
+import { buildSubmitPayload } from '@/lib/inspection-submit';
 import {
   answeredCount,
   failedCount,
@@ -38,6 +41,13 @@ function ChecklistView(): ReactElement {
   const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
 
+  const { setDraft, setResult } = useInspectionDraft();
+  const submitInspection = useSubmitInspection();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  // One idempotency key per mounted checklist screen, so an operator retrying a failed pass-path
+  // submit replays the original 201 instead of creating a second inspection (ADR 0009).
+  const idempotencyKeyRef = useRef<string>('');
+
   if (equipmentLoading) return <div className="p-8 text-center">Loading equipment...</div>;
   if (equipmentError)
     return <div className="p-8 text-center text-destructive">Error loading equipment.</div>;
@@ -57,14 +67,63 @@ function ChecklistView(): ReactElement {
   const answered = answeredCount(template.items, answers);
   const failures = failedCount(template.items, answers);
 
-  // The submit control state is wired here (DEV-16); the actual POST is Sprint 2. With
-  // failures the action moves the operator to failure documentation (design 04), so the
-  // label and color change to signal that, per design 03.
+  // With failures the action moves the operator to failure documentation (design 04), so the
+  // label and color change to signal that, per design 03. On the clean path the button submits
+  // the inspection directly (DEV-123).
   const submitLabel =
     failures > 0
       ? `Proceed with (${failures}) Failure${failures === 1 ? '' : 's'}`
       : 'Submit Inspection';
   const submitColor = failures > 0 ? 'bg-warning' : 'bg-primary';
+
+  const isSubmitting = submitInspection.isPending;
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!canSubmit || isSubmitting) return;
+    setSubmitError(null);
+
+    // Any failure sends the operator to document each defect first; the POST happens from that
+    // screen once photos and notes are attached. The answers ride along in the shared draft.
+    if (failures > 0) {
+      setDraft({
+        equipmentId: equipment.id,
+        templateId: template.id,
+        items: template.items,
+        answers,
+        inlineNotes: notes,
+      });
+      router.push(`/checklist/${params.equipmentId}/failures`);
+      return;
+    }
+
+    // Clean path: submit the attested answers now.
+    if (idempotencyKeyRef.current === '') {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
+
+    try {
+      const payload = buildSubmitPayload({
+        equipmentId: equipment.id,
+        templateId: template.id,
+        items: template.items,
+        answers,
+        inlineNotes: notes,
+      });
+      const inspection = await submitInspection.mutateAsync({
+        payload,
+        idempotencyKey: idempotencyKeyRef.current,
+      });
+      setResult({
+        equipmentId: equipment.id,
+        inspectionId: inspection.id,
+        result: inspection.result,
+        failures: [],
+      });
+      router.push(`/checklist/${params.equipmentId}/submitted`);
+    } catch {
+      setSubmitError('Could not submit the inspection. Check your connection and try again.');
+    }
+  };
 
   return (
     <main className="min-h-screen bg-muted pb-28">
@@ -99,25 +158,27 @@ function ChecklistView(): ReactElement {
           />
         ))}
 
+        {submitError && (
+          <p
+            role="status"
+            className="fixed inset-x-4 bottom-20 mx-auto max-w-xl text-center text-xs font-semibold text-destructive"
+          >
+            {submitError}
+          </p>
+        )}
+
         <button
           type="button"
-          disabled={!canSubmit}
+          disabled={!canSubmit || isSubmitting}
           title={canSubmit ? undefined : 'Answer all required items to submit'}
-          onClick={() => {
-            if (!canSubmit) return;
-            if (failures > 0) {
-              router.push(`/checklist/${params.equipmentId}/failures`);
-            } else {
-              router.push(`/checklist/${params.equipmentId}/submitted`);
-            }
-          }}
+          onClick={handleSubmit}
           className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-lg py-4 text-base font-bold shadow-card ${
-            canSubmit
+            canSubmit && !isSubmitting
               ? `${submitColor} text-primary-foreground`
               : 'cursor-not-allowed bg-muted-foreground text-background'
           }`}
         >
-          {submitLabel}
+          {isSubmitting ? 'Submitting...' : submitLabel}
         </button>
       </div>
     </main>

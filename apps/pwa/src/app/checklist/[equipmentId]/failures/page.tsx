@@ -2,12 +2,20 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useRef, useEffect, type ReactElement } from 'react';
+import { useState, useRef, useEffect, useMemo, type ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { mediaUploadResponseSchema } from '@mat-inspect/shared-schemas';
 import { AuthGuard } from '@/components/auth-guard';
 import { acquireAccessToken } from '@/lib/auth';
+import { useInspectionDraft } from '@/components/inspection-draft-provider';
+import { useSubmitInspection } from '@/hooks/use-submit-inspection';
+import {
+  buildSubmitPayload,
+  collectFailedItems,
+  type FailedItem,
+  type FailureDocs,
+} from '@/lib/inspection-submit';
 import {
   applyTextEdit,
   applyTranscript,
@@ -21,11 +29,6 @@ import {
   type FailureEntry,
 } from '@/lib/voice-notes';
 
-const MOCK_FAILURES = [
-  { id: '1', question: 'Tire Condition & Pressure?' },
-  { id: '2', question: 'Brake Functionality?' },
-];
-
 function FailureCard({
   failure,
   index,
@@ -33,7 +36,7 @@ function FailureCard({
   entry,
   onChange,
 }: {
-  failure: (typeof MOCK_FAILURES)[0];
+  failure: FailedItem;
   index: number;
   total: number;
   entry: FailureEntry;
@@ -192,7 +195,7 @@ function FailureCard({
           <p className="text-xs font-bold text-warning mb-0.5">
             Failure {index + 1} of {total}
           </p>
-          <h3 className="text-base font-extrabold text-foreground">{failure.question}</h3>
+          <h3 className="text-base font-extrabold text-foreground">{failure.prompt}</h3>
         </div>
 
         {/* Photo */}
@@ -287,22 +290,48 @@ function FailuresContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
   const { instance, accounts } = useMsal();
+  const { draft, setResult } = useInspectionDraft();
+  const submitInspection = useSubmitInspection();
 
-  const [entries, setEntries] = useState<Record<string, FailureEntry>>(
-    Object.fromEntries(MOCK_FAILURES.map((f) => [f.id, emptyFailureEntry()])),
+  // The failed items to document come from the answers the checklist screen carried over. Without
+  // a draft (a hard refresh dropped it), there is nothing to document: send the operator back to
+  // re-answer rather than showing an empty screen.
+  const failedItems = useMemo(
+    () => (draft ? collectFailedItems(draft.items, draft.answers) : []),
+    [draft],
   );
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  //New state for displaying the submit error on screen
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!draft) router.replace(`/inspect/${params.equipmentId}`);
+  }, [draft, params.equipmentId, router]);
 
-  const allPhotosAttached = Object.values(entries).every((e) => e.photo !== null);
+  const [entries, setEntries] = useState<Record<string, FailureEntry>>({});
+
+  // Seed one entry per failed item once the list is known, keyed by item key.
+  useEffect(() => {
+    setEntries((prev) => {
+      const next: Record<string, FailureEntry> = {};
+      for (const item of failedItems) {
+        next[item.itemKey] = prev[item.itemKey] ?? emptyFailureEntry();
+      }
+      return next;
+    });
+  }, [failedItems]);
+
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  // One idempotency key per mounted screen so a retry after a failed submit replays the original
+  // 201 instead of creating a second inspection (ADR 0009).
+  const idempotencyKeyRef = useRef<string>('');
+
+  const isSubmitting = submitInspection.isPending;
+  const allPhotosAttached =
+    failedItems.length > 0 && failedItems.every((item) => entries[item.itemKey]?.photo != null);
 
   const updateEntry = (id: string, update: (prev: FailureEntry) => FailureEntry) => {
-    setEntries((prev) => ({ ...prev, [id]: update(prev[id]!) }));
+    setEntries((prev) => ({ ...prev, [id]: update(prev[id] ?? emptyFailureEntry()) }));
   };
 
-  const uploadPhoto = async (photoUrl: string) => {
+  const uploadPhoto = async (photoUrl: string): Promise<string> => {
     const response = await fetch(photoUrl);
     const blob = await response.blob();
     const accessToken = await acquireAccessToken(instance, accounts);
@@ -316,43 +345,70 @@ function FailuresContent(): ReactElement {
     });
 
     if (!res.ok) throw new Error('Upload failed');
-    return mediaUploadResponseSchema.parse(await res.json());
+    return mediaUploadResponseSchema.parse(await res.json()).photoId;
   };
 
-  //Updated handleSubmit without alert() or console.error
-  // Handles the final submission workflow. Uploads photos, captures the returned
-  // media references per DEV-33 criteria, and updates the state before transitioning.
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
+  // Uploads each evidence photo, seals its reference plus the operator's defect note into the
+  // matching checklist response, then submits the whole inspection (DEV-123). The POST carries
+  // every answer, not just the failures, so the server derives the result from the full set.
+  const handleSubmit = async (): Promise<void> => {
+    if (!draft || !allPhotosAttached || isSubmitting) return;
     setSubmitError(null);
+
+    if (idempotencyKeyRef.current === '') {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
+
     try {
-      // 1. Upload each photo and catch the server's reply (the photo reference ID)
-      const uploadPromises = Object.entries(entries).map(async ([id, entry]) => {
-        const result = await uploadPhoto(entry.photo!);
-        return { id, mediaRef: result.photoId };
+      const uploaded = await Promise.all(
+        failedItems.map(async (item) => {
+          const entry = entries[item.itemKey]!;
+          const photoId = await uploadPhoto(entry.photo!);
+          return { itemKey: item.itemKey, photoId, entry };
+        }),
+      );
+
+      const failureDocs: FailureDocs = {};
+      for (const { itemKey, photoId, entry } of uploaded) {
+        failureDocs[itemKey] = {
+          notes: entry.notes,
+          notesSource: entry.notesSource,
+          photoIds: [photoId],
+        };
+      }
+
+      const payload = buildSubmitPayload({
+        equipmentId: draft.equipmentId,
+        templateId: draft.templateId,
+        items: draft.items,
+        answers: draft.answers,
+        inlineNotes: draft.inlineNotes,
+        failureDocs,
       });
 
-      const uploadedRefs = await Promise.all(uploadPromises);
-
-      // 2. We attach those returned photo IDs to our failure items
-      setEntries((prev) => {
-        const updated = { ...prev };
-        uploadedRefs.forEach(({ id, mediaRef }) => {
-          if (updated[id]) {
-            updated[id] = { ...updated[id]!, mediaRef };
-          }
-        });
-        return updated;
+      const inspection = await submitInspection.mutateAsync({
+        payload,
+        idempotencyKey: idempotencyKeyRef.current,
       });
 
-      // 3. Go to the success screen!
+      setResult({
+        equipmentId: draft.equipmentId,
+        inspectionId: inspection.id,
+        result: inspection.result,
+        failures: failedItems.map((item) => ({
+          prompt: item.prompt,
+          notes: entries[item.itemKey]?.notes ?? '',
+          photoUrl: entries[item.itemKey]?.photo ?? null,
+        })),
+      });
+
       router.push(`/checklist/${params.equipmentId}/submitted/fail`);
     } catch {
-      setSubmitError('Failed to upload photos. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      setSubmitError('Could not submit the inspection. Check your connection and try again.');
     }
   };
+
+  if (!draft) return <></>;
 
   return (
     <main className="min-h-screen bg-muted pb-32">
@@ -377,14 +433,14 @@ function FailuresContent(): ReactElement {
           </p>
         </div>
 
-        {MOCK_FAILURES.map((f, i) => (
+        {failedItems.map((f, i) => (
           <FailureCard
-            key={f.id}
+            key={f.itemKey}
             failure={f}
             index={i}
-            total={MOCK_FAILURES.length}
-            entry={entries[f.id]!}
-            onChange={(update) => updateEntry(f.id, update)}
+            total={failedItems.length}
+            entry={entries[f.itemKey] ?? emptyFailureEntry()}
+            onChange={(update) => updateEntry(f.itemKey, update)}
           />
         ))}
       </div>
@@ -409,13 +465,13 @@ function FailuresContent(): ReactElement {
           }`}
         >
           {isSubmitting
-            ? 'Uploading...'
+            ? 'Submitting...'
             : allPhotosAttached
               ? 'Submit Inspection with Failures'
               : 'Attach all photos to continue'}
         </button>
 
-        <Link href={`/checklist/${params.equipmentId}/submitted`} className="block">
+        <Link href={`/inspect/${params.equipmentId}`} className="block">
           <button
             type="button"
             className="w-full rounded-sm border border-border bg-card py-3 text-sm font-semibold text-muted-foreground shadow-card"
