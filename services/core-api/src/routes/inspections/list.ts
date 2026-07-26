@@ -4,22 +4,23 @@ import { and, desc, eq, gte, lte, type SQL } from 'drizzle-orm';
 import { inspectionListItemSchema, listInspectionsQuerySchema } from '@mat-inspect/shared-schemas';
 import { db, inspections, users } from '../../db/index.js';
 import { logger } from '../../lib/logger.js';
+import { httpError } from '../../lib/http-error.js';
 import { requireRole } from '../../middleware/auth.js';
+import { canReadAllInspections } from '../../lib/inspection-access.js';
 import { serializeInspectionListItem } from './serialize.js';
 
-// Backs the fleet drilldown history (DEV-37): filtered by equipmentId for a single machine, or
-// by operatorId/from/to for the fleet-wide filter bar. limit keeps the page flat as history
-// accumulates (NFR: drilldown under 500ms); there is no cursor yet since the capstone's fleet
-// and inspection volume do not need one (same reasoning as the equipment list, DEV-24).
-//
-// Dashboard-only route (apps/dashboard use-inspections.ts is the sole caller). operator is
-// deliberately excluded, same as GET /inspections/:id: this list lets a caller enumerate every
-// operator's inspections by operatorId, and the detail it links to exposes voice-transcript PII.
+// Backs two audiences off one route. The dashboard (supervisor/manager/admin) reads any operator's
+// inspections, filtered by equipmentId for a single machine or by operatorId/from/to for the
+// fleet-wide filter bar (DEV-37). The operator PWA reads the operator's own history (DEV-115): an
+// operator-only caller is force-scoped to their own operatorId here, because this list can
+// otherwise enumerate any operator's inspections and the detail it links to exposes
+// voice-transcript PII (FOIP). limit keeps the page flat as history accumulates (NFR: under 500ms);
+// there is no cursor yet since the capstone's inspection volume does not need one (DEV-24).
 export const listInspectionsRoute: FastifyPluginAsync = async (app) => {
   app.get(
     '/inspections',
     {
-      preHandler: [requireRole('supervisor', 'manager', 'admin')],
+      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin')],
       schema: {
         querystring: listInspectionsQuerySchema,
         response: { 200: z.array(inspectionListItemSchema) },
@@ -28,9 +29,19 @@ export const listInspectionsRoute: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const query = listInspectionsQuerySchema.parse(req.query);
 
+      // Operator-only callers see their own inspections. A request for someone else's operatorId is
+      // refused rather than silently rewritten, so the client is not misled about whose data it got.
+      let operatorId = query.operatorId;
+      if (!canReadAllInspections(req.user.roles)) {
+        if (operatorId && operatorId !== req.user.id) {
+          throw httpError(403, 'FORBIDDEN', 'Operators may only list their own inspections');
+        }
+        operatorId = req.user.id;
+      }
+
       const filters: SQL[] = [];
       if (query.equipmentId) filters.push(eq(inspections.equipmentId, query.equipmentId));
-      if (query.operatorId) filters.push(eq(inspections.operatorId, query.operatorId));
+      if (operatorId) filters.push(eq(inspections.operatorId, operatorId));
       if (query.from) filters.push(gte(inspections.submittedAt, new Date(query.from)));
       if (query.to) filters.push(lte(inspections.submittedAt, new Date(query.to)));
 
