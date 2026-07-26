@@ -215,7 +215,10 @@ describe('inspections API', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('provisions an unknown operator exactly once across repeated submits (DEV-124)', async () => {
+  it('provisioning is idempotent: repeated submits by the same new operator keep one users row (DEV-124)', async () => {
+    // The upsert is onConflictDoNothing, so a second submit by the same operator succeeds and does
+    // not create a duplicate row (nor error on the users.id primary key), whether or not the
+    // in-process cache short-circuits the write.
     const newOperatorId = randomUUID();
     const token = await makeToken('operator', newOperatorId);
     const passResponses = [

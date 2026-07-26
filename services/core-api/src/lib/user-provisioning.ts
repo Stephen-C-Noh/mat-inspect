@@ -18,15 +18,22 @@ import { logger } from './logger.js';
 // the DB conflict clause is the real guard.
 const provisionedIds = new Set<string>();
 
+// displayName is NOT NULL and is recorded onto inspections as the operator's name (submit.ts,
+// OHS s.257), so prefer the token's `name` claim; fall back to the email, then the id, when the
+// token omits it. The row is written once and not overwritten (see onConflictDoNothing below), so
+// this is the operator's recorded name until an admin edits it.
+const deriveDisplayName = (user: AuthUser): string => user.name || user.email || user.id;
+
 // email is NOT NULL and UNIQUE. A dev token (and some Entra tokens) carry no upn/preferred_username,
 // so req.user.email can be empty; fall back to an id-derived placeholder so two unnamed users never
-// collide on the unique constraint. displayName is NOT NULL; the email, then the id, stand in until
-// a name claim or an admin edit fills it.
-const deriveDisplayName = (user: AuthUser): string => user.email || user.id;
+// collide on the unique constraint.
 const deriveEmail = (user: AuthUser): string => user.email || `${user.id}@placeholder.local`;
 
 // Idempotent upsert. Inserts the row on first sight; an existing row (seeded, or provisioned by a
-// concurrent request) is left untouched. Safe to call on every authenticated request.
+// concurrent request) is left untouched (DoNothing, not DoUpdate): a later login carrying a poorer
+// token, e.g. a dev token with no name or email, must not overwrite a good seeded row with a
+// placeholder. The trade-off is that a placeholder row is corrected by an admin edit, not by a
+// subsequent login. Safe to call on every authenticated request.
 export const provisionUser = async (user: AuthUser): Promise<void> => {
   // Imported lazily: the db barrel builds the Drizzle client from config() at module-eval time,
   // and this module is pulled in through the auth middleware, which tests import before they set
@@ -54,9 +61,4 @@ export const ensureUserProvisioned = async (user: AuthUser): Promise<void> => {
   } catch (err) {
     logger.warn({ err, userId: user.id }, 'user provisioning failed');
   }
-};
-
-// Test seam: clears the process cache so a test can assert the write happens again.
-export const resetProvisionedUserCacheForTest = (): void => {
-  provisionedIds.clear();
 };
