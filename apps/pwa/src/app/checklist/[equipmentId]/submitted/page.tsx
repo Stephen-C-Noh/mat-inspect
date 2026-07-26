@@ -93,7 +93,7 @@ function SubmittedContent(): ReactElement {
             </button>
           </Link>
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/" className="block">
+            <Link href="/history" className="block">
               <button
                 type="button"
                 className="flex w-full items-center justify-center gap-1.5 rounded-sm border border-border bg-card py-3.5 text-sm font-semibold text-foreground"
