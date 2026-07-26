@@ -297,4 +297,56 @@ describe('GET /inspections and GET /inspections/:id', () => {
     expect(untouched.lastInspectionResult).toBeNull();
     expect(untouched.lastInspectionOperatorDisplayName).toBeNull();
   });
+
+  // Operator self-scoped history (DEV-115). Placed last: these submit an OTHER_OPERATOR_ID
+  // inspection to equipmentId, which would otherwise change the "last inspection" operator the
+  // GET /equipment test above asserts is Jane Operator.
+  it('scopes an operator to their own inspections when no operatorId is given (DEV-115)', async () => {
+    const mine = await submit({ operatorToken, passed: true });
+    const otherToken = await makeToken('operator', OTHER_OPERATOR_ID);
+    await submit({ operatorToken: otherToken, passed: true });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/inspections',
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Array<{ id: string; operatorId: string }>;
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.every((row) => row.operatorId === OPERATOR_ID)).toBe(true);
+    expect(body.some((row) => row.id === mine.id)).toBe(true);
+  });
+
+  it('forbids an operator from listing another operator by operatorId (DEV-115)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/inspections?operatorId=${OTHER_OPERATOR_ID}`,
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('lets an operator read the detail of their own inspection (DEV-115)', async () => {
+    const created = await submit({ operatorToken, passed: false });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/inspections/${created.id}`,
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().operatorDisplayName).toBe('Jane Operator');
+  });
+
+  it("hides another operator's inspection detail from an operator with a 404, not a 403 (DEV-115)", async () => {
+    const otherToken = await makeToken('operator', OTHER_OPERATOR_ID);
+    const theirs = await submit({ operatorToken: otherToken, passed: true });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/inspections/${theirs.id}`,
+      headers: { authorization: `Bearer ${operatorToken}` },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().title).toBe('INSPECTION_NOT_FOUND');
+  });
 });

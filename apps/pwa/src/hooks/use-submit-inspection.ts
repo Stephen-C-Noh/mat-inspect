@@ -1,4 +1,4 @@
-import { useMutation, type UseMutationResult } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { useMsal } from '@azure/msal-react';
 import {
   inspectionSchema,
@@ -21,8 +21,16 @@ type SubmitArgs = {
 // retry with the same idempotency key.
 export const useSubmitInspection = (): UseMutationResult<Inspection, Error, SubmitArgs> => {
   const { instance, accounts } = useMsal();
+  const queryClient = useQueryClient();
 
   return useMutation<Inspection, Error, SubmitArgs>({
+    // A fresh submit changes the operator's history and the equipment's last-inspection/status, so
+    // drop those caches; otherwise the just-submitted inspection is missing from the recent list
+    // and /history until React Query's staleTime elapses.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['my-inspections'] });
+      void queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    },
     mutationFn: async ({ payload, idempotencyKey }) => {
       const accessToken = await acquireAccessToken(instance, accounts);
 
