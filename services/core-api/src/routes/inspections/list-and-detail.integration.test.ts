@@ -198,6 +198,72 @@ describe('GET /inspections and GET /inspections/:id', () => {
     ]);
   });
 
+  it('round-trips per-response photo references on submit and detail read', async () => {
+    const photoA = randomUUID();
+    const photoB = randomUUID();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/inspections',
+      headers: {
+        authorization: `Bearer ${operatorToken}`,
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        equipmentId,
+        templateId,
+        responses: [
+          { itemKey: 'horn', value: true, passed: true },
+          { itemKey: 'forks-condition', value: false, passed: false, photoIds: [photoA, photoB] },
+        ],
+        attested: true,
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const created = res.json();
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/inspections/${created.id}`,
+      headers: { authorization: `Bearer ${managerToken}` },
+    });
+    expect(detail.statusCode).toBe(200);
+    const byKey = Object.fromEntries(
+      detail
+        .json()
+        .responses.map((r: { itemKey: string; photoIds: string[] }) => [r.itemKey, r.photoIds]),
+    );
+    // Preserved in submit order on the item that carried them; empty array (not absent) on the
+    // item that carried none.
+    expect(byKey['forks-condition']).toEqual([photoA, photoB]);
+    expect(byKey['horn']).toEqual([]);
+  });
+
+  it('rejects a response carrying more than 10 photo references', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/inspections',
+      headers: {
+        authorization: `Bearer ${operatorToken}`,
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        equipmentId,
+        templateId,
+        responses: [
+          { itemKey: 'horn', value: true, passed: true },
+          {
+            itemKey: 'forks-condition',
+            value: false,
+            passed: false,
+            photoIds: Array.from({ length: 11 }, () => randomUUID()),
+          },
+        ],
+        attested: true,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('returns 404 for a well-formed but unknown inspection id', async () => {
     const res = await app.inject({
       method: 'GET',

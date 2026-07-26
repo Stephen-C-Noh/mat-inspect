@@ -56,6 +56,7 @@ const sealInspectionEvent = async (inspection: ReportInspectionDetail): Promise<
       passed: r.passed,
       notes: r.notes,
       notesSource: r.notesSource,
+      photoIds: r.photoIds,
     })),
   });
   await appendAuditEvent({
@@ -150,6 +151,40 @@ describe('chain-segment (DEV-38 export-time verification)', () => {
     ]);
     // The chain's own structural integrity is unaffected by a core_db-side tamper; only the
     // digest comparison catches it.
+    expect(result.chainOk).toBe(true);
+  });
+
+  it('detects tampering: a photo reference changed after sealing no longer matches', async () => {
+    const { buildChainSegmentForInspections } = await import('./chain-segment.js');
+    const photoA = randomUUID();
+    const photoB = randomUUID();
+    const inspection = makeInspectionDetail({
+      responses: [
+        {
+          itemKey: 'brakes',
+          prompt: 'Brakes engage cleanly?',
+          value: false,
+          passed: false,
+          notes: null,
+          notesSource: null,
+          photoIds: [photoA, photoB],
+        },
+      ],
+    });
+    await sealInspectionEvent(inspection);
+
+    // A swapped photo reference is answer content under ADR 0023, so it must break the digest the
+    // same way a changed pass/fail does.
+    const tampered: ReportInspectionDetail = {
+      ...inspection,
+      responses: [{ ...inspection.responses[0]!, photoIds: [photoA] }],
+    };
+
+    const result = await buildChainSegmentForInspections([tampered]);
+
+    expect(result.digestChecks).toEqual([
+      { inspectionId: inspection.id, auditEventFound: true, digestMatches: false },
+    ]);
     expect(result.chainOk).toBe(true);
   });
 

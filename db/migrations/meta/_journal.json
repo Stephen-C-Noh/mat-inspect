@@ -57,6 +57,13 @@
       "when": 1782980619956,
       "tag": "0007_numerous_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784955085512,
+      "tag": "0008_fast_the_call",
+      "breakpoints": true
     }
   ]
 }

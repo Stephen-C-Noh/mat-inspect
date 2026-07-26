@@ -8,6 +8,8 @@ const INTERNAL_TOKEN = 'reports-data-test-token';
 // users.id has no default: it stores the Entra oid directly (db/schema/users.ts), so an insert
 // must always supply one explicitly.
 const OPERATOR_ID = randomUUID();
+const BRAKE_PHOTO_A = randomUUID();
+const BRAKE_PHOTO_B = randomUUID();
 
 describe('POST /internal/reports-data', () => {
   let container: import('@testcontainers/postgresql').StartedPostgreSqlContainer;
@@ -91,6 +93,7 @@ describe('POST /internal/reports-data', () => {
       passed: false,
       notes: 'Grinding noise on engagement',
       notesSource: 'TYPED',
+      photoIds: [BRAKE_PHOTO_A, BRAKE_PHOTO_B],
     });
 
     await migrationDb.insert(defects).values({
@@ -170,7 +173,7 @@ describe('POST /internal/reports-data', () => {
         passed: false,
         notes: 'Grinding noise on engagement',
         notesSource: 'TYPED',
-        photoIds: [],
+        photoIds: [BRAKE_PHOTO_A, BRAKE_PHOTO_B],
       },
     ]);
     expect(inspection.defects).toHaveLength(1);

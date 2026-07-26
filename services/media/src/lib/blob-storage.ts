@@ -35,8 +35,8 @@ const getContainerClient = (): Promise<ContainerClient> => {
 };
 
 // The stored-photo reference returned to the caller. photoId is the value the PWA later puts in
-// InspectionResponse.photo_ids (DEV-18); blobName equals photoId, so the id alone locates the
-// object inside the container.
+// InspectionResponse.photo_ids (ADR 0023, DEV-104); blobName equals photoId, so the id alone
+// locates the object inside the container.
 export type StoredPhoto = {
   photoId: string;
   container: string;

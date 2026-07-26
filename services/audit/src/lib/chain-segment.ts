@@ -81,6 +81,10 @@ export const buildChainSegmentForInspections = async (
         passed: response.passed,
         notes: response.notes,
         notesSource: response.notesSource,
+        // Part of the sealed digest since ADR 0023; core-api seals it, so omitting it here would
+        // make every inspection that carries photos (and every one that carries none, since []
+        // is still in the hashed shape) report a false mismatch.
+        photoIds: response.photoIds,
       })),
     });
 
