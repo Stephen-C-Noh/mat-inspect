@@ -2,6 +2,7 @@
 
 Date: 2026-06-30
 Status: Accepted
+Amended by: ADR 0024 (adds a team-owned Azure demo deployment for the capstone; 0016's core decision, that the capstone does not depend on SAIT hosting, is unchanged)
 
 ## Context
 
