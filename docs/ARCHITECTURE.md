@@ -339,10 +339,10 @@ Token policy:
 
 Two layers:
 
-1. Caddy passes the JWT; `verifyToken` middleware validates the signature against the Entra ID JWKS endpoint and extracts the role claim.
-2. Each service re-validates and enforces fine-grained permissions per endpoint via Casbin or a simple JSON policy.
+1. The gateway (Caddy, or Azure Front Door on the ACA demo) forwards the request with its bearer token; the shared `verifyToken` middleware validates the signature against the Entra ID JWKS endpoint and extracts the role claim.
+2. Each service enforces authorization per route with the `requireRole(...)` preHandler (`packages/shared-auth-server`). There is no central Casbin or JSON policy layer; that was considered but never built (ADR 0014).
 
-Endpoints without a declared permission fail closed.
+Endpoints without a declared role fail closed. A boot-time `onRoute` guard crashes any service that registers a non-public route without an authenticator, so a forgotten role check cannot ship (ADR 0014).
 
 ### 8.3 Transport and Storage Security
 
@@ -593,16 +593,16 @@ All endpoints validate input with Zod schemas. Generating an OpenAPI spec from t
 
 ### 12.1 Environments
 
-| Environment   | Purpose                                                               | Hosting                                                            |
-| ------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Local dev     | Each student's laptop                                                 | Docker Compose, single host                                        |
-| Dev staging   | Shared environment for daily integration testing; synthetic data only | Team-owned mini-PC on Tailscale (Sprints 0 to 6); see Section 12.7 |
-| Capstone demo | Sprint 5 and Sprint 6 sponsor demos; synthetic data only              | Team-owned mini-PC; same host as dev staging                       |
-| Production    | Live use at SAIT (post-handover, if School of MAT adopts the app)     | SAIT-controlled infrastructure, provisioned by SAIT IT on request  |
+| Environment   | Purpose                                                               | Hosting                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Local dev     | Each student's laptop                                                 | Docker Compose, single host                                                                                                              |
+| Dev staging   | Shared environment for daily integration testing; synthetic data only | Team-owned mini-PC on Tailscale (Sprints 0 to 6); see Section 12.7                                                                       |
+| Capstone demo | Sprint 5 and Sprint 6 sponsor demos and pilot; synthetic data only    | Team-owned Azure tenant: Azure Container Apps with Front Door and a managed data tier (ADR 0024). Compose on the mini-PC is the fallback |
+| Production    | Live use at SAIT (post-handover, if School of MAT adopts the app)     | SAIT-controlled infrastructure, provisioned by SAIT IT on request                                                                        |
 
 ### 12.2 Hosting Strategy
 
-All services run in Docker containers via Docker Compose for the full capstone period. This is the only deployment path.
+All services run in Docker containers via Docker Compose. This is the baseline path for local dev, dev staging, and any SAIT self-hosted deployment. For the live capstone demo the same container images run on Azure Container Apps, with Azure Front Door as the edge (TLS and `/api/v1` path routing) and the managed data tier (Azure Blob, Azure Database for PostgreSQL Flexible Server, Azure Monitor); the AI Service runs as an internal-ingress Container App (ADR 0024). That is a deployment-topology change on the same images, not a code change. See `docs/runbooks/azure-deployment-and-entra-setup.md`.
 
 **Why all-in-Docker:**
 
