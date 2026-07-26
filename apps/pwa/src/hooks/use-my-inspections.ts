@@ -68,5 +68,8 @@ export const useMyInspectionDetail = (
       return inspectionDetailSchema.parse(await res.json());
     },
     enabled: accounts.length > 0 && !!id,
+    // A 404 is expected here (an id the operator does not own, or a bad deep link); do not retry an
+    // error that will not change. Matches use-equipment-by-id / use-equipment-lookup.
+    retry: false,
   });
 };

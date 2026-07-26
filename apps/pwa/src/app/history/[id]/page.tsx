@@ -1,11 +1,11 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useMemo, type ReactElement } from 'react';
+import { type ReactElement } from 'react';
 import { ChevronLeft, CheckCircle, XCircle, ImageIcon, Mic } from 'lucide-react';
 import type { InspectionResponseRecord } from '@mat-inspect/shared-schemas';
 import { AuthGuard } from '@/components/auth-guard';
-import { useEquipmentList } from '@/hooks/use-equipment';
+import { useEquipmentById } from '@/hooks/use-equipment-by-id';
 import { useMyInspectionDetail } from '@/hooks/use-my-inspections';
 import { RESULT_DISPLAY, formatInspectionDate } from '@/lib/inspection-display';
 
@@ -59,13 +59,9 @@ function ResponseRow({ response }: { response: InspectionResponseRecord }): Reac
 function DetailContent(): ReactElement {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { data: equipmentList } = useEquipmentList();
   const { data: inspection, isLoading, error } = useMyInspectionDetail(params.id);
-
-  const equipment = useMemo(
-    () => equipmentList?.find((e) => e.id === inspection?.equipmentId),
-    [equipmentList, inspection?.equipmentId],
-  );
+  // Fetch just this inspection's equipment for its name/tag, once the detail loads its equipmentId.
+  const { data: equipment } = useEquipmentById(inspection?.equipmentId);
 
   return (
     <main className="min-h-screen bg-muted pb-10">

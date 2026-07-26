@@ -11,10 +11,18 @@ import { useMyInspections } from '@/hooks/use-my-inspections';
 import { RESULT_DISPLAY, formatInspectionDate } from '@/lib/inspection-display';
 
 // Converts a date input (YYYY-MM-DD, empty when unset) to the ISO datetime bound core-api's
-// from/to filters expect. from is the start of the day, to the end, both in UTC to line up with
-// the stored submittedAt.
-const dayStart = (d: string): string | undefined => (d ? `${d}T00:00:00.000Z` : undefined);
-const dayEnd = (d: string): string | undefined => (d ? `${d}T23:59:59.999Z` : undefined);
+// from/to filters expect. The bound is the operator's LOCAL day, not a UTC day: the lab is in
+// Calgary (UTC-6/-7), so a UTC day boundary would exclude an inspection the operator did in the
+// evening (stored as the next UTC day) from "that day". Parsing without a Z is local time;
+// toISOString() then converts to the correct UTC instant for the local day's edges.
+const dayStart = (d: string): string | undefined =>
+  d ? new Date(`${d}T00:00:00.000`).toISOString() : undefined;
+const dayEnd = (d: string): string | undefined =>
+  d ? new Date(`${d}T23:59:59.999`).toISOString() : undefined;
+
+// core-api caps the list at 200 (listInspectionsQuerySchema). Request the cap so the client-side
+// result filter operates over the operator's full realistic history, not a short recent slice.
+const HISTORY_LIMIT = 200;
 
 function HistoryContent(): ReactElement {
   const router = useRouter();
@@ -35,7 +43,13 @@ function HistoryContent(): ReactElement {
     equipmentId: equipmentId || undefined,
     from: dayStart(from),
     to: dayEnd(to),
+    limit: HISTORY_LIMIT,
   });
+
+  // When the page is full, older inspections are not loaded, so the client-side result filter
+  // cannot see them. Tell the operator to narrow by equipment or date rather than silently
+  // filtering an incomplete set.
+  const truncated = (inspections?.length ?? 0) >= HISTORY_LIMIT;
 
   const equipmentById = useMemo(
     () => new Map((equipmentList ?? []).map((e) => [e.id, e])),
@@ -121,6 +135,13 @@ function HistoryContent(): ReactElement {
         )}
         {!isLoading && !error && rows.length === 0 && (
           <p className="p-8 text-center text-sm text-muted-foreground">No inspections found.</p>
+        )}
+
+        {truncated && (
+          <p className="rounded-sm bg-warning/10 px-3 py-2 text-center text-xs font-semibold text-warning">
+            Showing the {HISTORY_LIMIT} most recent. Narrow by equipment or date to see older
+            records.
+          </p>
         )}
 
         <div className="space-y-2">
