@@ -31,6 +31,22 @@ const EQUIPMENT_ID = '11111111-1111-1111-1111-111111111111';
 const TEMPLATE_ID = '22222222-2222-2222-2222-222222222222';
 
 describe('buildSubmitPayload', () => {
+  // ADR 0007: the attestation is an explicit confirm action taken after the operator reviews a
+  // summary. A payload that no human affirmed must not be constructible, so the caller has to
+  // hand in the confirm and a missing one is a programming error, not a silent false.
+  it('refuses to build a payload when the operator has not attested', () => {
+    expect(() =>
+      buildSubmitPayload({
+        equipmentId: EQUIPMENT_ID,
+        templateId: TEMPLATE_ID,
+        items: [booleanItem],
+        answers: { forks: { kind: 'BOOLEAN', passed: true } },
+        inlineNotes: {},
+        attested: false,
+      }),
+    ).toThrow(/attest/i);
+  });
+
   it('builds an attested pass-path payload from all-passed boolean answers', () => {
     const items = [booleanItem, hornItem];
     const answers: ChecklistAnswers = {
@@ -44,6 +60,7 @@ describe('buildSubmitPayload', () => {
       items,
       answers,
       inlineNotes: {},
+      attested: true,
     });
 
     expect(payload).toEqual({
@@ -64,6 +81,7 @@ describe('buildSubmitPayload', () => {
       items: [booleanItem],
       answers: { forks: { kind: 'BOOLEAN', passed: false } },
       inlineNotes: {},
+      attested: true,
     });
 
     expect(payload.responses).toEqual([
@@ -78,6 +96,7 @@ describe('buildSubmitPayload', () => {
       items: [textItem],
       answers: { remarks: { kind: 'TEXT', value: 'runs hot after 20 min' } },
       inlineNotes: {},
+      attested: true,
     });
 
     expect(payload.responses).toEqual([
@@ -92,6 +111,7 @@ describe('buildSubmitPayload', () => {
       items: [booleanItem, textItem],
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
       inlineNotes: {},
+      attested: true,
     });
 
     expect(payload.responses).toEqual([
@@ -106,6 +126,7 @@ describe('buildSubmitPayload', () => {
       items: [booleanItem],
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
       inlineNotes: { forks: 'slight surface rust, still safe' },
+      attested: true,
     });
 
     expect(payload.responses).toEqual([
@@ -127,6 +148,7 @@ describe('buildSubmitPayload', () => {
       items: [booleanItem],
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
       inlineNotes: { forks: '   ' },
+      attested: true,
     });
 
     expect(payload.responses).toEqual([
@@ -146,6 +168,7 @@ describe('buildSubmitPayload', () => {
       },
       // Inline note on the failed item is superseded by the documented failure below.
       inlineNotes: { forks: 'typed earlier' },
+      attested: true,
       failureDocs: {
         forks: {
           notes: 'left fork cracked at the heel',

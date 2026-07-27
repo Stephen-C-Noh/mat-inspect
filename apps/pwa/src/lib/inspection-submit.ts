@@ -36,6 +36,10 @@ type BuildParams = {
   answers: ChecklistAnswers;
   inlineNotes: Record<string, string>;
   failureDocs?: FailureDocs;
+  // The operator's explicit confirm, taken on the review screen after seeing a summary of their
+  // answers (ADR 0007). Passed in rather than hardcoded so no code path can produce an attested
+  // payload without one.
+  attested: boolean;
 };
 
 // Maps the operator's answers to the POST /api/v1/inspections contract (ADR 0007, 0008). The
@@ -44,6 +48,13 @@ type BuildParams = {
 // answer carries its pass/fail as both value and passed, matching the round-trip-stable jsonb
 // value the audit chain re-reads (shared-schemas inspectionResponseValueSchema).
 export const buildSubmitPayload = (params: BuildParams): SubmitInspection => {
+  // Fail loudly instead of sending attested: false. The server contract only accepts true
+  // (shared-schemas attested: z.literal(true)), so an unattested submit is a caller bug: some
+  // screen tried to POST without routing the operator through the review-and-confirm step.
+  if (!params.attested) {
+    throw new Error('Cannot build an inspection payload without the operator attestation');
+  }
+
   const responses: InspectionResponse[] = [];
 
   for (const item of params.items) {

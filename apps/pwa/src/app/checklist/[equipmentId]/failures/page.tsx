@@ -8,22 +8,14 @@ import { ChevronRight, ImageIcon, Mic, X, AlertTriangle, Loader2 } from 'lucide-
 import { mediaUploadResponseSchema } from '@mat-inspect/shared-schemas';
 import { AuthGuard } from '@/components/auth-guard';
 import { acquireAccessToken } from '@/lib/auth';
-import { useInspectionDraft } from '@/components/inspection-draft-provider';
-import { useSubmitInspection } from '@/hooks/use-submit-inspection';
 import { useInspectionDraftStore } from '@/hooks/use-inspection-draft-store';
-import { submitErrorMessage } from '@/lib/submit-error-message';
 import {
   defaultRetryRuntime,
   HttpAttemptError,
   runWithRetry,
   uploadRetry,
 } from '@/lib/retry-policy';
-import {
-  buildSubmitPayload,
-  collectFailedItems,
-  type FailedItem,
-  type FailureDocs,
-} from '@/lib/inspection-submit';
+import { collectFailedItems, type FailedItem, type FailureDocs } from '@/lib/inspection-submit';
 import {
   applyTextEdit,
   applyTranscript,
@@ -367,13 +359,11 @@ function FailureCard({
 function FailuresContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
-  const { setResult } = useInspectionDraft();
-  const submitInspection = useSubmitInspection();
 
   // The answers come from the persisted draft, so a page load on this screen restores the whole
   // inspection instead of discarding it (DEV-125). A null draft now means what it says: no
   // inspection is in progress for this machine, so send the operator back to start one.
-  const { restored: draft, save, clear } = useInspectionDraftStore(params.equipmentId);
+  const { restored: draft, save } = useInspectionDraftStore(params.equipmentId);
 
   const failedItems = useMemo(
     () => (draft ? collectFailedItems(draft.items, draft.answers) : []),
@@ -424,12 +414,6 @@ function FailuresContent(): ReactElement {
     save({ ...draft, failureDocs });
   }, [entries, draft, save]);
 
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  // One idempotency key per mounted screen so a retry after a failed submit replays the original
-  // 201 instead of creating a second inspection (ADR 0009).
-  const idempotencyKeyRef = useRef<string>('');
-
-  const isSubmitting = submitInspection.isPending;
   // Photos are uploaded at capture, so the gate is an uploaded id rather than a local file. An
   // upload still in flight or failed therefore holds submit, which is what the operator expects
   // from a screen that requires evidence.
@@ -440,58 +424,25 @@ function FailuresContent(): ReactElement {
     setEntries((prev) => ({ ...prev, [id]: update(prev[id] ?? emptyFailureEntry()) }));
   };
 
-  // Submits the whole inspection (DEV-123). The POST carries every answer, not just the failures,
-  // so the server derives the result from the full set. Evidence photos are already uploaded by
-  // now, so this is one JSON request and the retry policy covers it end to end.
-  const handleSubmit = async (): Promise<void> => {
-    if (!draft || !allPhotosAttached || isSubmitting) return;
-    setSubmitError(null);
+  // Documentation is finished here; nothing is recorded. The defect notes and uploaded photo ids
+  // are already in the draft (the effect above writes them as the operator records them), so this
+  // only hands off to the review screen, where the operator sees the summary and attests
+  // (ADR 0007). The POST lives there, on both the clean and the fail path.
+  const handleReview = (): void => {
+    if (!draft || !allPhotosAttached) return;
 
-    if (idempotencyKeyRef.current === '') {
-      idempotencyKeyRef.current = crypto.randomUUID();
+    const failureDocs: FailureDocs = {};
+    for (const item of failedItems) {
+      const entry = entries[item.itemKey]!;
+      failureDocs[item.itemKey] = {
+        notes: entry.notes,
+        notesSource: entry.notesSource,
+        photoIds: entry.photoId ? [entry.photoId] : [],
+      };
     }
+    save({ ...draft, failureDocs });
 
-    try {
-      const failureDocs: FailureDocs = {};
-      for (const item of failedItems) {
-        const entry = entries[item.itemKey]!;
-        failureDocs[item.itemKey] = {
-          notes: entry.notes,
-          notesSource: entry.notesSource,
-          photoIds: entry.photoId ? [entry.photoId] : [],
-        };
-      }
-
-      const payload = buildSubmitPayload({
-        equipmentId: draft.equipmentId,
-        templateId: draft.templateId,
-        items: draft.items,
-        answers: draft.answers,
-        inlineNotes: draft.inlineNotes,
-        failureDocs,
-      });
-
-      const inspection = await submitInspection.mutateAsync({
-        payload,
-        idempotencyKey: idempotencyKeyRef.current,
-      });
-
-      setResult({
-        equipmentId: draft.equipmentId,
-        inspectionId: inspection.id,
-        result: inspection.result,
-        failures: failedItems.map((item) => ({
-          prompt: item.prompt,
-          notes: entries[item.itemKey]?.notes ?? '',
-          photoUrl: entries[item.itemKey]?.photo ?? null,
-        })),
-      });
-
-      clear();
-      router.push(`/checklist/${params.equipmentId}/submitted/fail`);
-    } catch (err) {
-      setSubmitError(submitErrorMessage(err));
-    }
+    router.push(`/checklist/${params.equipmentId}/review`);
   };
 
   if (!draft) return <></>;
@@ -533,28 +484,17 @@ function FailuresContent(): ReactElement {
 
       {/* Reverted back to fixed positioning to match DEV-100 */}
       <div className="fixed inset-x-0 bottom-4 mx-auto max-w-lg px-4 space-y-2">
-        {/*Inline error display replacing the alert() */}
-        {submitError && (
-          <p role="status" className="mb-2 text-center text-xs font-semibold text-warning">
-            {submitError}
-          </p>
-        )}
-
         <button
           type="button"
-          disabled={!allPhotosAttached || isSubmitting}
-          onClick={handleSubmit}
+          disabled={!allPhotosAttached}
+          onClick={handleReview}
           className={`w-full rounded-sm py-4 text-sm font-bold shadow-card transition-colors ${
-            allPhotosAttached && !isSubmitting
+            allPhotosAttached
               ? 'bg-warning text-warning-foreground'
               : 'bg-muted text-muted-foreground cursor-not-allowed'
           }`}
         >
-          {isSubmitting
-            ? 'Submitting...'
-            : allPhotosAttached
-              ? 'Submit Inspection with Failures'
-              : 'Attach all photos to continue'}
+          {allPhotosAttached ? 'Review and Submit' : 'Attach all photos to continue'}
         </button>
 
         <Link href={`/inspect/${params.equipmentId}`} className="block">
