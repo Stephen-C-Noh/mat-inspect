@@ -1,24 +1,28 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { hasAllowedRole } from '@mat-inspect/shared-auth';
 import { ALLOWED_ROLES, loginRequest } from '@/lib/auth';
+import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 
-export default function LoginPage() {
+function LoginContent() {
   const { instance, accounts } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!isAuthenticated) return;
     if (hasAllowedRole(accounts[0] ?? null, ALLOWED_ROLES)) {
-      router.replace('/dashboard');
+      // AuthGuard sends unauthenticated deep links here as ?redirect=<path> (DEV-128); honor
+      // it so a supervisor lands back where they asked to go, not always on the dashboard home.
+      router.replace(sanitizeRedirectPath(searchParams.get('redirect')) ?? '/dashboard');
     } else {
       router.replace('/unauthorized');
     }
-  }, [isAuthenticated, accounts, router]);
+  }, [isAuthenticated, accounts, router, searchParams]);
 
   const handleSignIn = async () => {
     try {
@@ -46,6 +50,14 @@ export default function LoginPage() {
         </button>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }
 
