@@ -6,8 +6,15 @@
 export type NotesSource = 'TYPED' | 'VOICE_TRANSCRIBED' | 'VOICE_EDITED';
 
 export type FailureEntry = {
-  notes: string;
+  // A blob: URL for the thumbnail. Session-only and deliberately not persisted: the browser revokes
+  // it on unload, so a restored draft would hold a reference fetch() cannot read (DEV-125).
   photo: string | null;
+  // The Media Service id, set once the photo has been uploaded. This is what the draft persists and
+  // what the submit payload carries (ADR 0023).
+  photoId: string | null;
+  photoError: string | null;
+  isUploadingPhoto: boolean;
+  notes: string;
   notesSource: NotesSource;
   mediaRef?: string | null;
   // The exact machine output, when the note is still exactly that. Null once the note is a mix of
@@ -18,6 +25,9 @@ export type FailureEntry = {
 export const emptyFailureEntry = (): FailureEntry => ({
   notes: '',
   photo: null,
+  photoId: null,
+  photoError: null,
+  isUploadingPhoto: false,
   notesSource: 'TYPED',
   rawTranscript: null,
 });

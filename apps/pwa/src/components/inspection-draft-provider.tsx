@@ -1,21 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, type ReactElement, type ReactNode } from 'react';
-import type { ChecklistItem, InspectionResult } from '@mat-inspect/shared-types';
-import type { ChecklistAnswers } from '@/lib/checklist-answers';
-
-// An in-progress inspection carried across the client-side route change from the checklist screen
-// to the failure-documentation screen. Next keeps this provider mounted (it sits in the root
-// layout) while the operator navigates between /inspect and /checklist segments, so the answers
-// survive that navigation. Nothing is submitted yet, so a hard refresh dropping the draft is
-// acceptable (the operator re-answers); the POST only happens once, from a single screen.
-export type InspectionDraft = {
-  equipmentId: string;
-  templateId: string;
-  items: ChecklistItem[];
-  answers: ChecklistAnswers;
-  inlineNotes: Record<string, string>;
-};
+import type { InspectionResult } from '@mat-inspect/shared-types';
 
 // One documented failure as the operator recorded it, kept for the confirmation screen so it can
 // show what was actually submitted instead of a hardcoded placeholder.
@@ -34,10 +20,13 @@ export type SubmissionResult = {
   failures: SubmittedFailure[];
 };
 
+// The in-progress draft used to live here in React state, which meant any full page load between
+// the checklist screen and the POST discarded a completed inspection (DEV-125). It now lives in
+// sessionStorage, read and written through lib/inspection-draft-storage, so there is one source of
+// truth that survives a reload or an interactive token renewal. This provider carries only the
+// submission result, which is short-lived by design: it exists between the POST returning and the
+// confirmation screen rendering, and nothing is lost if a reload drops it.
 type InspectionDraftContextValue = {
-  draft: InspectionDraft | null;
-  setDraft: (draft: InspectionDraft) => void;
-  clearDraft: () => void;
   result: SubmissionResult | null;
   setResult: (result: SubmissionResult) => void;
   clearResult: () => void;
@@ -46,13 +35,9 @@ type InspectionDraftContextValue = {
 const InspectionDraftContext = createContext<InspectionDraftContextValue | null>(null);
 
 export const InspectionDraftProvider = ({ children }: { children: ReactNode }): ReactElement => {
-  const [draft, setDraftState] = useState<InspectionDraft | null>(null);
   const [result, setResultState] = useState<SubmissionResult | null>(null);
 
   const value: InspectionDraftContextValue = {
-    draft,
-    setDraft: setDraftState,
-    clearDraft: () => setDraftState(null),
     result,
     setResult: setResultState,
     clearResult: () => setResultState(null),
