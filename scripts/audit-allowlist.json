@@ -16,12 +16,12 @@
     "reason": "find-my-way 9.7.0 fix (DDoS with HTTP2) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Transitive via fastify (router). Disclosed after the first DEV-102 batch, so it was not yet allowlisted. Tracked in DEV-102."
   },
   "GHSA-4c8g-83qw-93j6": {
-    "expires": "2026-07-27",
-    "reason": "fast-uri 3.1.3 fix (host confusion via IDN) published 2026-07-19; blocked by min-release-age until ~2026-07-26. Transitive via fastify/ajv. Tracked in DEV-102."
+    "expires": "2026-07-29",
+    "reason": "fast-uri 3.1.3 fix (host confusion via IDN) published 2026-07-19; the min-release-age cooldown has now passed. Held to the DEV-102 batch date rather than pulled forward: npm 11 re-evaluates overrides only on a clean lockfile regen, and next/find-my-way/propagator-jaeger do not clear the cooldown until ~2026-07-28, so a fix today would be a partial batch needing a second regen. Extended from 2026-07-27 in DEV-130. Transitive via fastify/ajv."
   },
   "GHSA-v2hh-gcrm-f6hx": {
-    "expires": "2026-07-27",
-    "reason": "fast-uri 3.1.4 fix (host confusion via backslash authority) published 2026-07-19; blocked by min-release-age until ~2026-07-26. Transitive via fastify/ajv. Tracked in DEV-102."
+    "expires": "2026-07-29",
+    "reason": "fast-uri 3.1.4 fix (host confusion via backslash authority) published 2026-07-19; same as GHSA-4c8g-83qw-93j6. Held to the DEV-102 batch date. Extended from 2026-07-27 in DEV-130. Transitive via fastify/ajv."
   },
   "GHSA-45rx-2jwx-cxfr": {
     "expires": "2026-07-29",
