@@ -14,9 +14,13 @@ const mockMsalState = vi.hoisted(() => ({
   accounts: [] as unknown[],
 }));
 
+let pathname = '/fleet';
+let searchParams = new URLSearchParams();
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
-  usePathname: () => '/fleet',
+  usePathname: () => pathname,
+  useSearchParams: () => searchParams,
 }));
 
 vi.mock('@azure/msal-react', () => ({
@@ -39,6 +43,8 @@ beforeEach(() => {
   mockMsalState.isAuthenticated = false;
   mockMsalState.inProgress = 'none';
   mockMsalState.accounts = [];
+  pathname = '/fleet';
+  searchParams = new URLSearchParams();
 });
 
 afterEach(() => {
@@ -100,5 +106,42 @@ describe('AuthGuard', () => {
     );
 
     expect(replace).toHaveBeenCalledWith('/unauthorized');
+  });
+
+  it('preserves the query string of the requested path in the /login redirect', () => {
+    mockMsalState.isAuthenticated = false;
+    mockMsalState.inProgress = 'none';
+    pathname = '/defects';
+    searchParams = new URLSearchParams({ id: 'abc-123' });
+
+    render(
+      <AuthGuard>
+        <div>Defects page</div>
+      </AuthGuard>,
+    );
+
+    expect(replace).toHaveBeenCalledWith(
+      `/login?redirect=${encodeURIComponent('/defects?id=abc-123')}`,
+    );
+  });
+
+  it('keeps rendering the protected content during a background token-renewal redirect', () => {
+    // acquireApiToken's interactive fallback (packages/shared-auth/src/access-token.ts) calls
+    // instance.acquireTokenRedirect, which briefly sets inProgress to "acquireToken" before the
+    // full-page navigation actually happens. That is not "still starting up": the account is
+    // already known and role-checked, so treating it the same as Startup/HandleRedirect would
+    // blank an open defect panel or in-progress notes for no reason.
+    mockMsalState.isAuthenticated = true;
+    mockMsalState.inProgress = 'acquireToken';
+    mockMsalState.accounts = [supervisorAccount];
+
+    render(
+      <AuthGuard>
+        <div>Fleet page</div>
+      </AuthGuard>,
+    );
+
+    expect(screen.getByText('Fleet page')).toBeDefined();
+    expect(replace).not.toHaveBeenCalled();
   });
 });

@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import LoginPage from './page';
 
 const replace = vi.fn();
+const loginRedirect = vi.fn();
 
 // Next's router and MSAL are the two things this page cannot run without and neither belongs
 // to this project's code, so they are stubbed at the module boundary (CLAUDE.md: mock external
 // services only). hasAllowedRole (from @mat-inspect/shared-auth) is real project code.
 const mockMsalState = vi.hoisted(() => ({
   isAuthenticated: false,
+  inProgress: 'none' as string,
   accounts: [] as unknown[],
 }));
 
@@ -24,7 +26,8 @@ vi.mock('@azure/msal-react', () => ({
   useIsAuthenticated: () => mockMsalState.isAuthenticated,
   useMsal: () => ({
     accounts: mockMsalState.accounts,
-    instance: { loginRedirect: vi.fn() },
+    inProgress: mockMsalState.inProgress,
+    instance: { loginRedirect },
   }),
 }));
 
@@ -40,7 +43,9 @@ const supervisorAccount = {
 
 beforeEach(() => {
   replace.mockClear();
+  loginRedirect.mockClear();
   mockMsalState.isAuthenticated = false;
+  mockMsalState.inProgress = 'none';
   mockMsalState.accounts = [];
   searchParams = new URLSearchParams();
 });
@@ -87,5 +92,31 @@ describe('LoginPage', () => {
     render(<LoginPage />);
 
     expect(replace).toHaveBeenCalledWith('/unauthorized');
+  });
+
+  it('disables the sign-in button while MSAL is still starting up', () => {
+    // Clicking while MSAL is still restoring the cached session (Startup) or processing a
+    // just-completed Entra redirect (HandleRedirect) throws BrowserAuthError:
+    // interaction_in_progress, which the catch block below swallows silently, so the button
+    // looks dead. Disable it instead of letting that click happen.
+    mockMsalState.inProgress = 'startup';
+
+    render(<LoginPage />);
+
+    const button = screen.getByRole('button', {
+      name: /sign in with microsoft/i,
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
+  it('enables the sign-in button once MSAL has settled', () => {
+    mockMsalState.inProgress = 'none';
+
+    render(<LoginPage />);
+
+    const button = screen.getByRole('button', {
+      name: /sign in with microsoft/i,
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
   });
 });
