@@ -17,6 +17,7 @@ import { diffChecklistTemplatesRoute } from './routes/checklists/diff.js';
 import { submitInspectionRoute } from './routes/inspections/submit.js';
 import { listInspectionsRoute } from './routes/inspections/list.js';
 import { activityFeedRoute } from './routes/activity/feed.js';
+import { dismissNotificationsRoute } from './routes/activity/dismiss.js';
 import { getInspectionByIdRoute } from './routes/inspections/get-by-id.js';
 import { listDefectsRoute } from './routes/defects/list.js';
 import { getDefectByIdRoute } from './routes/defects/get-by-id.js';
@@ -121,6 +122,7 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   await app.register(getInspectionByIdRoute, { prefix: '/api/v1' });
   // The dashboard's change signal, polled every couple of seconds per open dashboard (ADR 0026).
   await app.register(activityFeedRoute, { prefix: '/api/v1' });
+  await app.register(dismissNotificationsRoute, { prefix: '/api/v1' });
   // Defect list is registered before the /defects/:id parameter route; Fastify's radix router
   // handles the static-vs-parameter ordering, so registration order is not load-bearing here.
   await app.register(listDefectsRoute, { prefix: '/api/v1' });

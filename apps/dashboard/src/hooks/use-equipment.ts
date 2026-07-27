@@ -5,7 +5,7 @@ import {
   type EquipmentWithLastInspection,
 } from '@mat-inspect/shared-schemas';
 import { acquireAccessToken } from '@/lib/auth';
-import { EQUIPMENT_SAFETY_POLL_INTERVAL_MS } from '@/lib/polling';
+import { CROSS_SESSION_SAFETY_POLL_INTERVAL_MS } from '@/lib/polling';
 
 export const EQUIPMENT_QUERY_KEY = ['equipment'] as const;
 
@@ -31,6 +31,6 @@ export const useEquipment = (): UseQueryResult<EquipmentWithLastInspection[], Er
     enabled: accounts.length > 0,
     // A submitted inspection reaches this query through the activity feed, which invalidates it
     // (ADR 0026). The slow interval is only for equipment changes with no inspection behind them.
-    refetchInterval: EQUIPMENT_SAFETY_POLL_INTERVAL_MS,
+    refetchInterval: CROSS_SESSION_SAFETY_POLL_INTERVAL_MS,
   });
 };

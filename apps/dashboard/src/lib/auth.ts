@@ -1,6 +1,7 @@
 import type { AccountInfo, IPublicClientApplication } from '@azure/msal-browser';
 import {
   acquireApiToken,
+  acquireApiTokenSilent,
   createLoginRequest,
   createMsalConfig,
   createTokenRequest,
@@ -25,6 +26,13 @@ export const acquireAccessToken = (
   instance: IPublicClientApplication,
   accounts: AccountInfo[],
 ): Promise<string> => acquireApiToken(instance, accounts, tokenRequest);
+
+// For the activity poll, which runs on a timer and must never start an interactive redirect on
+// its own (ADR 0026).
+export const acquireAccessTokenSilent = (
+  instance: IPublicClientApplication,
+  accounts: AccountInfo[],
+): Promise<string> => acquireApiTokenSilent(instance, accounts, tokenRequest);
 
 // Roles permitted to view the dashboard. Supervisor gets the team dashboard, Manager and
 // Admin get full read access. See ARCHITECTURE.md section 3 (roles). Values must match the

@@ -9,16 +9,17 @@ import { useDefects } from '@/hooks/use-defects';
 import { ACTIVITY_POLL_INTERVAL_MS } from '@/lib/polling';
 
 const EQUIPMENT_ID = '11111111-1111-1111-1111-111111111111';
+const INSPECTION_ID = '44444444-4444-4444-4444-444444444444';
+
+const acquireTokenSilent = vi.fn();
+const acquireTokenRedirect = vi.fn();
 
 // MSAL is the one dependency these hooks cannot run without and it is not this project's code
 // (CLAUDE.md: mock external services only). Token acquisition, Zod parsing and the TanStack cache
 // are all the real thing below this line.
 vi.mock('@azure/msal-react', () => ({
   useMsal: () => ({
-    instance: {
-      acquireTokenSilent: vi.fn().mockResolvedValue({ accessToken: 'test-token' }),
-      getActiveAccount: () => null,
-    },
+    instance: { acquireTokenSilent, acquireTokenRedirect, getActiveAccount: () => null },
     accounts: [
       {
         homeAccountId: 'home-id',
@@ -53,8 +54,8 @@ const equipmentRow = {
   lastInspectionOperatorDisplayName: 'Jane Doe',
 };
 
-const newInspection = {
-  id: '44444444-4444-4444-4444-444444444444',
+const undismissedInspection = {
+  id: INSPECTION_ID,
   equipmentId: EQUIPMENT_ID,
   operatorId: '55555555-5555-5555-5555-555555555555',
   templateId: '22222222-2222-2222-2222-222222222222',
@@ -102,26 +103,27 @@ const renderViews = (): ReturnType<typeof renderHook<Views, void>> => {
   );
 };
 
-let activityCalls: string[];
 let fetchMock: ReturnType<typeof vi.fn>;
-let feedQueue: unknown[];
+let undismissed: unknown[];
+let dismissBodies: string[][];
 
 beforeEach(() => {
-  activityCalls = [];
-  // Every poll after the queue is drained is quiet. serverTime advances so the cursor moves.
-  feedQueue = [];
+  undismissed = [];
+  dismissBodies = [];
+  acquireTokenSilent.mockReset().mockResolvedValue({ accessToken: 'test-token' });
+  acquireTokenRedirect.mockReset().mockResolvedValue(undefined);
 
-  fetchMock = vi.fn(async (url: string) => {
-    if (url.startsWith('/api/v1/activity')) {
-      activityCalls.push(url);
-      const queued = feedQueue.shift();
-      return json(
-        queued ?? {
-          serverTime: new Date(2026, 6, 26, 21, 13, activityCalls.length).toISOString(),
-          inspections: [],
-        },
+  fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === '/api/v1/activity/dismiss') {
+      const body = JSON.parse(String(init?.body)) as { inspectionIds: string[] };
+      dismissBodies.push(body.inspectionIds);
+      // The server decides what is left; model it by dropping the dismissed ids.
+      undismissed = undismissed.filter(
+        (item) => !body.inspectionIds.includes((item as { id: string }).id),
       );
+      return { ok: true, status: 204, json: async () => ({}) } as Response;
     }
+    if (url.startsWith('/api/v1/activity')) return json({ inspections: undismissed });
     if (url.startsWith('/api/v1/equipment')) return json([equipmentRow]);
     if (url.startsWith('/api/v1/defects')) return json([]);
     throw new Error(`unexpected fetch: ${url}`);
@@ -138,73 +140,120 @@ const countFetches = (prefix: string): number =>
   fetchMock.mock.calls.filter((call) => String(call[0]).startsWith(prefix)).length;
 
 describe('activity-driven dashboard refresh', () => {
-  // The first poll establishes the cursor. Asking for history on it would announce every
-  // inspection already submitted today as new the moment a manager opens the dashboard.
-  it('sends no since on the first poll and picks up the server clock for the next one', async () => {
-    renderViews();
-
-    await waitFor(() => expect(activityCalls.length).toBeGreaterThan(1), { timeout: POLL_WAIT_MS });
-    expect(activityCalls[0]).toBe('/api/v1/activity');
-    expect(activityCalls[1]).toContain('since=');
-  });
-
   // The reason this design exists. Polling every dashboard query would re-read the fleet, the
   // defect list and a machine's history every couple of seconds to learn that nothing happened.
-  it('does not refetch the fleet or the defect list while the feed is quiet', async () => {
-    const { result } = renderViews();
+  //
+  // Asserted against the invalidations the provider issues rather than against fetch counts: the
+  // fleet and defect queries carry a slow safety interval of their own, and counting their
+  // requests would make this test a race between two timers under a loaded suite.
+  it('invalidates nothing while nothing is undismissed', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
 
-    await waitFor(() => expect(result.current.equipmentFetchedAt).toBeGreaterThan(0));
-    const equipmentReads = countFetches('/api/v1/equipment');
-    const defectReads = countFetches('/api/v1/defects');
+    const { result } = renderHook(() => useActivity(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          <ActivityProvider>{children}</ActivityProvider>
+        </QueryClientProvider>
+      ),
+    });
 
-    await waitFor(() => expect(activityCalls.length).toBeGreaterThan(2), { timeout: POLL_WAIT_MS });
+    const polls = countFetches('/api/v1/activity');
+    await waitFor(() => expect(countFetches('/api/v1/activity')).toBeGreaterThan(polls + 1), {
+      timeout: POLL_WAIT_MS,
+    });
 
-    expect(countFetches('/api/v1/equipment')).toBe(equipmentReads);
-    expect(countFetches('/api/v1/defects')).toBe(defectReads);
+    expect(invalidate).not.toHaveBeenCalled();
     expect(result.current.unread).toEqual([]);
   });
 
   // FRS AC 6.1.3: a submission has to appear without user interaction. A submit can also change
   // the machine's status and raise a blocking defect, so all three views are refreshed.
-  it('refetches the fleet and the defect list when the feed reports an inspection', async () => {
+  it('refetches the fleet and the defect list when an inspection appears', async () => {
     const { result } = renderViews();
 
     await waitFor(() => expect(result.current.equipmentFetchedAt).toBeGreaterThan(0));
     const equipmentReads = countFetches('/api/v1/equipment');
     const defectReads = countFetches('/api/v1/defects');
 
-    feedQueue.push({
-      serverTime: '2026-07-26T21:20:01.000Z',
-      inspections: [newInspection],
-    });
+    undismissed = [undismissedInspection];
 
     await waitFor(() => expect(countFetches('/api/v1/equipment')).toBeGreaterThan(equipmentReads), {
       timeout: POLL_WAIT_MS,
     });
-    expect(countFetches('/api/v1/defects')).toBeGreaterThan(defectReads);
+    await waitFor(() => expect(countFetches('/api/v1/defects')).toBeGreaterThan(defectReads), {
+      timeout: POLL_WAIT_MS,
+    });
   });
 
-  // What the bell shows. Newest first, and it survives later quiet polls: a manager who steps away
-  // must still find what they missed when they come back.
-  it('collects reported inspections as unread until the manager clears them', async () => {
-    const { result } = renderViews();
+  // The feed repeats an undismissed inspection on every poll, which is what makes the cursor
+  // unnecessary. It must not be mistaken for a new arrival each time.
+  it('reacts once to an inspection the feed keeps repeating', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
 
-    feedQueue.push({
-      serverTime: '2026-07-26T21:20:01.000Z',
-      inspections: [newInspection],
+    const { result } = renderHook(() => useActivity(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          <ActivityProvider>{children}</ActivityProvider>
+        </QueryClientProvider>
+      ),
     });
+    undismissed = [undismissedInspection];
+
+    await waitFor(() => expect(result.current.unread).toHaveLength(1), { timeout: POLL_WAIT_MS });
+    const invalidations = invalidate.mock.calls.length;
+    const polls = countFetches('/api/v1/activity');
+
+    await waitFor(() => expect(countFetches('/api/v1/activity')).toBeGreaterThan(polls + 1), {
+      timeout: POLL_WAIT_MS,
+    });
+
+    expect(invalidate.mock.calls.length).toBe(invalidations);
+    expect(result.current.unread).toHaveLength(1);
+  });
+
+  // Dismissal is server-side (ADR 0026), so what the bell shows is whatever the server still
+  // reports as undismissed, not a list the client edits.
+  it('dismisses through the server and drops the entry once the feed agrees', async () => {
+    const { result } = renderViews();
+    undismissed = [undismissedInspection];
 
     await waitFor(() => expect(result.current.unread).toHaveLength(1), { timeout: POLL_WAIT_MS });
     expect(result.current.unread[0]!.equipmentAssetTag).toBe('TD102');
 
-    // Two more quiet polls must not drop it.
-    const seen = activityCalls.length;
-    await waitFor(() => expect(activityCalls.length).toBeGreaterThan(seen + 1), {
-      timeout: POLL_WAIT_MS,
-    });
-    expect(result.current.unread).toHaveLength(1);
+    result.current.dismiss([INSPECTION_ID]);
 
-    result.current.markAllRead();
-    await waitFor(() => expect(result.current.unread).toEqual([]));
+    await waitFor(() => expect(dismissBodies).toEqual([[INSPECTION_ID]]));
+    await waitFor(() => expect(result.current.unread).toEqual([]), { timeout: POLL_WAIT_MS });
+  });
+
+  // The poll runs on a timer, so it must never start MSAL's interactive redirect: it would
+  // navigate the page with no user action, and the next tick would fire again before navigation
+  // commits, leaving MSAL wedged on interaction_in_progress.
+  it('never starts an interactive redirect from the background poll', async () => {
+    const { InteractionRequiredAuthError } = await import('@azure/msal-browser');
+    acquireTokenSilent.mockRejectedValue(
+      new InteractionRequiredAuthError('interaction_required', 'session expired'),
+    );
+
+    // Provider only. The fleet and defect queries take the interactive path on their initial load
+    // by design (a manager opening the dashboard on an expired session should be signed back in),
+    // so mounting them here would attribute their redirect to the poll.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useActivity(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          <ActivityProvider>{children}</ActivityProvider>
+        </QueryClientProvider>
+      ),
+    });
+
+    await waitFor(() => expect(acquireTokenSilent).toHaveBeenCalled());
+    // Give the timer room to fire again before concluding it stopped.
+    await new Promise((resolve) => setTimeout(resolve, POLL_WAIT_MS));
+
+    expect(acquireTokenRedirect).not.toHaveBeenCalled();
+    expect(result.current.unread).toEqual([]);
   });
 });

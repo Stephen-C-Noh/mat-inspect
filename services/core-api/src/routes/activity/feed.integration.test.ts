@@ -121,12 +121,23 @@ describe('GET /activity', () => {
     return res.json() as { id: string };
   };
 
-  const poll = async (since?: string, token = managerToken) =>
+  const poll = async (token = managerToken) =>
     app.inject({
       method: 'GET',
-      url: since ? `/api/v1/activity?since=${encodeURIComponent(since)}` : '/api/v1/activity',
+      url: '/api/v1/activity',
       headers: { authorization: `Bearer ${token}` },
     });
+
+  const dismiss = async (inspectionIds: string[], token = managerToken) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/v1/activity/dismiss',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { inspectionIds },
+    });
+
+  const feedIds = async (token = managerToken): Promise<string[]> =>
+    ((await poll(token)).json() as ActivityFeed).inspections.map((row) => row.id);
 
   it('rejects an unauthenticated request with 401', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/v1/activity' });
@@ -135,59 +146,69 @@ describe('GET /activity', () => {
 
   // The feed is fleet-wide: it reports every operator's inspections, which is exactly what an
   // operator may not read (see inspection-access and GET /inspections).
-  it('refuses an operator', async () => {
-    const res = await poll(undefined, operatorToken);
-    expect(res.statusCode).toBe(403);
+  it('refuses an operator on both the feed and the dismiss route', async () => {
+    const submitted = await submit();
+    expect((await poll(operatorToken)).statusCode).toBe(403);
+    // A real id, not an empty list: body validation runs before the role check in Fastify's
+    // lifecycle, so an invalid body would answer 400 and prove nothing about the role gate.
+    expect((await dismiss([submitted.id], operatorToken)).statusCode).toBe(403);
   });
 
-  // A first poll establishes the cursor. Returning the day's backlog here would make a manager's
-  // first sight of the dashboard a wall of notifications for inspections they already knew about.
-  it('reports nothing and hands back the server clock when no cursor is given', async () => {
-    await submit();
+  it('reports an undismissed inspection with the machine and operator named', async () => {
+    const submitted = await submit();
 
     const res = await poll();
     expect(res.statusCode).toBe(200);
     const body = res.json() as ActivityFeed;
-    expect(body.inspections).toEqual([]);
-    expect(Date.parse(body.serverTime)).not.toBeNaN();
+
+    const row = body.inspections.find((item) => item.id === submitted.id);
+    expect(row).toBeDefined();
+    expect(row!.equipmentAssetTag).toBe('FORK-ACT-1');
+    expect(row!.equipmentName).toBe('Forklift Activity');
+    expect(row!.operatorDisplayName).toBe('Jane Operator');
   });
 
-  it('reports an inspection submitted after the cursor, with the machine and operator named', async () => {
-    const start = (await poll()).json() as ActivityFeed;
-
+  // The property that removes the cursor race. The feed repeating an entry is not a bug: it is
+  // what lets a late-committing inspection be reported on the next poll rather than lost.
+  it('keeps reporting an inspection until it is dismissed', async () => {
     const submitted = await submit();
 
-    const res = await poll(start.serverTime);
-    expect(res.statusCode).toBe(200);
-    const body = res.json() as ActivityFeed;
+    expect(await feedIds()).toContain(submitted.id);
+    expect(await feedIds()).toContain(submitted.id);
 
-    expect(body.inspections).toHaveLength(1);
-    expect(body.inspections[0]!.id).toBe(submitted.id);
-    expect(body.inspections[0]!.equipmentAssetTag).toBe('FORK-ACT-1');
-    expect(body.inspections[0]!.equipmentName).toBe('Forklift Activity');
-    expect(body.inspections[0]!.operatorDisplayName).toBe('Jane Operator');
+    expect((await dismiss([submitted.id])).statusCode).toBe(204);
+
+    expect(await feedIds()).not.toContain(submitted.id);
+  });
+
+  // Dismissal is per manager. One supervisor clearing their bell must not clear anyone else's.
+  it('dismisses for the calling manager only', async () => {
+    const submitted = await submit();
+    const adminToken = await makeToken('admin', ADMIN_ID);
+
+    await dismiss([submitted.id]);
+
+    expect(await feedIds()).not.toContain(submitted.id);
+    expect(await feedIds(adminToken)).toContain(submitted.id);
+  });
+
+  // The panel can be cleared from two tabs, and a retry after a dropped response has to land on
+  // the same state as the original request.
+  it('treats a repeated dismissal as a no-op', async () => {
+    const submitted = await submit();
+
+    expect((await dismiss([submitted.id])).statusCode).toBe(204);
+    expect((await dismiss([submitted.id])).statusCode).toBe(204);
+    expect(await feedIds()).not.toContain(submitted.id);
   });
 
   // The quiet case is the common one: it runs every couple of seconds per open dashboard and has
   // to stay empty, or the dashboard would refetch everything on every poll.
-  it('reports nothing when the cursor is already current', async () => {
+  it('reports nothing once everything in the window is dismissed', async () => {
     await submit();
-    const caughtUp = (await poll()).json() as ActivityFeed;
+    const outstanding = await feedIds();
+    if (outstanding.length > 0) await dismiss(outstanding);
 
-    const res = await poll(caughtUp.serverTime);
-    expect((res.json() as ActivityFeed).inspections).toEqual([]);
-  });
-
-  // The cursor advances by consuming each response's serverTime, so the same inspection must not
-  // be reported to the same client twice.
-  it('does not repeat an inspection once the cursor has moved past it', async () => {
-    const start = (await poll()).json() as ActivityFeed;
-    await submit();
-
-    const first = (await poll(start.serverTime)).json() as ActivityFeed;
-    expect(first.inspections).toHaveLength(1);
-
-    const second = (await poll(first.serverTime)).json() as ActivityFeed;
-    expect(second.inspections).toEqual([]);
+    expect(await feedIds()).toEqual([]);
   });
 });

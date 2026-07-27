@@ -7,6 +7,7 @@ import {
   outbox,
   idempotencyKeys,
   defects,
+  notificationDismissals,
   users,
 } from '@mat-inspect/db';
 import { config } from '../lib/config.js';
@@ -22,5 +23,6 @@ export {
   outbox,
   idempotencyKeys,
   defects,
+  notificationDismissals,
   users,
 };

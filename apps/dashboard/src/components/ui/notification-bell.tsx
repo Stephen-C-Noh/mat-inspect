@@ -26,7 +26,7 @@ const formatTime = (iso: string): string =>
 // minutes can see what they missed rather than comparing a screen against their memory of it
 // (DEV-127).
 export const NotificationBell = (): ReactElement => {
-  const { unread, markAllRead } = useActivity();
+  const { unread, dismiss, isDismissing } = useActivity();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +59,9 @@ export const NotificationBell = (): ReactElement => {
         onClick={() => setIsOpen((open) => !open)}
         aria-expanded={isOpen}
         aria-label={
-          count === 0 ? 'Notifications, none new' : `Notifications, ${count} new inspections`
+          count === 0
+            ? 'Notifications, none new'
+            : `Notifications, ${count} new ${count === 1 ? 'inspection' : 'inspections'}`
         }
         className="relative rounded-sm p-1 hover:bg-primary-foreground/10"
       >
@@ -84,17 +86,20 @@ export const NotificationBell = (): ReactElement => {
             {count > 0 && (
               <button
                 type="button"
-                onClick={markAllRead}
-                className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+                disabled={isDismissing}
+                // Dismisses exactly what is on screen. An inspection that lands between the render
+                // and the click keeps its notification rather than being cleared unseen.
+                onClick={() => dismiss(unread.map((item) => item.id))}
+                className="text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
-                Mark all read
+                Dismiss all
               </button>
             )}
           </div>
 
           {count === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              Nothing new since you opened the dashboard.
+              Nothing new. Dismissed notifications stay dismissed on every device.
             </p>
           ) : (
             <ul aria-label="New inspection notifications" className="max-h-80 overflow-y-auto">
@@ -111,9 +116,20 @@ export const NotificationBell = (): ReactElement => {
                       {RESULT_LABEL[item.result]}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {item.operatorDisplayName} &middot; {formatTime(item.submittedAt)}
-                  </p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      {item.operatorDisplayName} &middot; {formatTime(item.submittedAt)}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={isDismissing}
+                      onClick={() => dismiss([item.id])}
+                      aria-label={`Dismiss notification for ${item.equipmentName}`}
+                      className="text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -6,8 +6,10 @@
 // (ADR 0026). Nothing else on the dashboard is on a timer.
 export const ACTIVITY_POLL_INTERVAL_MS = 2_000;
 
-// The activity feed reports inspections, so an equipment change with no inspection behind it (a
-// supervisor returning a machine to service from another session) would otherwise sit unseen until
-// someone reloaded. A slow background read covers that without putting the fleet query back on a
-// fast timer.
-export const EQUIPMENT_SAFETY_POLL_INTERVAL_MS = 60_000;
+// The activity feed reports inspections, so a change with no inspection behind it would otherwise
+// sit unseen until someone reloaded. Two such changes exist and both come from another session:
+// a supervisor returning a machine to service, and a manager acknowledging or resolving a defect
+// (the mutation hooks invalidate only the client that performed it, so a second dashboard never
+// hears about it). Two supervisors dispatched to the same machine is the failure this prevents.
+// A slow background read covers both without putting either query back on a fast timer.
+export const CROSS_SESSION_SAFETY_POLL_INTERVAL_MS = 60_000;

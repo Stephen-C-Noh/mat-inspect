@@ -257,26 +257,26 @@ export const activityInspectionSchema = inspectionListItemSchema.extend({
 
 export type ActivityInspection = z.infer<typeof activityInspectionSchema>;
 
-// Query for GET /api/v1/activity?since=&limit=. since is exclusive and comes from the previous
-// response's serverTime, never from the client's own clock: a manager's laptop can be minutes off
-// the mini-PC, and a fast clock would silently skip inspections submitted in the gap.
-// Omitting since asks only "what time is it on the server", which is how a client starts.
-export const activitySinceQuerySchema = z.object({
-  since: z.string().datetime().optional(),
-  limit: z.coerce.number().int().positive().max(50).default(20),
-});
-
-export type ActivitySinceQuery = z.infer<typeof activitySinceQuerySchema>;
-
-// Response for GET /api/v1/activity. The dashboard polls this and nothing else, then refetches
-// its real queries only when inspections is non-empty (ADR 0026). Kept small on purpose: an empty
-// feed is the common case and has to stay cheap enough to ask for every couple of seconds.
+// Response for GET /api/v1/activity: the inspections inside the feed's retention window that the
+// calling manager has not dismissed. There is no cursor, by design. A cursor of any kind, a
+// timestamp or a sequence, is assigned when a row is inserted but only takes effect when its
+// transaction commits, and an inspection stamped before a poll can commit after it, which loses
+// the row permanently. "What have I not dismissed" cannot lose anything: a late arrival is simply
+// in the next answer (ADR 0026).
 export const activityFeedSchema = z.object({
-  serverTime: z.string().datetime(),
   inspections: z.array(activityInspectionSchema),
 });
 
 export type ActivityFeed = z.infer<typeof activityFeedSchema>;
+
+// Body for POST /api/v1/activity/dismiss. Takes a list rather than a single id so that clearing
+// the whole panel is one request and one transaction. The client sends the ids it is actually
+// showing, so an inspection that arrives mid-click is not silently dismissed unseen.
+export const dismissNotificationsSchema = z.object({
+  inspectionIds: z.array(uuidSchema).min(1).max(200),
+});
+
+export type DismissNotifications = z.infer<typeof dismissNotificationsSchema>;
 
 // Extends the equipment contract with the fleet grid's "last inspection" summary (DEV-37). Kept
 // separate from equipmentSchema (used by create/update/get-by-id) so those routes are unaffected;
