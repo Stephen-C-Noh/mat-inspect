@@ -265,11 +265,12 @@ export const inspections = pgTable('inspections', {
     .references(() => users.id),
   templateId: uuid('template_id').notNull(),
   templateVersion: integer('template_version').notNull(),
-  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
-  submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull(),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
   result: inspectionResultEnum('result').notNull(),
-  // Attestation is operatorId + submittedAt + the confirmed submit; no signature column
-  // (ADR 0007). Rows are immutable; an UPDATE/DELETE-blocking trigger enforces it.
+  // Attestation is operatorId + submittedAt + the confirmed submit; no attested_at column and
+  // no signature column (ADR 0007). A submit is only reachable through the review-and-confirm
+  // screen, so the row's existence is the record of the attestation. Rows are immutable; an
+  // UPDATE/DELETE-blocking trigger enforces it.
 });
 ```
 
