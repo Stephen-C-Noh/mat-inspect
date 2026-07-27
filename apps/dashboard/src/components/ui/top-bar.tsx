@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
 import type { ReactElement } from 'react';
-import { Bell, User } from 'lucide-react';
+import { User } from 'lucide-react';
+import { NotificationBell } from '@/components/ui/notification-bell';
 
 export const TopBar = function (): ReactElement | null {
   const { accounts } = useMsal();
@@ -33,7 +34,7 @@ export const TopBar = function (): ReactElement | null {
 
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium">{activeAccount.name}</span>
-        <Bell className="size-6 cursor-pointer" />
+        <NotificationBell />
         {/* TODO: Flagged - Replace with 'darker-primary' token once defined */}
         <User className="size-6 bg-muted-foreground p-1 rounded-full cursor-pointer" />
       </div>

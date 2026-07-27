@@ -39,5 +39,7 @@ export const useInspections = (
       return inspectionListItemSchema.array().parse(await res.json());
     },
     enabled: accounts.length > 0,
+    // No timer. The history panel is refreshed by the activity feed when a new inspection lands
+    // (ADR 0026). Individual rows never change once written (ADR 0008); the list they form does.
   });
 };

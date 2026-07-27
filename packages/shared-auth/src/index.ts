@@ -1,4 +1,4 @@
-export { acquireApiToken } from './access-token';
+export { acquireApiToken, acquireApiTokenSilent } from './access-token';
 export {
   apiScope,
   createLoginRequest,

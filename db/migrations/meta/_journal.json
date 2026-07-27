@@ -64,6 +64,20 @@
       "when": 1784955085512,
       "tag": "0008_fast_the_call",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785142027689,
+      "tag": "0009_silky_the_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785144505778,
+      "tag": "0010_fantastic_machine_man",
+      "breakpoints": true
     }
   ]
 }

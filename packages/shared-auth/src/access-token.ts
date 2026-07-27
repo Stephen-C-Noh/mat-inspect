@@ -15,12 +15,25 @@ export const acquireApiToken = async (
   tokenRequest: TokenRequest,
 ): Promise<string> => {
   try {
-    const response = await instance.acquireTokenSilent({ ...tokenRequest, account: accounts[0] });
-    return response.accessToken;
+    return await acquireApiTokenSilent(instance, accounts, tokenRequest);
   } catch (err) {
     if (err instanceof InteractionRequiredAuthError) {
       await instance.acquireTokenRedirect({ ...tokenRequest, account: accounts[0] });
     }
     throw err;
   }
+};
+
+// The same acquisition without the interactive fallback, for callers that run on a timer rather
+// than behind a user action. A redirect started from a background poll navigates the page with no
+// warning, and a second poll firing inside the moment before navigation commits leaves MSAL on
+// interaction_in_progress, which blocks the next real sign-in. Such a caller should let the token
+// acquisition fail and wait for something the user actually did (ADR 0026).
+export const acquireApiTokenSilent = async (
+  instance: IPublicClientApplication,
+  accounts: AccountInfo[],
+  tokenRequest: TokenRequest,
+): Promise<string> => {
+  const response = await instance.acquireTokenSilent({ ...tokenRequest, account: accounts[0] });
+  return response.accessToken;
 };

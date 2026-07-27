@@ -2,6 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useMsal } from '@azure/msal-react';
 import { defectSchema, type Defect } from '@mat-inspect/shared-schemas';
 import { acquireAccessToken } from '@/lib/auth';
+import { CROSS_SESSION_SAFETY_POLL_INTERVAL_MS } from '@/lib/polling';
 
 export const DEFECTS_QUERY_KEY = ['defects'] as const;
 
@@ -22,5 +23,10 @@ export const useDefects = (): UseQueryResult<Defect[], Error> => {
       return defectSchema.array().parse(await res.json());
     },
     enabled: accounts.length > 0,
+    // A blocking defect raised by an inspection submit arrives through the activity feed, which
+    // invalidates this query (ADR 0026). The slow interval covers the other direction: a defect
+    // acknowledged or resolved in another manager's session, which no feed reports. The manual
+    // Refresh control stays as a fallback.
+    refetchInterval: CROSS_SESSION_SAFETY_POLL_INTERVAL_MS,
   });
 };
