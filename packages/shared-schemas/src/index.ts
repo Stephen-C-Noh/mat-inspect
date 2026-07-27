@@ -247,6 +247,37 @@ export const inspectionDetailSchema = inspectionListItemSchema.extend({
 
 export type InspectionDetail = z.infer<typeof inspectionDetailSchema>;
 
+// One entry in the dashboard's activity feed. Carries the machine's identity as well as the
+// operator's: the notification panel names what was inspected, and reading it must not cost a
+// lookup per entry.
+export const activityInspectionSchema = inspectionListItemSchema.extend({
+  equipmentAssetTag: z.string(),
+  equipmentName: z.string(),
+});
+
+export type ActivityInspection = z.infer<typeof activityInspectionSchema>;
+
+// Query for GET /api/v1/activity?since=&limit=. since is exclusive and comes from the previous
+// response's serverTime, never from the client's own clock: a manager's laptop can be minutes off
+// the mini-PC, and a fast clock would silently skip inspections submitted in the gap.
+// Omitting since asks only "what time is it on the server", which is how a client starts.
+export const activitySinceQuerySchema = z.object({
+  since: z.string().datetime().optional(),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+});
+
+export type ActivitySinceQuery = z.infer<typeof activitySinceQuerySchema>;
+
+// Response for GET /api/v1/activity. The dashboard polls this and nothing else, then refetches
+// its real queries only when inspections is non-empty (ADR 0026). Kept small on purpose: an empty
+// feed is the common case and has to stay cheap enough to ask for every couple of seconds.
+export const activityFeedSchema = z.object({
+  serverTime: z.string().datetime(),
+  inspections: z.array(activityInspectionSchema),
+});
+
+export type ActivityFeed = z.infer<typeof activityFeedSchema>;
+
 // Extends the equipment contract with the fleet grid's "last inspection" summary (DEV-37). Kept
 // separate from equipmentSchema (used by create/update/get-by-id) so those routes are unaffected;
 // only GET /api/v1/equipment's list response uses this shape. Null fields mean the equipment has

@@ -22,5 +22,7 @@ export const useDefects = (): UseQueryResult<Defect[], Error> => {
       return defectSchema.array().parse(await res.json());
     },
     enabled: accounts.length > 0,
+    // No timer. A blocking defect is raised by an inspection submit, so the activity feed sees it
+    // and invalidates this query (ADR 0026). The manual Refresh control stays as a fallback.
   });
 };

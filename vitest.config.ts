@@ -41,10 +41,20 @@ export default defineConfig({
         },
       },
       {
+        plugins: [react()],
+        resolve: { alias: { ...sharedPackageAlias, '@/': `${fromHere('apps/dashboard/src')}/` } },
+        test: {
+          name: 'dashboard',
+          include: ['apps/dashboard/**/*.test.{ts,tsx}'],
+          exclude,
+          environment: 'node',
+        },
+      },
+      {
         resolve: { alias: sharedPackageAlias },
         test: {
           name: 'root',
-          exclude: [...exclude, 'apps/pwa/**'],
+          exclude: [...exclude, 'apps/pwa/**', 'apps/dashboard/**'],
         },
       },
     ],
