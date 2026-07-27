@@ -542,8 +542,9 @@ This isolation is enforced by the fact that AI Service is a separate container w
   - Idempotency-Key is generated client-side at tap time, so retries do not create duplicates.
   - Photos and voice clips are uploaded with exponential backoff (1s, 2s, 4s, 8s, then user-visible error).
   - If a submission cannot reach the server after 15 minutes, the operator sees a clear failure state and is asked to retry manually. The submission payload is preserved in `sessionStorage` so a page refresh does not lose data.
-  - This is intentionally simpler than full IndexedDB offline-first persistence. Saves an estimated 3 to 5 days of Sprint 3 work.
-- If pilot reveals connectivity issues that the short-drop model does not cover, **escalate to full offline-first in v2.** Not for capstone.
+  - An in-progress inspection is held in `sessionStorage` for the browser session, so a page load or an interactive token renewal does not discard the operator's answers. A hard device failure ends the session and the operator re-answers.
+  - This is intentionally simpler than full IndexedDB offline-first persistence. Saves an estimated 3 to 5 days of Sprint 3 work. Offline submission is not additive: it requires deciding whether a client-supplied `submitted_at` can drive readiness, which would amend ADR 0006 and weaken ADR 0007. See **ADR 0025** for the decision and its reasons.
+- If pilot reveals connectivity issues that the short-drop model does not cover, **escalate to full offline-first in v2.** Not for capstone. Any such work starts with the `submitted_at` authority decision (ADR 0025).
 - Checklists are cached on first load via standard HTTP caching (1 hour TTL), not via service worker, to keep the implementation simple.
 - QR scanner: `html5-qrcode` via `getUserMedia`.
 - Audio capture: `MediaRecorder` API, webm/opus codec.
