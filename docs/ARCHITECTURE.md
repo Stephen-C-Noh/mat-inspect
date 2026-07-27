@@ -212,9 +212,11 @@ Inspection
   operator_id (uuid, from Auth)
   template_id (uuid)
   template_version (int)
-  started_at, submitted_at (timestamps)
+  submitted_at (timestamp, server-set; also the attestation time. A submit is only reachable
+    through the review-and-confirm step, so the row's existence records that the operator
+    confirmed after reviewing their answers. There is no separate attested_at column and no
+    signature column; see ADR 0007)
   result (enum: PASS, FAIL_WARNING, FAIL_BLOCKING; derived server-side, never client-sent)
-  attested_at (timestamp; operator confirmed after reviewing answers; see ADR 0007)
 
 InspectionResponse
   id (uuid)
