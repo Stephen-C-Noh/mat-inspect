@@ -6,6 +6,12 @@ import {
   type SubmitInspection,
 } from '@mat-inspect/shared-schemas';
 import { acquireAccessToken } from '@/lib/auth';
+import {
+  defaultRetryRuntime,
+  HttpAttemptError,
+  runWithRetry,
+  submissionRetry,
+} from '@/lib/retry-policy';
 
 type SubmitArgs = {
   payload: SubmitInspection;
@@ -31,24 +37,32 @@ export const useSubmitInspection = (): UseMutationResult<Inspection, Error, Subm
       void queryClient.invalidateQueries({ queryKey: ['my-inspections'] });
       void queryClient.invalidateQueries({ queryKey: ['equipment'] });
     },
-    mutationFn: async ({ payload, idempotencyKey }) => {
-      const accessToken = await acquireAccessToken(instance, accounts);
+    // A short network drop must not end a completed inspection (ADR 0025, FRS 9.1). The POST is
+    // retried on the 1s/2s/4s/8s schedule up to the 15-minute ceiling, reusing the caller's
+    // Idempotency-Key so a replay returns the original 201 rather than creating a second
+    // inspection (ADR 0009). The token is re-acquired per attempt: a drop long enough to matter
+    // can outlive the access token.
+    mutationFn: ({ payload, idempotencyKey }) =>
+      runWithRetry(
+        async () => {
+          const accessToken = await acquireAccessToken(instance, accounts);
 
-      const res = await fetch('/api/v1/inspections', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
+          const res = await fetch('/api/v1/inspections', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Idempotency-Key': idempotencyKey,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) throw new HttpAttemptError(res.status);
+
+          return inspectionSchema.parse(await res.json());
         },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to submit inspection: ${res.status}`);
-      }
-
-      return inspectionSchema.parse(await res.json());
-    },
+        submissionRetry,
+        defaultRetryRuntime,
+      ),
   });
 };

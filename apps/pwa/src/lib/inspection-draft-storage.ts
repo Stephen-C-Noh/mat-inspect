@@ -103,3 +103,15 @@ export const loadDraft = (
 export const clearDraft = (storage: DraftStorage): void => {
   storage.removeItem(STORAGE_KEY);
 };
+
+// sessionStorage, or null during the server render and wherever storage is unavailable (Safari
+// private mode throws on access). Callers treat null as "no draft", so persistence degrades to
+// the pre-DEV-125 in-memory behaviour rather than breaking the inspection.
+export const browserDraftStorage = (): DraftStorage | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+};

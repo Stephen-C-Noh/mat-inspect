@@ -10,6 +10,14 @@ import { AuthGuard } from '@/components/auth-guard';
 import { acquireAccessToken } from '@/lib/auth';
 import { useInspectionDraft } from '@/components/inspection-draft-provider';
 import { useSubmitInspection } from '@/hooks/use-submit-inspection';
+import { useInspectionDraftStore } from '@/hooks/use-inspection-draft-store';
+import { submitErrorMessage } from '@/lib/submit-error-message';
+import {
+  defaultRetryRuntime,
+  HttpAttemptError,
+  runWithRetry,
+  uploadRetry,
+} from '@/lib/retry-policy';
 import {
   buildSubmitPayload,
   collectFailedItems,
@@ -88,11 +96,53 @@ function FailureCard({
     };
   }, []);
 
-  const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Uploads as soon as the operator takes the photo, rather than holding the file until submit.
+  // Two reasons. A blob: URL does not survive a page load, so only an uploaded id can be persisted
+  // into the draft (DEV-125). And it moves the slow part of submitting off the moment the operator
+  // is waiting on, so the final POST is one small JSON request.
+  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const url = URL.createObjectURL(file);
-    onChange((prev) => ({ ...prev, photo: url }));
+    onChange((prev) => ({
+      ...prev,
+      photo: url,
+      photoId: null,
+      photoError: null,
+      isUploadingPhoto: true,
+    }));
+
+    try {
+      const photoId = await runWithRetry(
+        async () => {
+          const accessToken = await acquireAccessToken(instance, accounts);
+          const formData = new FormData();
+          formData.append('file', file, 'failure.jpg');
+
+          const res = await fetch('/api/v1/media/upload', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: formData,
+          });
+
+          if (!res.ok) throw new HttpAttemptError(res.status);
+          return mediaUploadResponseSchema.parse(await res.json()).photoId;
+        },
+        uploadRetry,
+        defaultRetryRuntime,
+      );
+
+      onChange((prev) => ({ ...prev, photoId, isUploadingPhoto: false }));
+    } catch {
+      // The operator is standing at the machine and can retake the photo, so this stays a local
+      // error on the card (ADR 0025) rather than ending the inspection.
+      onChange((prev) => ({
+        ...prev,
+        isUploadingPhoto: false,
+        photoError: 'Photo upload failed. Tap the photo to try again.',
+      }));
+    }
   };
 
   // Sends the clip to core-api, which forwards it to the AI Service on the internal network. The
@@ -211,16 +261,39 @@ function FailureCard({
             className="hidden"
             onChange={handlePhoto}
           />
-          {entry.photo ? (
+          {entry.photo || entry.photoId ? (
             <div className="relative">
-              <img
-                src={entry.photo}
-                alt="Evidence"
-                className="h-40 w-full rounded-sm object-cover"
-              />
+              {entry.photo ? (
+                <img
+                  src={entry.photo}
+                  alt="Evidence"
+                  className="h-40 w-full rounded-sm object-cover"
+                />
+              ) : (
+                // Restored from the draft after a page load. The uploaded photo is safe on the
+                // server, but its blob: URL is gone, so say so rather than showing a broken image.
+                <div className="flex h-40 w-full items-center justify-center gap-2 rounded-sm border border-border bg-muted text-sm text-muted-foreground">
+                  <ImageIcon className="size-5" />
+                  Photo attached
+                </div>
+              )}
+              {entry.isUploadingPhoto && (
+                <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-sm bg-black/50 text-sm font-semibold text-white">
+                  <Loader2 className="size-4 animate-spin" />
+                  Uploading...
+                </div>
+              )}
               <button
                 type="button"
-                onClick={() => onChange((prev) => ({ ...prev, photo: null }))}
+                aria-label="Remove photo"
+                onClick={() =>
+                  onChange((prev) => ({
+                    ...prev,
+                    photo: null,
+                    photoId: null,
+                    photoError: null,
+                  }))
+                }
                 className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white"
               >
                 <X className="size-3.5" />
@@ -235,6 +308,11 @@ function FailureCard({
               <ImageIcon className="size-5" />
               Tap to add photo
             </button>
+          )}
+          {entry.photoError && (
+            <p role="status" className="mt-2 text-xs font-semibold text-destructive">
+              {entry.photoError}
+            </p>
           )}
         </div>
 
@@ -289,13 +367,14 @@ function FailureCard({
 function FailuresContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
-  const { instance, accounts } = useMsal();
-  const { draft, setResult } = useInspectionDraft();
+  const { setResult } = useInspectionDraft();
   const submitInspection = useSubmitInspection();
 
-  // The failed items to document come from the answers the checklist screen carried over. Without
-  // a draft (a hard refresh dropped it), there is nothing to document: send the operator back to
-  // re-answer rather than showing an empty screen.
+  // The answers come from the persisted draft, so a page load on this screen restores the whole
+  // inspection instead of discarding it (DEV-125). A null draft now means what it says: no
+  // inspection is in progress for this machine, so send the operator back to start one.
+  const { restored: draft, save, clear } = useInspectionDraftStore(params.equipmentId);
+
   const failedItems = useMemo(
     () => (draft ? collectFailedItems(draft.items, draft.answers) : []),
     [draft],
@@ -305,7 +384,20 @@ function FailuresContent(): ReactElement {
     if (!draft) router.replace(`/inspect/${params.equipmentId}`);
   }, [draft, params.equipmentId, router]);
 
-  const [entries, setEntries] = useState<Record<string, FailureEntry>>({});
+  // Seeded from the draft's failureDocs, so defect notes and uploaded evidence survive a page load
+  // alongside the answers. The photo thumbnail does not: only the uploaded id is persisted.
+  const [entries, setEntries] = useState<Record<string, FailureEntry>>(() => {
+    const seeded: Record<string, FailureEntry> = {};
+    for (const [itemKey, doc] of Object.entries(draft?.failureDocs ?? {})) {
+      seeded[itemKey] = {
+        ...emptyFailureEntry(),
+        notes: doc.notes,
+        notesSource: doc.notesSource,
+        photoId: doc.photoIds[0] ?? null,
+      };
+    }
+    return seeded;
+  });
 
   // Seed one entry per failed item once the list is known, keyed by item key.
   useEffect(() => {
@@ -318,39 +410,39 @@ function FailuresContent(): ReactElement {
     });
   }, [failedItems]);
 
+  // Write defect notes and uploaded photo ids back into the draft as the operator records them.
+  useEffect(() => {
+    if (!draft) return;
+    const failureDocs: FailureDocs = {};
+    for (const [itemKey, entry] of Object.entries(entries)) {
+      failureDocs[itemKey] = {
+        notes: entry.notes,
+        notesSource: entry.notesSource,
+        photoIds: entry.photoId ? [entry.photoId] : [],
+      };
+    }
+    save({ ...draft, failureDocs });
+  }, [entries, draft, save]);
+
   const [submitError, setSubmitError] = useState<string | null>(null);
   // One idempotency key per mounted screen so a retry after a failed submit replays the original
   // 201 instead of creating a second inspection (ADR 0009).
   const idempotencyKeyRef = useRef<string>('');
 
   const isSubmitting = submitInspection.isPending;
+  // Photos are uploaded at capture, so the gate is an uploaded id rather than a local file. An
+  // upload still in flight or failed therefore holds submit, which is what the operator expects
+  // from a screen that requires evidence.
   const allPhotosAttached =
-    failedItems.length > 0 && failedItems.every((item) => entries[item.itemKey]?.photo != null);
+    failedItems.length > 0 && failedItems.every((item) => entries[item.itemKey]?.photoId != null);
 
   const updateEntry = (id: string, update: (prev: FailureEntry) => FailureEntry) => {
     setEntries((prev) => ({ ...prev, [id]: update(prev[id] ?? emptyFailureEntry()) }));
   };
 
-  const uploadPhoto = async (photoUrl: string): Promise<string> => {
-    const response = await fetch(photoUrl);
-    const blob = await response.blob();
-    const accessToken = await acquireAccessToken(instance, accounts);
-    const formData = new FormData();
-    formData.append('file', blob, 'failure.jpg');
-
-    const res = await fetch('/api/v1/media/upload', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: formData,
-    });
-
-    if (!res.ok) throw new Error('Upload failed');
-    return mediaUploadResponseSchema.parse(await res.json()).photoId;
-  };
-
-  // Uploads each evidence photo, seals its reference plus the operator's defect note into the
-  // matching checklist response, then submits the whole inspection (DEV-123). The POST carries
-  // every answer, not just the failures, so the server derives the result from the full set.
+  // Submits the whole inspection (DEV-123). The POST carries every answer, not just the failures,
+  // so the server derives the result from the full set. Evidence photos are already uploaded by
+  // now, so this is one JSON request and the retry policy covers it end to end.
   const handleSubmit = async (): Promise<void> => {
     if (!draft || !allPhotosAttached || isSubmitting) return;
     setSubmitError(null);
@@ -360,20 +452,13 @@ function FailuresContent(): ReactElement {
     }
 
     try {
-      const uploaded = await Promise.all(
-        failedItems.map(async (item) => {
-          const entry = entries[item.itemKey]!;
-          const photoId = await uploadPhoto(entry.photo!);
-          return { itemKey: item.itemKey, photoId, entry };
-        }),
-      );
-
       const failureDocs: FailureDocs = {};
-      for (const { itemKey, photoId, entry } of uploaded) {
-        failureDocs[itemKey] = {
+      for (const item of failedItems) {
+        const entry = entries[item.itemKey]!;
+        failureDocs[item.itemKey] = {
           notes: entry.notes,
           notesSource: entry.notesSource,
-          photoIds: [photoId],
+          photoIds: entry.photoId ? [entry.photoId] : [],
         };
       }
 
@@ -402,9 +487,10 @@ function FailuresContent(): ReactElement {
         })),
       });
 
+      clear();
       router.push(`/checklist/${params.equipmentId}/submitted/fail`);
-    } catch {
-      setSubmitError('Could not submit the inspection. Check your connection and try again.');
+    } catch (err) {
+      setSubmitError(submitErrorMessage(err));
     }
   };
 

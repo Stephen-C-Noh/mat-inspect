@@ -1,12 +1,14 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useMemo, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
 import { useActiveChecklist } from '@/hooks/use-active-checklist';
 import { useSubmitInspection } from '@/hooks/use-submit-inspection';
+import { useInspectionDraftStore } from '@/hooks/use-inspection-draft-store';
 import { useInspectionDraft } from '@/components/inspection-draft-provider';
+import { submitErrorMessage } from '@/lib/submit-error-message';
 import { ChecklistItemCard } from '@/components/checklist/checklist-item-card';
 import { InspectionProgressCard } from '@/components/checklist/inspection-progress-card';
 import { buildSubmitPayload } from '@/lib/inspection-submit';
@@ -38,15 +40,37 @@ function ChecklistView(): ReactElement {
     error: checklistError,
   } = useActiveChecklist(equipment?.type);
 
-  const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
+  // Seeded from the persisted draft, so a page load part-way through a walkaround returns the
+  // operator to their answers instead of a blank checklist (DEV-125).
+  const { restored, save, clear } = useInspectionDraftStore(params.equipmentId);
+  const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>(
+    () => restored?.answers ?? {},
+  );
+  const [notes, setNotes] = useState<Record<string, string>>(() => restored?.inlineNotes ?? {});
 
-  const { setDraft, setResult } = useInspectionDraft();
+  const { setResult } = useInspectionDraft();
   const submitInspection = useSubmitInspection();
   const [submitError, setSubmitError] = useState<string | null>(null);
   // One idempotency key per mounted checklist screen, so an operator retrying a failed pass-path
   // submit replays the original 201 instead of creating a second inspection (ADR 0009).
   const idempotencyKeyRef = useRef<string>('');
+
+  // Persist on every answer, not only on the way to the failure screen. The reported defect lost
+  // inspections that had never reached a failure screen at all, because nothing was stored until
+  // then. Waits for the template, so a draft is never written without the items it answers.
+  useEffect(() => {
+    if (!template || !equipment) return;
+    save({
+      equipmentId: equipment.id,
+      templateId: template.id,
+      items: template.items,
+      answers,
+      inlineNotes: notes,
+      // Owned by the failure screen. Preserved here so saving an answer does not wipe defect
+      // notes the operator already recorded on a failure they then came back to change.
+      failureDocs: restored?.failureDocs ?? {},
+    });
+  }, [answers, notes, template, equipment, save, restored]);
 
   if (equipmentLoading) return <div className="p-8 text-center">Loading equipment...</div>;
   if (equipmentError)
@@ -83,14 +107,16 @@ function ChecklistView(): ReactElement {
     setSubmitError(null);
 
     // Any failure sends the operator to document each defect first; the POST happens from that
-    // screen once photos and notes are attached. The answers ride along in the shared draft.
+    // screen once photos and notes are attached. The answers are already in the persisted draft,
+    // which is what that screen reads.
     if (failures > 0) {
-      setDraft({
+      save({
         equipmentId: equipment.id,
         templateId: template.id,
         items: template.items,
         answers,
         inlineNotes: notes,
+        failureDocs: restored?.failureDocs ?? {},
       });
       router.push(`/checklist/${params.equipmentId}/failures`);
       return;
@@ -119,9 +145,12 @@ function ChecklistView(): ReactElement {
         result: inspection.result,
         failures: [],
       });
+      // The record is on the server; the draft has served its purpose. Clearing it stops the next
+      // inspection of this machine from reopening the answers that were just submitted.
+      clear();
       router.push(`/checklist/${params.equipmentId}/submitted`);
-    } catch {
-      setSubmitError('Could not submit the inspection. Check your connection and try again.');
+    } catch (err) {
+      setSubmitError(submitErrorMessage(err));
     }
   };
 

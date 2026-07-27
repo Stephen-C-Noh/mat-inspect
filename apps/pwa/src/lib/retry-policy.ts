@@ -78,6 +78,22 @@ export type RetryRuntime = {
   sleep: (ms: number) => Promise<void>;
 };
 
+export const defaultRetryRuntime: RetryRuntime = {
+  clock: () => Date.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+
+// Raised by a caller that got an HTTP response, so the policy can tell a 503 (worth retrying)
+// from a 409 (never worth retrying) instead of treating every rejection as a transport failure.
+export class HttpAttemptError extends Error {
+  readonly kind = 'http';
+
+  constructor(readonly status: number) {
+    super(`request failed with status ${status}`);
+    this.name = 'HttpAttemptError';
+  }
+}
+
 const asOutcome = (err: unknown): AttemptOutcome => {
   if (typeof err === 'object' && err !== null && 'kind' in err) return err as AttemptOutcome;
   // An exception that is not a classified outcome (a thrown TypeError from fetch, say) is a
