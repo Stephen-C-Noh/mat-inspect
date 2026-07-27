@@ -79,7 +79,7 @@ const seedDocumentedFailure = (): void => {
 
 const renderFailures = (): ReturnType<typeof render> => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const wrapper = ({ children }: { children: ReactElement }): ReactElement => (
+  const wrapper = ({ children }: { children: ReactNode }): ReactElement => (
     <QueryClientProvider client={queryClient}>
       <InspectionDraftProvider>{children}</InspectionDraftProvider>
     </QueryClientProvider>

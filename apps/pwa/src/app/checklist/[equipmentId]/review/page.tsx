@@ -2,7 +2,7 @@
 
 import { useMsal } from '@azure/msal-react';
 import { useParams, useRouter } from 'next/navigation';
-import { useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useInspectionDraft } from '@/components/inspection-draft-provider';
 import { useInspectionDraftStore } from '@/hooks/use-inspection-draft-store';
@@ -20,21 +20,44 @@ function ReviewView(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
   const { accounts } = useMsal();
-  const { restored: draft, clear } = useInspectionDraftStore(params.equipmentId);
+  const { restored: draft, save, clear } = useInspectionDraftStore(params.equipmentId);
 
   const { setResult } = useInspectionDraft();
   const submitInspection = useSubmitInspection();
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // One key for the lifetime of this screen, so an operator retrying a failed confirm replays the
-  // original 201 instead of creating a second inspection (ADR 0009).
-  const idempotencyKeyRef = useRef<string>('');
+  // One key per attempted submit, kept in the draft so it survives leaving this screen. An
+  // operator whose confirm failed can take "Back to Checklist" and come back; a fresh key would
+  // turn a POST that reached the server into a second inspection instead of a replayed 201
+  // (ADR 0009).
+  const idempotencyKeyRef = useRef<string>(draft?.submitIdempotencyKey ?? '');
 
-  // No draft means a reload after the draft expired or was cleared. Send the operator back to the
-  // checklist rather than showing an empty attestation.
-  if (!draft) return <></>;
+  const failedItems = useMemo(
+    () => (draft ? collectFailedItems(draft.items, draft.answers) : []),
+    [draft],
+  );
+
+  // Every failed item must carry evidence before it can be attested to. This is the same gate the
+  // failure screen applies before handing off (allPhotosAttached); repeating it here closes the
+  // path where the operator reaches the checklist from this screen, flips an item to fail, and
+  // returns with the browser's back gesture, which remounts this screen against the updated draft.
+  const failuresDocumented = useMemo(
+    () => failedItems.every((item) => (draft?.failureDocs[item.itemKey]?.photoIds.length ?? 0) > 0),
+    [failedItems, draft],
+  );
+
+  useEffect(() => {
+    // No draft means a reload after the draft expired or was cleared. Send the operator back to
+    // the checklist rather than showing an empty attestation.
+    if (!draft) {
+      router.replace(`/inspect/${params.equipmentId}`);
+    } else if (!failuresDocumented) {
+      router.replace(`/checklist/${params.equipmentId}/failures`);
+    }
+  }, [draft, failuresDocumented, params.equipmentId, router]);
+
+  if (!draft || !failuresDocumented) return <></>;
 
   const summary = attestationSummary(draft.items, draft.answers);
-  const failedItems = collectFailedItems(draft.items, draft.answers);
   const account = accounts[0];
   const operator = account ? operatorDisplayName(account) : '';
   const isSubmitting = submitInspection.isPending;
@@ -48,6 +71,7 @@ function ReviewView(): ReactElement {
 
     if (idempotencyKeyRef.current === '') {
       idempotencyKeyRef.current = crypto.randomUUID();
+      save({ ...draft, submitIdempotencyKey: idempotencyKeyRef.current });
     }
 
     try {

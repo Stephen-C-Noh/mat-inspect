@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { InspectionDraftProvider } from '@/components/inspection-draft-provider';
 import ChecklistPage from './page';
 
@@ -87,7 +87,7 @@ const fetchMock = vi.fn(async (url: string) => {
 
 const renderChecklist = (): ReturnType<typeof render> => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const wrapper = ({ children }: { children: ReactElement }): ReactElement => (
+  const wrapper = ({ children }: { children: ReactNode }): ReactElement => (
     <QueryClientProvider client={queryClient}>
       <InspectionDraftProvider>{children}</InspectionDraftProvider>
     </QueryClientProvider>

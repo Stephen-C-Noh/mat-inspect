@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import type { ChecklistItem } from '@mat-inspect/shared-types';
 import { InspectionDraftProvider } from '@/components/inspection-draft-provider';
 import { loadDraft, saveDraft } from '@/lib/inspection-draft-storage';
@@ -13,13 +13,14 @@ const EQUIPMENT_ID = '11111111-1111-1111-1111-111111111111';
 const TEMPLATE_ID = '22222222-2222-2222-2222-222222222222';
 
 const push = vi.fn();
+const replace = vi.fn();
 
 // Next's router and MSAL are the two things a page cannot run without and neither belongs to this
 // project's code, so they are stubbed at the module boundary (CLAUDE.md: mock external services
 // only). Everything below the page (draft storage, summary, payload builder) is the real thing.
 vi.mock('next/navigation', () => ({
   useParams: () => ({ equipmentId: EQUIPMENT_ID }),
-  useRouter: () => ({ push, back: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push, back: vi.fn(), replace }),
   usePathname: () => `/checklist/${EQUIPMENT_ID}/review`,
 }));
 
@@ -88,7 +89,7 @@ const seedDraft = (overrides: Partial<Parameters<typeof saveDraft>[1]> = {}): vo
 
 const renderReview = (): ReturnType<typeof render> => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const wrapper = ({ children }: { children: ReactElement }): ReactElement => (
+  const wrapper = ({ children }: { children: ReactNode }): ReactElement => (
     <QueryClientProvider client={queryClient}>
       <InspectionDraftProvider>{children}</InspectionDraftProvider>
     </QueryClientProvider>
@@ -119,6 +120,7 @@ beforeEach(() => {
   cleanup();
   window.sessionStorage.clear();
   push.mockClear();
+  replace.mockClear();
   vi.unstubAllGlobals();
 });
 
@@ -231,5 +233,57 @@ describe('review and confirm screen', () => {
       horn: { kind: 'BOOLEAN', passed: true },
       remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
     });
+  });
+
+  // Reachable with the browser's back gesture after a confirm cleared the draft, and after the
+  // lab-local day rolls over, which makes loadDraft discard the previous day's work. An empty
+  // attestation screen with no header and no navigation is a dead end.
+  it('sends the operator back to the checklist when no draft is in progress', async () => {
+    renderReview();
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/inspect/${EQUIPMENT_ID}`));
+    expect(screen.queryByRole('button', { name: /confirm and submit/i })).toBeNull();
+  });
+
+  // "Back to Checklist" pushes rather than pops, so an operator can leave this screen, fail an
+  // item (which the checklist persists immediately) and return with the back gesture, remounting
+  // the screen against a draft whose failure was never documented. Attesting there would record a
+  // FAIL_BLOCKING with no defect note and no evidence photo, past the failure screen's own gate.
+  it('sends the operator to the failure screen when a failed item has no evidence photo', async () => {
+    seedDraft({
+      answers: {
+        forks: { kind: 'BOOLEAN', passed: false },
+        horn: { kind: 'BOOLEAN', passed: true },
+        remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
+      },
+      failureDocs: {},
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderReview();
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(`/checklist/${EQUIPMENT_ID}/failures`),
+    );
+    expect(screen.queryByRole('button', { name: /confirm and submit/i })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // The key outlives this screen so the recovery path the screen itself offers (the error sits
+  // directly above "Back to Checklist") cannot turn a POST that reached core-api into a second
+  // inspection for the same walkaround (ADR 0009).
+  it('persists the idempotency key into the draft so a retry replays the original submit', async () => {
+    seedDraft();
+    const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderReview();
+    await userEvent.click(screen.getByRole('button', { name: /confirm and submit/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const sent = (fetchMock.mock.calls[0]![1] as RequestInit).headers as Record<string, string>;
+    const stored = loadDraft(window.sessionStorage, EQUIPMENT_ID, new Date());
+    expect(stored?.submitIdempotencyKey).toBe(sent['Idempotency-Key']);
   });
 });

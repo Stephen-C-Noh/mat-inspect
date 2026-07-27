@@ -191,6 +191,59 @@ describe('buildSubmitPayload', () => {
       { itemKey: 'horn', value: true, passed: true, photoIds: [] },
     ]);
   });
+
+  // The operator documented a failure, went back to the checklist, re-inspected the item and
+  // flipped it to pass. The draft still holds the earlier defect note and evidence photo so the
+  // failure screen can restore them, but the record must not claim a defect on a passing item:
+  // the row is immutable once written and its content is sealed into the audit chain (ADR 0008).
+  it('drops a failure doc whose item was re-inspected and now passes', () => {
+    const payload = buildSubmitPayload({
+      equipmentId: EQUIPMENT_ID,
+      templateId: TEMPLATE_ID,
+      items: [booleanItem],
+      answers: { forks: { kind: 'BOOLEAN', passed: true } },
+      inlineNotes: {},
+      attested: true,
+      failureDocs: {
+        forks: {
+          notes: 'left fork cracked at the heel',
+          notesSource: 'VOICE_TRANSCRIBED',
+          photoIds: ['33333333-3333-3333-3333-333333333333'],
+        },
+      },
+    });
+
+    expect(payload.responses).toEqual([
+      { itemKey: 'forks', value: true, passed: true, photoIds: [] },
+    ]);
+  });
+
+  // The inline note is the operator's own current text on the checklist card, so it stays on a
+  // passing response. Only the stale failure doc is dropped.
+  it('keeps the inline note on a passing item whose failure doc was dropped', () => {
+    const payload = buildSubmitPayload({
+      equipmentId: EQUIPMENT_ID,
+      templateId: TEMPLATE_ID,
+      items: [booleanItem],
+      answers: { forks: { kind: 'BOOLEAN', passed: true } },
+      inlineNotes: { forks: 'heel reground, within spec' },
+      attested: true,
+      failureDocs: {
+        forks: { notes: 'left fork cracked at the heel', notesSource: 'TYPED', photoIds: ['x'] },
+      },
+    });
+
+    expect(payload.responses).toEqual([
+      {
+        itemKey: 'forks',
+        value: true,
+        passed: true,
+        notes: 'heel reground, within spec',
+        notesSource: 'TYPED',
+        photoIds: [],
+      },
+    ]);
+  });
 });
 
 describe('collectFailedItems', () => {
