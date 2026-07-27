@@ -46,6 +46,12 @@ jobs:
       - name: tsc
         run: npm run type-check
 
+      # The root tsc -b covers the services and packages only: neither Next.js app is a project
+      # reference, and next build skips test files. Without this step a type error in an app (a
+      # .tsx test in particular) reaches main green.
+      - name: tsc (apps)
+        run: npm run type-check --workspace=@mat-inspect/pwa --workspace=@mat-inspect/dashboard
+
   test-ts:
     name: Test (TypeScript)
     runs-on: ubuntu-24.04

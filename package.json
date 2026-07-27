@@ -44,12 +44,15 @@
     "lint-staged": "^15.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0",
+    "undici": "^7.29.0",
     "vitest": "^4.1.8"
   },
   "overrides": {
     "esbuild": "^0.28.1",
     "postcss": "^8.5.15",
-    "undici": "8.5.0",
-    "@types/pg": "^8.20.0"
+    "@types/pg": "^8.20.0",
+    "testcontainers": {
+      "undici": "8.5.0"
+    }
   }
 }

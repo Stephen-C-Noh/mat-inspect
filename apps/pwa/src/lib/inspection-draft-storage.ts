@@ -24,6 +24,10 @@ export type DraftSnapshot = {
   // a blob: URL is revoked on unload, so persisting one restores a reference that fetch() cannot
   // read. Photos are uploaded at capture time and only the returned id is kept (ADR 0023).
   failureDocs: FailureDocs;
+  // The idempotency key minted for the first submit attempt, kept so a retry after a failed or
+  // lost POST replays the original 201 rather than recording a second inspection (ADR 0009).
+  // Absent until the operator confirms on the review screen.
+  submitIdempotencyKey?: string;
 };
 
 const STORAGE_KEY = 'mat-inspect.inspection-draft';
@@ -68,6 +72,7 @@ const storedDraftSchema = z.object({
     answers: z.record(answerSchema),
     inlineNotes: z.record(z.string()),
     failureDocs: z.record(failureDocSchema),
+    submitIdempotencyKey: z.string().optional(),
   }),
 });
 

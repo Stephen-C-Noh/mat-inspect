@@ -293,11 +293,11 @@ The global error handler in Fastify converts `HttpError` to RFC 7807 JSON.
 // packages/shared-schemas/inspection.ts
 import { z } from 'zod';
 
+// templateVersion, submittedAt and result are absent on purpose: the server resolves the
+// template version, stamps the time and derives the result. A client-sent value is ignored.
 export const submitInspectionSchema = z.object({
   equipmentId: z.string().uuid(),
   templateId: z.string().uuid(),
-  templateVersion: z.number().int().positive(),
-  startedAt: z.string().datetime(),
   responses: z
     .array(
       z.object({
@@ -342,11 +342,12 @@ export const inspections = pgTable('inspections', {
     .references(() => users.id),
   templateId: uuid('template_id').notNull(),
   templateVersion: integer('template_version').notNull(),
-  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
   submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
   result: inspectionResultEnum('result').notNull(),
-  // Attestation is operatorId + submittedAt + the confirmed submit; no signature column
-  // (ADR 0007). Rows are immutable; an UPDATE/DELETE-blocking trigger enforces it (ADR 0008).
+  // Attestation is operatorId + submittedAt + the confirmed submit; no attested_at column and
+  // no signature column (ADR 0007). A submit is only reachable through the review-and-confirm
+  // screen, so the row's existence is the record of the attestation. Rows are immutable; an
+  // UPDATE/DELETE-blocking trigger enforces it (ADR 0008).
 });
 ```
 

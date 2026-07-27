@@ -36,6 +36,10 @@ type BuildParams = {
   answers: ChecklistAnswers;
   inlineNotes: Record<string, string>;
   failureDocs?: FailureDocs;
+  // The operator's explicit confirm, taken on the review screen after seeing a summary of their
+  // answers (ADR 0007). Passed in rather than hardcoded so no code path can produce an attested
+  // payload without one.
+  attested: boolean;
 };
 
 // Maps the operator's answers to the POST /api/v1/inspections contract (ADR 0007, 0008). The
@@ -44,6 +48,13 @@ type BuildParams = {
 // answer carries its pass/fail as both value and passed, matching the round-trip-stable jsonb
 // value the audit chain re-reads (shared-schemas inspectionResponseValueSchema).
 export const buildSubmitPayload = (params: BuildParams): SubmitInspection => {
+  // Fail loudly instead of sending attested: false. The server contract only accepts true
+  // (shared-schemas attested: z.literal(true)), so an unattested submit is a caller bug: some
+  // screen tried to POST without routing the operator through the review-and-confirm step.
+  if (!params.attested) {
+    throw new Error('Cannot build an inspection payload without the operator attestation');
+  }
+
   const responses: InspectionResponse[] = [];
 
   for (const item of params.items) {
@@ -54,7 +65,12 @@ export const buildSubmitPayload = (params: BuildParams): SubmitInspection => {
       // A documented failure takes precedence: it carries the operator's reviewed defect note
       // (which may be voice-sourced) and the evidence photo references. Absent one, fall back to
       // the plain inline note typed on the checklist card, which is always TYPED.
-      const doc = params.failureDocs?.[item.key];
+      //
+      // Only a failed answer carries one. An operator can document a failure, go back to the
+      // checklist, re-inspect the item and flip it to pass; the draft keeps the earlier defect
+      // note and evidence photo so the failure screen can restore them. Sending those on a
+      // passing response would seal "left fork cracked" into an immutable PASS row (ADR 0008).
+      const doc = answer.passed ? undefined : params.failureDocs?.[item.key];
       const docNote = doc?.notes.trim();
       const inlineNote = params.inlineNotes[item.key]?.trim();
 

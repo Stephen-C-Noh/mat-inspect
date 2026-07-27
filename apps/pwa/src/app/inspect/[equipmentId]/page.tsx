@@ -1,17 +1,13 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
 import { useActiveChecklist } from '@/hooks/use-active-checklist';
-import { useSubmitInspection } from '@/hooks/use-submit-inspection';
 import { useInspectionDraftStore } from '@/hooks/use-inspection-draft-store';
-import { useInspectionDraft } from '@/components/inspection-draft-provider';
-import { submitErrorMessage } from '@/lib/submit-error-message';
 import { ChecklistItemCard } from '@/components/checklist/checklist-item-card';
 import { InspectionProgressCard } from '@/components/checklist/inspection-progress-card';
-import { buildSubmitPayload } from '@/lib/inspection-submit';
 import {
   answeredCount,
   failedCount,
@@ -42,18 +38,11 @@ function ChecklistView(): ReactElement {
 
   // Seeded from the persisted draft, so a page load part-way through a walkaround returns the
   // operator to their answers instead of a blank checklist (DEV-125).
-  const { restored, save, clear } = useInspectionDraftStore(params.equipmentId);
+  const { restored, save } = useInspectionDraftStore(params.equipmentId);
   const [answers, setAnswers] = useState<Record<string, ChecklistAnswer>>(
     () => restored?.answers ?? {},
   );
   const [notes, setNotes] = useState<Record<string, string>>(() => restored?.inlineNotes ?? {});
-
-  const { setResult } = useInspectionDraft();
-  const submitInspection = useSubmitInspection();
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  // One idempotency key per mounted checklist screen, so an operator retrying a failed pass-path
-  // submit replays the original 201 instead of creating a second inspection (ADR 0009).
-  const idempotencyKeyRef = useRef<string>('');
 
   // Persist on every answer, not only on the way to the failure screen. The reported defect lost
   // inspections that had never reached a failure screen at all, because nothing was stored until
@@ -100,58 +89,27 @@ function ChecklistView(): ReactElement {
       : 'Submit Inspection';
   const submitColor = failures > 0 ? 'bg-warning' : 'bg-primary';
 
-  const isSubmitting = submitInspection.isPending;
+  // This screen records nothing. The attestation is an explicit confirm taken on the review
+  // screen after the operator sees a summary of their answers (ADR 0007), so submitting here only
+  // persists the draft and hands off: to failure documentation when there are defects to record,
+  // otherwise straight to review. Both destinations read the same draft.
+  const handleSubmit = (): void => {
+    if (!canSubmit) return;
 
-  const handleSubmit = async (): Promise<void> => {
-    if (!canSubmit || isSubmitting) return;
-    setSubmitError(null);
+    save({
+      equipmentId: equipment.id,
+      templateId: template.id,
+      items: template.items,
+      answers,
+      inlineNotes: notes,
+      failureDocs: restored?.failureDocs ?? {},
+    });
 
-    // Any failure sends the operator to document each defect first; the POST happens from that
-    // screen once photos and notes are attached. The answers are already in the persisted draft,
-    // which is what that screen reads.
-    if (failures > 0) {
-      save({
-        equipmentId: equipment.id,
-        templateId: template.id,
-        items: template.items,
-        answers,
-        inlineNotes: notes,
-        failureDocs: restored?.failureDocs ?? {},
-      });
-      router.push(`/checklist/${params.equipmentId}/failures`);
-      return;
-    }
-
-    // Clean path: submit the attested answers now.
-    if (idempotencyKeyRef.current === '') {
-      idempotencyKeyRef.current = crypto.randomUUID();
-    }
-
-    try {
-      const payload = buildSubmitPayload({
-        equipmentId: equipment.id,
-        templateId: template.id,
-        items: template.items,
-        answers,
-        inlineNotes: notes,
-      });
-      const inspection = await submitInspection.mutateAsync({
-        payload,
-        idempotencyKey: idempotencyKeyRef.current,
-      });
-      setResult({
-        equipmentId: equipment.id,
-        inspectionId: inspection.id,
-        result: inspection.result,
-        failures: [],
-      });
-      // The record is on the server; the draft has served its purpose. Clearing it stops the next
-      // inspection of this machine from reopening the answers that were just submitted.
-      clear();
-      router.push(`/checklist/${params.equipmentId}/submitted`);
-    } catch (err) {
-      setSubmitError(submitErrorMessage(err));
-    }
+    router.push(
+      failures > 0
+        ? `/checklist/${params.equipmentId}/failures`
+        : `/checklist/${params.equipmentId}/review`,
+    );
   };
 
   return (
@@ -187,27 +145,18 @@ function ChecklistView(): ReactElement {
           />
         ))}
 
-        {submitError && (
-          <p
-            role="status"
-            className="fixed inset-x-4 bottom-20 mx-auto max-w-xl text-center text-xs font-semibold text-destructive"
-          >
-            {submitError}
-          </p>
-        )}
-
         <button
           type="button"
-          disabled={!canSubmit || isSubmitting}
+          disabled={!canSubmit}
           title={canSubmit ? undefined : 'Answer all required items to submit'}
           onClick={handleSubmit}
           className={`fixed inset-x-4 bottom-4 mx-auto max-w-xl rounded-lg py-4 text-base font-bold shadow-card ${
-            canSubmit && !isSubmitting
+            canSubmit
               ? `${submitColor} text-primary-foreground`
               : 'cursor-not-allowed bg-muted-foreground text-background'
           }`}
         >
-          {isSubmitting ? 'Submitting...' : submitLabel}
+          {submitLabel}
         </button>
       </div>
     </main>

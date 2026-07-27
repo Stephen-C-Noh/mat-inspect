@@ -678,7 +678,7 @@ If PWA crashes or phone dies during an inspection:
 If an operator starts an inspection at 11:58 PM but submits at 12:01 AM (after the lab-local day rolls over):
 
 - Inspection is accepted; `submittedAt` records the actual submission time
-- Inspection validity is determined by the lab-local calendar day of `submittedAt`, not `startedAt`, so this inspection is valid for the new day
+- Inspection validity is determined by the lab-local calendar day of `submittedAt`, so this inspection is valid for the new day. The time the operator started walking around is not recorded and does not affect validity
 - Equipment readiness for the new day is satisfied by this inspection (ADR 0006)
 
 ### 13.4 Daylight Saving Time
