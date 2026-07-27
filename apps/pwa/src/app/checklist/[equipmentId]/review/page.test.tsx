@@ -186,6 +186,34 @@ describe('review and confirm screen', () => {
     );
   });
 
+  // ADR 0007 calls this step "a deliberate safety check before commit". Counts alone are not
+  // reviewable: the operator has to see which item failed and what they recorded against it,
+  // which is also the last chance to catch a defect note attached to the wrong item.
+  it('lists each failed item with its defect note and evidence photo count', () => {
+    seedDraft({
+      answers: {
+        forks: { kind: 'BOOLEAN', passed: false },
+        horn: { kind: 'BOOLEAN', passed: true },
+        remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
+      },
+      failureDocs: {
+        forks: {
+          notes: 'left fork cracked at the heel',
+          notesSource: 'VOICE_TRANSCRIBED',
+          photoIds: ['33333333-3333-3333-3333-333333333333'],
+        },
+      },
+    });
+    renderReview();
+
+    const failures = screen.getByRole('list', { name: /failed items/i });
+    expect(failures.textContent).toContain('Forks intact?');
+    expect(failures.textContent).toContain('left fork cracked at the heel');
+    expect(failures.textContent).toContain('1 evidence photo');
+    // A passing item is not a failure and must not appear in this list.
+    expect(failures.textContent).not.toContain('Horn sounds?');
+  });
+
   // Declining to confirm is a real outcome, not a dead end: the operator goes back to fix an
   // answer. Nothing may be recorded, and the walkaround they already did must survive.
   it('backs out to the checklist with the answers intact and nothing submitted', async () => {

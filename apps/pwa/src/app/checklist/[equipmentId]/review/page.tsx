@@ -34,6 +34,7 @@ function ReviewView(): ReactElement {
   if (!draft) return <></>;
 
   const summary = attestationSummary(draft.items, draft.answers);
+  const failedItems = collectFailedItems(draft.items, draft.answers);
   const account = accounts[0];
   const operator = account ? operatorDisplayName(account) : '';
   const isSubmitting = submitInspection.isPending;
@@ -65,7 +66,6 @@ function ReviewView(): ReactElement {
         idempotencyKey: idempotencyKeyRef.current,
       });
 
-      const failedItems = collectFailedItems(draft.items, draft.answers);
       setResult({
         equipmentId: draft.equipmentId,
         inspectionId: inspection.id,
@@ -110,6 +110,36 @@ function ReviewView(): ReactElement {
             Submitting as {operator}.
           </p>
         </div>
+
+        {failedItems.length > 0 && (
+          <div className="rounded-lg bg-card p-4 shadow-card">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Failed items
+            </p>
+            <ul aria-label="Failed items" className="mt-3 flex flex-col gap-3">
+              {failedItems.map((item) => {
+                const doc = draft.failureDocs[item.itemKey];
+                const photos = doc?.photoIds.length ?? 0;
+                return (
+                  <li
+                    key={item.itemKey}
+                    className="border-l-4 border-warning pl-3 text-sm text-foreground"
+                  >
+                    <p className="font-bold">{item.prompt}</p>
+                    {doc?.notes.trim() && (
+                      <p className="mt-1 italic text-muted-foreground">{doc.notes}</p>
+                    )}
+                    {photos > 0 && (
+                      <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                        {photos} evidence photo{photos === 1 ? '' : 's'}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {submitError && (
           <p role="status" className="text-center text-xs font-semibold text-destructive">
