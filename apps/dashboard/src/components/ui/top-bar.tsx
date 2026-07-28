@@ -4,13 +4,39 @@ import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
 import type { ReactElement } from 'react';
 import { User } from 'lucide-react';
+import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import type { UserRole } from '@mat-inspect/shared-types';
 import { NotificationBell } from '@/components/ui/notification-bell';
+
+// Mirrors each page's own AuthGuard allowedRoles (dashboard/fleet/defects/audit page.tsx).
+// Kept here rather than imported from a shared constant because each page's list can diverge
+// for its own reasons (e.g. Defects excludes admin today); this list exists only to avoid
+// showing a link that 403s, not to be the source of truth for access.
+const NAV_LINKS: ReadonlyArray<{
+  href: string;
+  label: string;
+  allowedRoles: readonly UserRole[];
+}> = [
+  { href: '/dashboard', label: 'Dashboard', allowedRoles: ['supervisor', 'manager', 'admin'] },
+  { href: '/fleet', label: 'Fleet', allowedRoles: ['supervisor', 'manager', 'admin'] },
+  { href: '/defects', label: 'Defects', allowedRoles: ['supervisor', 'manager'] },
+  {
+    href: '/audit',
+    label: 'Audit',
+    allowedRoles: ['supervisor', 'manager', 'admin', 'auditor'],
+  },
+];
 
 export const TopBar = function (): ReactElement | null {
   const { accounts } = useMsal();
   const activeAccount = accounts[0];
 
   if (!activeAccount) return null;
+
+  const roles = getRolesFromAccount(activeAccount);
+  const visibleLinks = NAV_LINKS.filter((link) =>
+    link.allowedRoles.some((role) => roles.includes(role)),
+  );
 
   return (
     <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
@@ -20,15 +46,11 @@ export const TopBar = function (): ReactElement | null {
         </div>
         <h1 className="font-bold text-lg tracking-wide">MAT SCHOOL</h1>
         <nav className="flex gap-4 pl-4 text-sm font-semibold">
-          <Link href="/dashboard" className="hover:opacity-80">
-            Dashboard
-          </Link>
-          <Link href="/fleet" className="hover:opacity-80">
-            Fleet
-          </Link>
-          <Link href="/defects" className="hover:opacity-80">
-            Defects
-          </Link>
+          {visibleLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="hover:opacity-80">
+              {link.label}
+            </Link>
+          ))}
         </nav>
       </div>
 

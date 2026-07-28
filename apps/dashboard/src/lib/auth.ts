@@ -34,13 +34,32 @@ export const acquireAccessTokenSilent = (
   accounts: AccountInfo[],
 ): Promise<string> => acquireApiTokenSilent(instance, accounts, tokenRequest);
 
-// Roles permitted to view the dashboard. Supervisor gets the team dashboard, Manager and
-// Admin get full read access. See ARCHITECTURE.md section 3 (roles). Values must match the
-// Entra app role values, which are lowercase (see core-api requireRole and shared-types
-// UserRole).
+// Roles permitted into the dashboard app at all (login page, root redirect, and the
+// (protected) layout's default AuthGuard). This is an app-entry gate, not a per-page one: it
+// says nothing about which pages a role can see once inside. Auditor is here so DEV-112's
+// entry point exists, but auditor must not gain the operational pages this gate used to imply
+// access to (dashboard, fleet) — those pages now carry their own explicit allowedRoles
+// override (see their page.tsx) so adding a role here never silently opens write-adjacent
+// screens to it (ADR 0021 amendment). Values must match the Entra app role values, which are
+// lowercase (see core-api requireRole and shared-types UserRole).
 export const ALLOWED_ROLES = [
   'supervisor',
   'manager',
   'admin',
+  'auditor',
 ] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
+
+// Pages an auditor may land on. Kept separate from ALLOWED_ROLES so a future role added to
+// the app-entry gate does not automatically inherit dashboard/fleet access.
+const OPERATIONAL_ROLES = ['supervisor', 'manager', 'admin'] as const satisfies readonly UserRole[];
+
+// Where to send a signed-in, role-allowed user with no more specific destination (root page,
+// login page). An auditor holding no operational role lands on the read-only Audit section
+// instead of the write-adjacent dashboard home.
+export const resolveLandingPath = (roles: readonly string[]): string =>
+  roles.some((role) => (OPERATIONAL_ROLES as readonly string[]).includes(role))
+    ? '/dashboard'
+    : roles.includes('auditor')
+      ? '/audit'
+      : '/dashboard';

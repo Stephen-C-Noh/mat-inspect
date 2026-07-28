@@ -4,8 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { hasAllowedRole } from '@mat-inspect/shared-auth';
-import { ALLOWED_ROLES } from '@/lib/auth';
+import { getRolesFromAccount, hasAllowedRole } from '@mat-inspect/shared-auth';
+import { ALLOWED_ROLES, resolveLandingPath } from '@/lib/auth';
 
 export default function RootPage() {
   const isAuthenticated = useIsAuthenticated();
@@ -25,11 +25,14 @@ export default function RootPage() {
       router.replace('/login');
       return;
     }
-    if (!hasAllowedRole(accounts[0] ?? null, ALLOWED_ROLES)) {
+    const activeAccount = accounts[0] ?? null;
+    if (!hasAllowedRole(activeAccount, ALLOWED_ROLES)) {
       router.replace('/unauthorized');
       return;
     }
-    router.replace('/dashboard');
+    // Auditor is app-entry-allowed (DEV-112) but must not land on the write-adjacent
+    // dashboard home; resolveLandingPath sends an auditor-only account to /audit instead.
+    router.replace(resolveLandingPath(getRolesFromAccount(activeAccount)));
   }, [isAuthenticated, accounts, router, msalInitializing]);
 
   return null;
