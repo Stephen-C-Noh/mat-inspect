@@ -1,11 +1,53 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { ChevronRight, LogOut, Shield } from 'lucide-react';
 import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }): ReactElement {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+        checked ? 'bg-accent' : 'bg-border'
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-accent-foreground shadow transition-transform ${
+          checked ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </button>
+  );
+}
+
+function ToggleRow({
+  label,
+  sublabel,
+  checked,
+  onChange,
+}: {
+  label: string;
+  sublabel?: string;
+  checked: boolean;
+  onChange: () => void;
+}): ReactElement {
+  return (
+    <div className="flex items-center justify-between p-4">
+      <div>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {sublabel && <p className="text-xs text-muted-foreground">{sublabel}</p>}
+      </div>
+      <Toggle checked={checked} onChange={onChange} />
+    </div>
+  );
+}
 
 // Roles are checked in this order for the single badge shown on the account card: a manager
 // account also carrying the supervisor role (Entra app roles are not hierarchical, see
@@ -32,6 +74,9 @@ function SettingsContent(): ReactElement {
 
   const roles = getRolesFromAccount(account ?? null);
   const roleLabel = ROLE_DISPLAY_PRIORITY.find((role) => roles.includes(role));
+
+  const [emailAlerts, setEmailAlerts] = useState(true);
+  const [teamsAlerts, setTeamsAlerts] = useState(true);
 
   const handleSignOut = async (): Promise<void> => {
     try {
@@ -70,6 +115,23 @@ function SettingsContent(): ReactElement {
               </span>
             )}
           </div>
+        </div>
+
+        {/* Notifications */}
+        <SectionLabel>Notifications</SectionLabel>
+        <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card divide-y divide-border">
+          <ToggleRow
+            label="Email"
+            sublabel="Send to your SAIT inbox"
+            checked={emailAlerts}
+            onChange={() => setEmailAlerts((v) => !v)}
+          />
+          <ToggleRow
+            label="Teams"
+            sublabel="Post to the equipment's Teams channel"
+            checked={teamsAlerts}
+            onChange={() => setTeamsAlerts((v) => !v)}
+          />
         </div>
 
         {/* Security */}

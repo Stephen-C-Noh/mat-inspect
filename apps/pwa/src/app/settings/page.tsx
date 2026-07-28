@@ -124,7 +124,7 @@ function SettingsContent(): ReactElement {
   const { isDark, toggle: toggleDark } = useTheme();
 
   const [emailAlerts, setEmailAlerts] = useState(true);
-  const [pushAlerts, setPushAlerts] = useState(false);
+  const [teamsAlerts, setTeamsAlerts] = useState(false);
   const [language, setLanguage] = useState<'en' | 'fr' | 'es'>('en');
 
   const handleSignOut = async () => {
@@ -171,7 +171,7 @@ function SettingsContent(): ReactElement {
             icon={Bell}
             label="Inspection Alerts"
             preview={
-              [emailAlerts && 'Email', pushAlerts && 'Push'].filter(Boolean).join(' · ') ||
+              [emailAlerts && 'Email', teamsAlerts && 'Teams'].filter(Boolean).join(' · ') ||
               'All off'
             }
           >
@@ -183,10 +183,10 @@ function SettingsContent(): ReactElement {
                 onChange={() => setEmailAlerts((v) => !v)}
               />
               <ToggleRow
-                label="Push Notifications"
-                sublabel="Browser push (requires permission)"
-                checked={pushAlerts}
-                onChange={() => setPushAlerts((v) => !v)}
+                label="Teams"
+                sublabel="Post to the equipment's Teams channel"
+                checked={teamsAlerts}
+                onChange={() => setTeamsAlerts((v) => !v)}
               />
             </div>
           </AccordionRow>

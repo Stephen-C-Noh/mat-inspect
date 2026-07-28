@@ -69,4 +69,16 @@ describe('dashboard settings page', () => {
 
     expect(logoutRedirect).toHaveBeenCalledTimes(1);
   });
+
+  it('toggles the Email and Teams notification switches', async () => {
+    render(<SettingsPage />);
+
+    const [email, teams] = screen.getAllByRole('switch');
+    expect(email.getAttribute('aria-checked')).toBe('true');
+    expect(teams.getAttribute('aria-checked')).toBe('true');
+
+    await userEvent.click(email);
+    expect(email.getAttribute('aria-checked')).toBe('false');
+    expect(teams.getAttribute('aria-checked')).toBe('true');
+  });
 });
