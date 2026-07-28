@@ -3,36 +3,12 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, type ReactElement } from 'react';
-import {
-  CheckCircle,
-  Home,
-  History,
-  RotateCcw,
-  Forklift,
-  AlertTriangle,
-  ImageIcon,
-} from 'lucide-react';
+import { CheckCircle, Home, History, RotateCcw, Forklift, AlertTriangle } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
-import { usePhotoBlob } from '@/hooks/use-photo';
-import { useObjectUrl } from '@/hooks/use-object-url';
+import { EvidencePhoto } from '@/components/checklist/evidence-photo';
 import { useInspectionDraft, type SubmittedFailure } from '@/components/inspection-draft-provider';
-
-function EvidencePhoto({ photoId }: { photoId: string | null }): ReactElement {
-  const { data: photoBlob } = usePhotoBlob(photoId);
-  const photoUrl = useObjectUrl(photoBlob);
-
-  return (
-    <div className="flex h-36 items-center justify-center overflow-hidden rounded-sm bg-muted">
-      {photoUrl ? (
-        <img src={photoUrl} alt="Evidence" className="h-full w-full object-cover" />
-      ) : (
-        <ImageIcon className="size-8 text-muted-foreground" />
-      )}
-    </div>
-  );
-}
 
 function FailureCard({
   failure,

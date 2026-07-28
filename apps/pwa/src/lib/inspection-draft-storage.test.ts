@@ -41,8 +41,10 @@ const snapshot = (overrides: Partial<DraftSnapshot> = {}): DraftSnapshot => ({
     'wire-rope': { kind: 'BOOLEAN', passed: false },
     hours: { kind: 'TEXT', value: '1420' },
   },
-  inlineNotes: { 'wire-rope': 'frayed near the drum' },
-  failureDocs: {},
+  notes: {
+    'wire-rope': { notes: 'frayed near the drum', notesSource: 'TYPED', rawTranscript: null },
+  },
+  photoIds: {},
   ...overrides,
 });
 

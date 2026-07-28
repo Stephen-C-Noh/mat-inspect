@@ -1,20 +1,25 @@
 import { useState, type ReactElement } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Mic } from 'lucide-react';
 import type { ChecklistItem } from '@mat-inspect/shared-types';
 import type { ChecklistAnswer } from '@/lib/checklist-answers';
 import { isItemAnswered } from '@/lib/checklist-answers';
+import { useVoiceNoteRecorder } from '@/hooks/use-voice-note-recorder';
+import { formatElapsed, MAX_RECORDING_MS } from '@/lib/voice-notes';
 import { SeverityTag } from './severity-tag';
 import { RegulatoryInfo } from './regulatory-info';
 import { BooleanToggle } from './boolean-toggle';
 import { TextResponseInput } from './text-response-input';
-import { PhotoRequiredPrompt } from './photo-required-prompt';
+import { EvidencePhotoCapture } from './evidence-photo-capture';
 
 type Props = {
   item: ChecklistItem;
   answer: ChecklistAnswer | undefined;
   notes: string;
+  photoIds: string[];
   onAnswerChange: (answer: ChecklistAnswer) => void;
   onNotesChange: (notes: string) => void;
+  onPhotoIdsChange: (photoIds: string[]) => void;
+  onTranscript: (transcript: string) => void;
 };
 
 // BOOLEAN and BOOLEAN_PHOTO_ON_FAIL render the same pass/fail toggle; the photo prompt is
@@ -52,14 +57,21 @@ export const ChecklistItemCard = ({
   item,
   answer,
   notes,
+  photoIds,
   onAnswerChange,
   onNotesChange,
+  onPhotoIdsChange,
+  onTranscript,
 }: Props): ReactElement => {
   const failed = answer?.kind === 'BOOLEAN' && !answer.passed;
 
   // Passing auto-collapses so the list stays scannable (design 03). Any item can also be
   // manually collapsed/expanded via the chevron in the header.
   const [collapsed, setCollapsed] = useState(false);
+
+  // The transcript is handed straight up: merging it into the existing note text is a business rule
+  // that lives in lib/voice-notes (applyTranscript), not in this component.
+  const voiceRecorder = useVoiceNoteRecorder(onTranscript);
 
   const handleBooleanChange = (nextPassed: boolean): void => {
     onAnswerChange({ kind: 'BOOLEAN', passed: nextPassed });
@@ -128,12 +140,16 @@ export const ChecklistItemCard = ({
           </div>
 
           {item.type === 'BOOLEAN_PHOTO_ON_FAIL' && failed && (
-            <div className="mt-3">
-              <PhotoRequiredPrompt />
-            </div>
+            <EvidencePhotoCapture photoIds={photoIds} onPhotoIdsChange={onPhotoIdsChange} />
           )}
 
-          {item.type !== 'TEXT' && (
+          {/*
+            "For each failed item, the app shows a notes field with two options: type or tap to
+            dictate" (ARCHITECTURE.md 7.1). Both input methods sit together here, so dictation is
+            available on every failed item rather than only the photo-required ones. The note itself
+            stays optional (the schema has it as optional text); nothing here gates submit.
+          */}
+          {failed && (
             <div className="mt-4">
               <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 Notes
@@ -141,10 +157,36 @@ export const ChecklistItemCard = ({
               <textarea
                 value={notes}
                 onChange={(event) => onNotesChange(event.target.value)}
-                placeholder="Add any observations or comments..."
+                placeholder="Describe the defect, or tap to dictate..."
                 rows={2}
                 className="mt-1 w-full rounded-sm border border-input bg-muted px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={
+                  voiceRecorder.state.status === 'recording'
+                    ? voiceRecorder.stop
+                    : voiceRecorder.start
+                }
+                disabled={voiceRecorder.state.status === 'transcribing'}
+                className={`mt-2 flex w-full items-center justify-center gap-2 rounded-sm py-3 text-sm font-bold shadow-card transition-colors disabled:opacity-60 ${
+                  voiceRecorder.state.status === 'recording'
+                    ? 'animate-pulse bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                }`}
+              >
+                <Mic className="size-4" />
+                {voiceRecorder.state.status === 'recording'
+                  ? `Stop Recording ${formatElapsed(voiceRecorder.state.elapsedMs)} / ${formatElapsed(MAX_RECORDING_MS)}`
+                  : voiceRecorder.state.status === 'transcribing'
+                    ? 'Transcribing...'
+                    : 'Add Voice Note'}
+              </button>
+              {voiceRecorder.state.status === 'error' && (
+                <p role="status" className="mt-2 text-xs font-semibold text-warning">
+                  {voiceRecorder.state.message}
+                </p>
+              )}
             </div>
           )}
         </div>

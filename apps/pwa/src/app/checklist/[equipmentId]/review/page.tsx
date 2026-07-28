@@ -8,7 +8,11 @@ import { useInspectionDraft } from '@/components/inspection-draft-provider';
 import { useInspectionDraftStore } from '@/hooks/use-inspection-draft-store';
 import { useSubmitInspection } from '@/hooks/use-submit-inspection';
 import { attestationSummary, operatorDisplayName } from '@/lib/attestation-summary';
-import { buildSubmitPayload, collectFailedItems } from '@/lib/inspection-submit';
+import {
+  buildSubmitPayload,
+  collectFailedItems,
+  failuresDocumented,
+} from '@/lib/inspection-submit';
 import { submitErrorMessage } from '@/lib/submit-error-message';
 
 // The review-and-confirm step required by ADR 0007. It is a route rather than a dialog on the
@@ -36,26 +40,26 @@ function ReviewView(): ReactElement {
     [draft],
   );
 
-  // Every failed item must carry evidence before it can be attested to. This is the same gate the
-  // failure screen applies before handing off (allPhotosAttached); repeating it here closes the
-  // path where the operator reaches the checklist from this screen, flips an item to fail, and
-  // returns with the browser's back gesture, which remounts this screen against the updated draft.
-  const failuresDocumented = useMemo(
-    () => failedItems.every((item) => (draft?.failureDocs[item.itemKey]?.photoIds.length ?? 0) > 0),
-    [failedItems, draft],
-  );
+  // Same gate the checklist screen applies before handing off (lib/inspection-submit.ts, shared so
+  // the two can't drift apart). Repeating it here closes the path where the operator reaches the
+  // checklist from this screen, flips an item to fail, and returns with the browser's back
+  // gesture, which remounts this screen against the updated draft.
+  // Not memoized: the result is a boolean, and the effect dep below compares by value.
+  const evidenceComplete = draft
+    ? failuresDocumented(draft.items, draft.answers, draft.photoIds)
+    : false;
 
   useEffect(() => {
-    // No draft means a reload after the draft expired or was cleared. Send the operator back to
-    // the checklist rather than showing an empty attestation.
-    if (!draft) {
+    // No draft means a reload after the draft expired or was cleared, or the required evidence is
+    // missing (the checklist screen applies the same gate before letting the operator submit).
+    // Either way, send the operator back to the checklist rather than showing an empty or
+    // unconfirmable attestation.
+    if (!draft || !evidenceComplete) {
       router.replace(`/inspect/${params.equipmentId}`);
-    } else if (!failuresDocumented) {
-      router.replace(`/checklist/${params.equipmentId}/failures`);
     }
-  }, [draft, failuresDocumented, params.equipmentId, router]);
+  }, [draft, evidenceComplete, params.equipmentId, router]);
 
-  if (!draft || !failuresDocumented) return <></>;
+  if (!draft || !evidenceComplete) return <></>;
 
   const summary = attestationSummary(draft.items, draft.answers);
   const account = accounts[0];
@@ -80,8 +84,8 @@ function ReviewView(): ReactElement {
         templateId: draft.templateId,
         items: draft.items,
         answers: draft.answers,
-        inlineNotes: draft.inlineNotes,
-        failureDocs: draft.failureDocs,
+        notes: draft.notes,
+        photoIds: draft.photoIds,
         attested: true,
       });
 
@@ -96,8 +100,8 @@ function ReviewView(): ReactElement {
         result: inspection.result,
         failures: failedItems.map((item) => ({
           prompt: item.prompt,
-          notes: draft.failureDocs[item.itemKey]?.notes ?? '',
-          photoId: draft.failureDocs[item.itemKey]?.photoIds[0] ?? null,
+          notes: draft.notes[item.itemKey]?.notes ?? '',
+          photoId: draft.photoIds[item.itemKey]?.[0] ?? null,
         })),
       });
 
@@ -112,7 +116,7 @@ function ReviewView(): ReactElement {
       if (inspection.result === 'FAIL_BLOCKING') {
         const lockoutParams = new URLSearchParams();
         for (const item of failedItems) {
-          const notes = draft.failureDocs[item.itemKey]?.notes.trim();
+          const notes = draft.notes[item.itemKey]?.notes.trim();
           lockoutParams.append('defect', notes ? `${item.prompt}: ${notes}` : item.prompt);
         }
         lockoutParams.set('lockedAt', inspection.submittedAt);
@@ -157,16 +161,16 @@ function ReviewView(): ReactElement {
             </p>
             <ul aria-label="Failed items" className="mt-3 flex flex-col gap-3">
               {failedItems.map((item) => {
-                const doc = draft.failureDocs[item.itemKey];
-                const photos = doc?.photoIds.length ?? 0;
+                const note = draft.notes[item.itemKey];
+                const photos = draft.photoIds[item.itemKey]?.length ?? 0;
                 return (
                   <li
                     key={item.itemKey}
                     className="border-l-4 border-warning pl-3 text-sm text-foreground"
                   >
                     <p className="font-bold">{item.prompt}</p>
-                    {doc?.notes.trim() && (
-                      <p className="mt-1 italic text-muted-foreground">{doc.notes}</p>
+                    {note?.notes.trim() && (
+                      <p className="mt-1 italic text-muted-foreground">{note.notes}</p>
                     )}
                     {photos > 0 && (
                       <p className="mt-1 text-xs font-semibold text-muted-foreground">

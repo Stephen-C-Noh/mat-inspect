@@ -17,9 +17,9 @@ type DraftStore = {
   clear: () => void;
 };
 
-// Binds a screen to the persisted draft for one piece of equipment. Both inspection screens use
-// it, so the checklist and the failure-documentation screens read and write the same record and a
-// page load between them keeps the operator's work (DEV-125).
+// Binds a screen to the persisted draft for one piece of equipment. The checklist screen and the
+// review screen both use it, so they read and write the same record and a page load between them
+// keeps the operator's work (DEV-125).
 //
 // The initial read happens in a useState initializer rather than an effect, so a restored draft is
 // present on the first painted render and the operator never sees their answers blink in. Both

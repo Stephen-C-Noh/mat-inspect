@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { ChecklistItem } from '@mat-inspect/shared-types';
 import type { ChecklistAnswers } from './checklist-answers';
-import { buildSubmitPayload, collectFailedItems } from './inspection-submit';
+import {
+  buildSubmitPayload,
+  collectFailedItems,
+  failuresDocumented,
+  photoRequiredFailures,
+} from './inspection-submit';
+import { emptyItemNote, type ItemNote } from './voice-notes';
 
 const booleanItem: ChecklistItem = {
   key: 'forks',
@@ -19,6 +25,14 @@ const hornItem: ChecklistItem = {
   failSeverity: 'WARNING',
 };
 
+const photoOnFailItem: ChecklistItem = {
+  key: 'forks',
+  prompt: 'Forks intact?',
+  type: 'BOOLEAN_PHOTO_ON_FAIL',
+  required: true,
+  failSeverity: 'BLOCKING',
+};
+
 const textItem: ChecklistItem = {
   key: 'remarks',
   prompt: 'Additional remarks',
@@ -29,6 +43,8 @@ const textItem: ChecklistItem = {
 
 const EQUIPMENT_ID = '11111111-1111-1111-1111-111111111111';
 const TEMPLATE_ID = '22222222-2222-2222-2222-222222222222';
+
+const typed = (notes: string): ItemNote => ({ ...emptyItemNote(), notes });
 
 describe('buildSubmitPayload', () => {
   // ADR 0007: the attestation is an explicit confirm action taken after the operator reviews a
@@ -41,7 +57,8 @@ describe('buildSubmitPayload', () => {
         templateId: TEMPLATE_ID,
         items: [booleanItem],
         answers: { forks: { kind: 'BOOLEAN', passed: true } },
-        inlineNotes: {},
+        notes: {},
+        photoIds: {},
         attested: false,
       }),
     ).toThrow(/attest/i);
@@ -59,7 +76,8 @@ describe('buildSubmitPayload', () => {
       templateId: TEMPLATE_ID,
       items,
       answers,
-      inlineNotes: {},
+      notes: {},
+      photoIds: {},
       attested: true,
     });
 
@@ -80,7 +98,8 @@ describe('buildSubmitPayload', () => {
       templateId: TEMPLATE_ID,
       items: [booleanItem],
       answers: { forks: { kind: 'BOOLEAN', passed: false } },
-      inlineNotes: {},
+      notes: {},
+      photoIds: {},
       attested: true,
     });
 
@@ -95,7 +114,8 @@ describe('buildSubmitPayload', () => {
       templateId: TEMPLATE_ID,
       items: [textItem],
       answers: { remarks: { kind: 'TEXT', value: 'runs hot after 20 min' } },
-      inlineNotes: {},
+      notes: {},
+      photoIds: {},
       attested: true,
     });
 
@@ -110,7 +130,8 @@ describe('buildSubmitPayload', () => {
       templateId: TEMPLATE_ID,
       items: [booleanItem, textItem],
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
-      inlineNotes: {},
+      notes: {},
+      photoIds: {},
       attested: true,
     });
 
@@ -119,13 +140,14 @@ describe('buildSubmitPayload', () => {
     ]);
   });
 
-  it('attaches typed inline notes to a boolean response as TYPED', () => {
+  it('attaches a typed note to a passing boolean response as TYPED', () => {
     const payload = buildSubmitPayload({
       equipmentId: EQUIPMENT_ID,
       templateId: TEMPLATE_ID,
       items: [booleanItem],
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
-      inlineNotes: { forks: 'slight surface rust, still safe' },
+      notes: { forks: typed('slight surface rust, still safe') },
+      photoIds: {},
       attested: true,
     });
 
@@ -141,13 +163,14 @@ describe('buildSubmitPayload', () => {
     ]);
   });
 
-  it('ignores whitespace-only inline notes', () => {
+  it('ignores a whitespace-only note', () => {
     const payload = buildSubmitPayload({
       equipmentId: EQUIPMENT_ID,
       templateId: TEMPLATE_ID,
       items: [booleanItem],
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
-      inlineNotes: { forks: '   ' },
+      notes: { forks: typed('   ') },
+      photoIds: {},
       attested: true,
     });
 
@@ -156,7 +179,7 @@ describe('buildSubmitPayload', () => {
     ]);
   });
 
-  it('merges a failure doc (voice notes + photo ids) onto its failed boolean response', () => {
+  it('merges a voice-transcribed note and evidence photo onto a failed boolean response', () => {
     const photoId = '33333333-3333-3333-3333-333333333333';
     const payload = buildSubmitPayload({
       equipmentId: EQUIPMENT_ID,
@@ -166,16 +189,15 @@ describe('buildSubmitPayload', () => {
         forks: { kind: 'BOOLEAN', passed: false },
         horn: { kind: 'BOOLEAN', passed: true },
       },
-      // Inline note on the failed item is superseded by the documented failure below.
-      inlineNotes: { forks: 'typed earlier' },
-      attested: true,
-      failureDocs: {
+      notes: {
         forks: {
           notes: 'left fork cracked at the heel',
           notesSource: 'VOICE_TRANSCRIBED',
-          photoIds: [photoId],
+          rawTranscript: null,
         },
       },
+      photoIds: { forks: [photoId] },
+      attested: true,
     });
 
     expect(payload.responses).toEqual([
@@ -192,45 +214,19 @@ describe('buildSubmitPayload', () => {
     ]);
   });
 
-  // The operator documented a failure, went back to the checklist, re-inspected the item and
-  // flipped it to pass. The draft still holds the earlier defect note and evidence photo so the
-  // failure screen can restore them, but the record must not claim a defect on a passing item:
-  // the row is immutable once written and its content is sealed into the audit chain (ADR 0008).
-  it('drops a failure doc whose item was re-inspected and now passes', () => {
+  // buildSubmitPayload trusts the draft: it sends whatever note and photo ids are on record for
+  // the current answer, with no pass/fail filtering of its own. Staleness (a fail-documented note
+  // surviving a flip to pass) is prevented upstream, by resetting an item's note and photo the
+  // moment its answer changes (the checklist screen, DEV-134), not by this function.
+  it('sends notes and photo ids as given, even for a currently-passing item', () => {
     const payload = buildSubmitPayload({
       equipmentId: EQUIPMENT_ID,
       templateId: TEMPLATE_ID,
       items: [booleanItem],
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
-      inlineNotes: {},
+      notes: { forks: typed('heel reground, within spec') },
+      photoIds: { forks: ['some-photo-id'] },
       attested: true,
-      failureDocs: {
-        forks: {
-          notes: 'left fork cracked at the heel',
-          notesSource: 'VOICE_TRANSCRIBED',
-          photoIds: ['33333333-3333-3333-3333-333333333333'],
-        },
-      },
-    });
-
-    expect(payload.responses).toEqual([
-      { itemKey: 'forks', value: true, passed: true, photoIds: [] },
-    ]);
-  });
-
-  // The inline note is the operator's own current text on the checklist card, so it stays on a
-  // passing response. Only the stale failure doc is dropped.
-  it('keeps the inline note on a passing item whose failure doc was dropped', () => {
-    const payload = buildSubmitPayload({
-      equipmentId: EQUIPMENT_ID,
-      templateId: TEMPLATE_ID,
-      items: [booleanItem],
-      answers: { forks: { kind: 'BOOLEAN', passed: true } },
-      inlineNotes: { forks: 'heel reground, within spec' },
-      attested: true,
-      failureDocs: {
-        forks: { notes: 'left fork cracked at the heel', notesSource: 'TYPED', photoIds: ['x'] },
-      },
     });
 
     expect(payload.responses).toEqual([
@@ -240,7 +236,7 @@ describe('buildSubmitPayload', () => {
         passed: true,
         notes: 'heel reground, within spec',
         notesSource: 'TYPED',
-        photoIds: [],
+        photoIds: ['some-photo-id'],
       },
     ]);
   });
@@ -267,5 +263,50 @@ describe('collectFailedItems', () => {
     });
 
     expect(failed).toEqual([]);
+  });
+});
+
+describe('photoRequiredFailures', () => {
+  // DEV-120 scopes the photo requirement to BOOLEAN_PHOTO_ON_FAIL specifically. A plain BOOLEAN
+  // fail never requires a photo, so it must never show up here even though it is a failure.
+  it('returns only failed BOOLEAN_PHOTO_ON_FAIL items, excluding a plain boolean fail', () => {
+    const failed = photoRequiredFailures([photoOnFailItem, hornItem], {
+      forks: { kind: 'BOOLEAN', passed: false },
+      horn: { kind: 'BOOLEAN', passed: false },
+    });
+
+    expect(failed).toEqual([{ itemKey: 'forks', prompt: 'Forks intact?' }]);
+  });
+
+  it('excludes a passing BOOLEAN_PHOTO_ON_FAIL item', () => {
+    const failed = photoRequiredFailures([photoOnFailItem], {
+      forks: { kind: 'BOOLEAN', passed: true },
+    });
+
+    expect(failed).toEqual([]);
+  });
+});
+
+describe('failuresDocumented', () => {
+  it('is true when there are no photo-required failures', () => {
+    expect(failuresDocumented([hornItem], { horn: { kind: 'BOOLEAN', passed: false } }, {})).toBe(
+      true,
+    );
+  });
+
+  it('is false when a photo-required failure has no photo id', () => {
+    expect(
+      failuresDocumented([photoOnFailItem], { forks: { kind: 'BOOLEAN', passed: false } }, {}),
+    ).toBe(false);
+  });
+
+  it('is true once the photo-required failure has a photo id', () => {
+    expect(
+      failuresDocumented(
+        [photoOnFailItem],
+        { forks: { kind: 'BOOLEAN', passed: false } },
+        { forks: ['some-photo-id'] },
+      ),
+    ).toBe(true);
   });
 });

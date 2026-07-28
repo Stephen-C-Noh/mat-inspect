@@ -46,10 +46,12 @@ vi.mock('@azure/msal-react', () => ({
   useIsAuthenticated: () => true,
 }));
 
+// BOOLEAN_PHOTO_ON_FAIL: the type that requires evidence on a fail (DEV-120). horn stays plain
+// BOOLEAN so tests can tell "no evidence required" apart from "evidence required and missing".
 const forks: ChecklistItem = {
   key: 'forks',
   prompt: 'Forks intact?',
-  type: 'BOOLEAN',
+  type: 'BOOLEAN_PHOTO_ON_FAIL',
   required: true,
   failSeverity: 'BLOCKING',
 };
@@ -82,8 +84,8 @@ const seedDraft = (overrides: Partial<Parameters<typeof saveDraft>[1]> = {}): vo
         horn: { kind: 'BOOLEAN', passed: true },
         remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
       },
-      inlineNotes: {},
-      failureDocs: {},
+      notes: {},
+      photoIds: {},
       ...overrides,
     },
     new Date(),
@@ -180,13 +182,14 @@ describe('review and confirm screen', () => {
         horn: { kind: 'BOOLEAN', passed: false },
         remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
       },
-      failureDocs: {
+      notes: {
         horn: {
           notes: 'horn is faint but audible',
           notesSource: 'VOICE_TRANSCRIBED',
-          photoIds: ['33333333-3333-3333-3333-333333333333'],
+          rawTranscript: null,
         },
       },
+      photoIds: { horn: ['33333333-3333-3333-3333-333333333333'] },
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okInspection('FAIL_WARNING')));
 
@@ -212,13 +215,14 @@ describe('review and confirm screen', () => {
         horn: { kind: 'BOOLEAN', passed: true },
         remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
       },
-      failureDocs: {
+      notes: {
         forks: {
           notes: 'left fork cracked at the heel',
           notesSource: 'VOICE_TRANSCRIBED',
-          photoIds: ['33333333-3333-3333-3333-333333333333'],
+          rawTranscript: null,
         },
       },
+      photoIds: { forks: ['33333333-3333-3333-3333-333333333333'] },
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okInspection('FAIL_BLOCKING')));
 
@@ -245,13 +249,14 @@ describe('review and confirm screen', () => {
         horn: { kind: 'BOOLEAN', passed: true },
         remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
       },
-      failureDocs: {
+      notes: {
         forks: {
           notes: 'left fork cracked at the heel',
           notesSource: 'VOICE_TRANSCRIBED',
-          photoIds: ['33333333-3333-3333-3333-333333333333'],
+          rawTranscript: null,
         },
       },
+      photoIds: { forks: ['33333333-3333-3333-3333-333333333333'] },
     });
     renderReview();
 
@@ -273,13 +278,14 @@ describe('review and confirm screen', () => {
         horn: { kind: 'BOOLEAN', passed: true },
         remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
       },
-      failureDocs: {
+      notes: {
         forks: {
           notes: 'left fork cracked at the heel',
           notesSource: 'VOICE_TRANSCRIBED',
-          photoIds: [PHOTO_ID],
+          rawTranscript: null,
         },
       },
+      photoIds: { forks: [PHOTO_ID] },
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okInspection('FAIL_BLOCKING')));
 
@@ -321,26 +327,44 @@ describe('review and confirm screen', () => {
   // "Back to Checklist" pushes rather than pops, so an operator can leave this screen, fail an
   // item (which the checklist persists immediately) and return with the back gesture, remounting
   // the screen against a draft whose failure was never documented. Attesting there would record a
-  // FAIL_BLOCKING with no defect note and no evidence photo, past the failure screen's own gate.
-  it('sends the operator to the failure screen when a failed item has no evidence photo', async () => {
+  // FAIL_BLOCKING with no defect note and no evidence photo, past the checklist screen's own gate.
+  it('sends the operator back to the checklist when a photo-required item has no evidence photo', async () => {
     seedDraft({
       answers: {
         forks: { kind: 'BOOLEAN', passed: false },
         horn: { kind: 'BOOLEAN', passed: true },
         remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
       },
-      failureDocs: {},
+      notes: {},
+      photoIds: {},
     });
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     renderReview();
 
-    await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith(`/checklist/${EQUIPMENT_ID}/failures`),
-    );
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/inspect/${EQUIPMENT_ID}`));
     expect(screen.queryByRole('button', { name: /confirm and submit/i })).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // A plain BOOLEAN fail (not BOOLEAN_PHOTO_ON_FAIL) never requires evidence (DEV-120): the review
+  // screen must not block on it just because horn's answer flipped to fail with no note or photo.
+  it('does not gate on a plain boolean fail that has no evidence photo', () => {
+    seedDraft({
+      answers: {
+        forks: { kind: 'BOOLEAN', passed: true },
+        horn: { kind: 'BOOLEAN', passed: false },
+        remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
+      },
+      notes: {},
+      photoIds: {},
+    });
+
+    renderReview();
+
+    expect(screen.getByRole('button', { name: /confirm and submit/i })).not.toBeNull();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   // The key outlives this screen so the recovery path the screen itself offers (the error sits
