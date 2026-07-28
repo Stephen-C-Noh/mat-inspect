@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
-import { History, LogOut, Settings, User } from 'lucide-react';
+import { HelpCircle, History, LogOut, Settings, User } from 'lucide-react';
 
 export const AccountMenu = (): ReactElement | null => {
   const { instance, accounts } = useMsal();
@@ -73,6 +73,15 @@ export const AccountMenu = (): ReactElement | null => {
           >
             <History className="size-4" />
             History
+          </Link>
+          <Link
+            href="/help"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+          >
+            <HelpCircle className="size-4" />
+            Help
           </Link>
           <button
             type="button"

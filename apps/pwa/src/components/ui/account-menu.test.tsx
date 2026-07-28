@@ -52,7 +52,7 @@ describe('AccountMenu', () => {
     });
   });
 
-  it('links to Settings and History and closes the menu on click', async () => {
+  it('links to Settings, History, and Help, and closes the menu on click', async () => {
     render(<AccountMenu />);
 
     await userEvent.click(screen.getByRole('button', { name: /account menu/i }));
@@ -61,6 +61,8 @@ describe('AccountMenu', () => {
     expect(settingsLink).toHaveProperty('href', expect.stringContaining('/settings'));
     const historyLink = screen.getByRole('menuitem', { name: /history/i });
     expect(historyLink).toHaveProperty('href', expect.stringContaining('/history'));
+    const helpLink = screen.getByRole('menuitem', { name: /help/i });
+    expect(helpLink).toHaveProperty('href', expect.stringContaining('/help'));
 
     await userEvent.click(settingsLink);
     expect(screen.queryByRole('menu')).toBeNull();

@@ -4,7 +4,6 @@ import { useMsal } from '@azure/msal-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
-import { Bell } from 'lucide-react';
 import { AccountMenu } from '@/components/ui/account-menu';
 
 export const TopBar = function (): ReactElement | null {
@@ -22,7 +21,6 @@ export const TopBar = function (): ReactElement | null {
 
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium">{activeAccount.name}</span>
-        <Bell className="size-6 cursor-pointer" />
         <AccountMenu />
       </div>
     </header>
