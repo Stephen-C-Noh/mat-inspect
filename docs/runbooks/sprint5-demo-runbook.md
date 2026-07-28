@@ -126,7 +126,8 @@ all, review the attestation summary, submit. Back on the equipment list, the for
 READY. Say the compliance line: READY is computed, valid only for today, and cannot be forced.
 
 **C. Operator fail flow with photo and voice, on the phone (7 min).** Scan MAT-OC-001 (crane).
-Fail a blocking item. On the failures screen, attach a photo (camera opens; a photo is required
+Fail a blocking item. The card expands in place with photo and voice capture (DEV-134 folded the
+separate failures screen into the checklist). Attach a photo (camera opens; a photo is required
 per failed item) and record a voice defect note. The transcript comes back for review and edit
 before it is accepted; typed, transcribed, and edited notes are tracked as different sources.
 Attest and submit. The lockout screen appears; the crane is OUT_OF_SERVICE. If transcription

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ChecklistItem } from '@mat-inspect/shared-types';
 import type { ChecklistAnswers } from './checklist-answers';
-import type { FailureDocs } from './inspection-submit';
+import type { ItemNote } from './voice-notes';
 
 // The part of the Storage interface this module needs. Narrow on purpose: it keeps the module
 // testable without a DOM, and nothing here needs key enumeration or clear().
@@ -19,11 +19,14 @@ export type DraftSnapshot = {
   templateId: string;
   items: ChecklistItem[];
   answers: ChecklistAnswers;
-  inlineNotes: Record<string, string>;
-  // Defect notes and uploaded evidence photo ids, keyed by item key. Photo ids, not blob: URLs:
-  // a blob: URL is revoked on unload, so persisting one restores a reference that fetch() cannot
-  // read. Photos are uploaded at capture time and only the returned id is kept (ADR 0023).
-  failureDocs: FailureDocs;
+  // One note per item, typed and/or voice-captured, kept regardless of the item's current
+  // pass/fail value. The checklist screen resets an item's entry the moment its answer changes,
+  // so a stale note can never outlive the answer it was written against (ADR 0008, DEV-134).
+  notes: Record<string, ItemNote>;
+  // Uploaded evidence photo ids, keyed by item key. Ids, not blob: URLs: a blob: URL is revoked
+  // on unload, so persisting one restores a reference that fetch() cannot read. Photos are
+  // uploaded at capture time and only the returned id is kept (ADR 0023).
+  photoIds: Record<string, string[]>;
   // The idempotency key minted for the first submit attempt, kept so a retry after a failed or
   // lost POST replays the original 201 rather than recording a second inspection (ADR 0009).
   // Absent until the operator confirms on the review screen.
@@ -57,10 +60,10 @@ const answerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('TEXT'), value: z.string() }),
 ]);
 
-const failureDocSchema = z.object({
+const itemNoteSchema = z.object({
   notes: z.string(),
   notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']),
-  photoIds: z.array(z.string()),
+  rawTranscript: z.string().nullable(),
 });
 
 const storedDraftSchema = z.object({
@@ -70,8 +73,8 @@ const storedDraftSchema = z.object({
     templateId: z.string(),
     items: z.array(checklistItemSchema),
     answers: z.record(answerSchema),
-    inlineNotes: z.record(z.string()),
-    failureDocs: z.record(failureDocSchema),
+    notes: z.record(itemNoteSchema),
+    photoIds: z.record(z.array(z.string())),
     submitIdempotencyKey: z.string().optional(),
   }),
 });

@@ -118,4 +118,76 @@ describe('checklist screen submit action', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/checklist/${EQUIPMENT_ID}/review`));
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/inspections')).toHaveLength(0);
   });
+
+  // ADR 0009: the review screen mints the idempotency key on the first confirm. If backing out to
+  // this screen dropped it, the retry after a timed-out POST would mint a new one and record a
+  // second inspection instead of replaying the original 201.
+  it('preserves the submit idempotency key already in the draft', async () => {
+    window.sessionStorage.setItem(
+      'mat-inspect.inspection-draft',
+      JSON.stringify({
+        savedAt: new Date().toISOString(),
+        draft: {
+          equipmentId: EQUIPMENT_ID,
+          templateId: TEMPLATE_ID,
+          items: template.items,
+          answers: { forks: { kind: 'BOOLEAN', passed: true } },
+          notes: {},
+          photoIds: {},
+          submitIdempotencyKey: '99999999-9999-9999-9999-999999999999',
+        },
+      }),
+    );
+
+    renderChecklist();
+    await screen.findByRole('button', { name: /pass/i });
+
+    await waitFor(() =>
+      expect(
+        JSON.parse(window.sessionStorage.getItem('mat-inspect.inspection-draft') as string).draft
+          .submitIdempotencyKey,
+      ).toBe('99999999-9999-9999-9999-999999999999'),
+    );
+  });
+
+  // The one thing stopping a note written against a fail from being sealed onto a PASS row
+  // (ADR 0008): buildSubmitPayload deliberately does no pass/fail filtering of its own and says so,
+  // so this reset is the whole guarantee. It had no test.
+  it('clears a note written against a fail when the operator re-marks the item as passing', async () => {
+    renderChecklist();
+
+    await userEvent.click(await screen.findByRole('button', { name: /fail/i }));
+    await userEvent.type(screen.getByPlaceholderText(/describe the defect/i), 'left fork cracked');
+
+    const storedNote = (): unknown =>
+      JSON.parse(window.sessionStorage.getItem('mat-inspect.inspection-draft') as string).draft
+        .notes.forks?.notes;
+
+    await waitFor(() => expect(storedNote()).toBe('left fork cracked'));
+
+    await userEvent.click(screen.getByRole('button', { name: /pass/i }));
+
+    await waitFor(() => expect(storedNote()).toBe(''));
+  });
+
+  // The submit action itself no longer writes the draft: persisting on every answer (DEV-125) has
+  // already done it. This pins that invariant, because the review screen reads the draft on mount
+  // and would show a blank summary if the answer had not reached storage on its own.
+  it('has already persisted the answers to storage by the time it hands off to review', async () => {
+    renderChecklist();
+
+    const pass = await screen.findByRole('button', { name: /pass/i });
+    await userEvent.click(pass);
+
+    await userEvent.click(screen.getByRole('button', { name: /submit inspection/i }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/checklist/${EQUIPMENT_ID}/review`));
+
+    const raw = window.sessionStorage.getItem('mat-inspect.inspection-draft');
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw as string).draft).toMatchObject({
+      equipmentId: EQUIPMENT_ID,
+      templateId: TEMPLATE_ID,
+      answers: { forks: { kind: 'BOOLEAN', passed: true } },
+    });
+  });
 });

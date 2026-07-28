@@ -24,5 +24,12 @@ export const usePhotoBlob = (photoId: string | null): UseQueryResult<Blob, Error
       return res.blob();
     },
     enabled: accounts.length > 0 && photoId !== null,
+    // An uploaded photo is immutable evidence addressed by its id (ADR 0023), so the bytes behind a
+    // photoId can never go stale. Without this the query inherits the global 30 s staleTime and
+    // refetches a 3 to 8 MB camera JPEG every time a checklist card is collapsed and reopened,
+    // because the card unmounts its body (checklist-item-card) and Media answers no-store, so the
+    // browser cache cannot absorb it either. gcTime is left at its default so the blobs are still
+    // evicted once nothing is rendering them.
+    staleTime: Infinity,
   });
 };
