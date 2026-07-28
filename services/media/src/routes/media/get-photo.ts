@@ -30,7 +30,14 @@ export const getPhotoRoute: FastifyPluginAsync = async (app) => {
 
       logger.info({ reqId: req.id, userId: req.user.id, photoId }, 'photo fetched');
 
-      return reply.code(200).type(photo.contentType).send(photo.data);
+      // Evidence photos are biometric-adjacent inspection PII (CLAUDE.md 2) shown on a shared lab
+      // tablet across operators; the browser's HTTP disk cache must not outlive this response, or
+      // the next operator to log in on the same device can see the previous one's photo.
+      return reply
+        .code(200)
+        .header('cache-control', 'private, no-store')
+        .type(photo.contentType)
+        .send(photo.data);
     },
   );
 };

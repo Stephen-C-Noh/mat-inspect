@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BlobServiceClient, type ContainerClient } from '@azure/storage-blob';
+import { buffer as streamToBuffer } from 'node:stream/consumers';
+import { BlobServiceClient, RestError, type ContainerClient } from '@azure/storage-blob';
 import type { PhotoContentType } from '@mat-inspect/shared-schemas';
 import { config } from './config.js';
 
@@ -87,25 +88,35 @@ export type PhotoBlob = {
   contentType: PhotoContentType;
 };
 
-// Returns null when no blob exists for the id, so the route can answer 404 rather than throw.
+// Returns null when no blob exists for the id, so the route can answer 404 rather than throw. A
+// single download() call, not an exists() check followed by a separate download: the two-call
+// form leaves a window where the blob can disappear (retention sweep, manual cleanup) between the
+// check and the read, which surfaced as an uncaught RestError and a 500 instead of the 404 the
+// caller was trying to produce. download() also returns the content type with the stream, so this
+// is one round trip instead of three.
 export const getPhoto = async (photoId: string): Promise<PhotoBlob | null> => {
   const container = await getContainerClient();
   const blockBlob = container.getBlockBlobClient(photoId);
 
-  if (!(await blockBlob.exists())) {
-    return null;
+  try {
+    const response = await blockBlob.download();
+    // Only absent when the SDK falls back to its browser body type, which does not happen on this
+    // Node runtime; a download() that resolves without throwing always has a body to read.
+    if (!response.readableStreamBody) {
+      throw new Error(`download() for photo ${photoId} returned no readable body`);
+    }
+    const data = await streamToBuffer(response.readableStreamBody);
+    return {
+      data,
+      // Set from a PhotoContentType at upload (storePhoto); no other writer touches this blob.
+      contentType: (response.contentType ?? 'image/jpeg') as PhotoContentType,
+    };
+  } catch (err) {
+    if (err instanceof RestError && err.statusCode === 404) {
+      return null;
+    }
+    throw err;
   }
-
-  const [data, properties] = await Promise.all([
-    blockBlob.downloadToBuffer(),
-    blockBlob.getProperties(),
-  ]);
-
-  return {
-    data,
-    // Set from a PhotoContentType at upload (storePhoto); no other writer touches this blob.
-    contentType: (properties.contentType ?? 'image/jpeg') as PhotoContentType,
-  };
 };
 
 // Test-only: drops the cached container client so a test can point at a fresh Azurite container.

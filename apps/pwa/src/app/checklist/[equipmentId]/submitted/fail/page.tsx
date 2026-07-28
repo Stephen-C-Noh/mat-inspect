@@ -15,11 +15,13 @@ import {
 import { useMsal } from '@azure/msal-react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
-import { usePhoto } from '@/hooks/use-photo';
+import { usePhotoBlob } from '@/hooks/use-photo';
+import { useObjectUrl } from '@/hooks/use-object-url';
 import { useInspectionDraft, type SubmittedFailure } from '@/components/inspection-draft-provider';
 
 function EvidencePhoto({ photoId }: { photoId: string | null }): ReactElement {
-  const { data: photoUrl } = usePhoto(photoId);
+  const { data: photoBlob } = usePhotoBlob(photoId);
+  const photoUrl = useObjectUrl(photoBlob);
 
   return (
     <div className="flex h-36 items-center justify-center overflow-hidden rounded-sm bg-muted">

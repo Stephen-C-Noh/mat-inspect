@@ -116,8 +116,36 @@ describe('fail confirmation screen evidence photo', () => {
     expect(init?.headers).toEqual({ Authorization: 'Bearer test-token' });
   });
 
-  it('shows the placeholder when the failure has no photo id', () => {
-    vi.stubGlobal('fetch', vi.fn());
+  // The object URL is owned by the mounted card, not by the query cache: a blob: URL pins the
+  // photo's bytes in memory until revoked, and an operator can view several fail confirmations
+  // in one shift. Ownership living in the component is what makes "revoke on unmount" correct
+  // even when two cards share a photoId (DEV-131 review).
+  it('revokes the object URL when the card unmounts', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        blob: async () => new Blob(['fake-jpeg-bytes'], { type: 'image/jpeg' }),
+      } as Response),
+    );
+
+    const { unmount } = renderFail({
+      ...baseResult,
+      failures: [{ prompt: 'Forks intact?', notes: '', photoId: PHOTO_ID }],
+    });
+
+    await screen.findByRole('img', { name: /evidence/i });
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-photo-url');
+  });
+
+  it('shows the placeholder and never calls Media when the failure has no photo id', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     renderFail({
       ...baseResult,
@@ -125,16 +153,21 @@ describe('fail confirmation screen evidence photo', () => {
     });
 
     expect(screen.queryByRole('img', { name: /evidence/i })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('shows the placeholder when the Media fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 } as Response));
+  it('shows the placeholder after a failed Media fetch, not before it settles', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 } as Response);
+    vi.stubGlobal('fetch', fetchMock);
 
     renderFail({
       ...baseResult,
       failures: [{ prompt: 'Forks intact?', notes: '', photoId: PHOTO_ID }],
     });
 
-    await waitFor(() => expect(screen.queryByRole('img', { name: /evidence/i })).toBeNull());
+    // Proves the fetch was actually attempted and rejected, not that the placeholder is simply
+    // the synchronous default an unwired usePhoto would also produce.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.queryByRole('img', { name: /evidence/i })).toBeNull();
   });
 });

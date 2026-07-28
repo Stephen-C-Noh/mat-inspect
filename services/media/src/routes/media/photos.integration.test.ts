@@ -123,5 +123,8 @@ describe('GET /api/v1/media/photos/:photoId', () => {
     expect(getRes.statusCode).toBe(200);
     expect(getRes.headers['content-type']).toBe('image/jpeg');
     expect(Buffer.compare(getRes.rawPayload, JPEG)).toBe(0);
+    // A shared lab tablet must not keep an operator's evidence photo in its HTTP disk cache past
+    // this response, or the next operator to log in on the device can see it.
+    expect(getRes.headers['cache-control']).toBe('private, no-store');
   });
 });

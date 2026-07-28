@@ -4,11 +4,13 @@ import { acquireAccessToken } from '@/lib/auth';
 
 // Fetches an evidence photo's bytes from the Media Service by id, PWA to Media direct (ADR 0020,
 // ADR 0023, DEV-131). core-api never sees the bytes, only the photoId reference the checklist
-// screens already carry. Returns a local object URL for an <img src>.
-export const usePhoto = (photoId: string | null): UseQueryResult<string, Error> => {
+// screens already carry. Returns the Blob rather than an object URL: an object URL is a browser
+// resource that must be revoked by whoever created it, and the query cache is not a component, so
+// it cannot own that lifecycle (see useObjectUrl).
+export const usePhotoBlob = (photoId: string | null): UseQueryResult<Blob, Error> => {
   const { instance, accounts } = useMsal();
 
-  return useQuery<string, Error>({
+  return useQuery<Blob, Error>({
     queryKey: ['photo', photoId],
     queryFn: async () => {
       const accessToken = await acquireAccessToken(instance, accounts);
@@ -19,7 +21,7 @@ export const usePhoto = (photoId: string | null): UseQueryResult<string, Error> 
 
       if (!res.ok) throw new Error(`Failed to fetch photo: ${res.status}`);
 
-      return URL.createObjectURL(await res.blob());
+      return res.blob();
     },
     enabled: accounts.length > 0 && photoId !== null,
   });
