@@ -104,11 +104,26 @@ function ReviewView(): ReactElement {
       // The record is on the server; the draft has served its purpose. Clearing it stops the next
       // inspection of this machine from reopening the answers that were just submitted.
       clear();
-      router.push(
-        failedItems.length > 0
-          ? `/checklist/${params.equipmentId}/submitted/fail`
-          : `/checklist/${params.equipmentId}/submitted`,
-      );
+
+      // FAIL_BLOCKING is the server's derived result (ADR 0006), not a client guess from
+      // failSeverity, so it is the only thing this branch trusts. It routes to the lockout tag
+      // screen (DEV-22) instead of the generic fail confirmation, carrying the blocking defects
+      // and the server's submittedAt since there is no endpoint to fetch them after the fact.
+      if (inspection.result === 'FAIL_BLOCKING') {
+        const lockoutParams = new URLSearchParams();
+        for (const item of failedItems) {
+          const notes = draft.failureDocs[item.itemKey]?.notes.trim();
+          lockoutParams.append('defect', notes ? `${item.prompt}: ${notes}` : item.prompt);
+        }
+        lockoutParams.set('lockedAt', inspection.submittedAt);
+        router.push(`/lockout/${params.equipmentId}?${lockoutParams.toString()}`);
+      } else {
+        router.push(
+          failedItems.length > 0
+            ? `/checklist/${params.equipmentId}/submitted/fail`
+            : `/checklist/${params.equipmentId}/submitted`,
+        );
+      }
     } catch (err) {
       setSubmitError(submitErrorMessage(err));
     }

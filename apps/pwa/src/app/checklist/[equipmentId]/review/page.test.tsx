@@ -158,8 +158,41 @@ describe('review and confirm screen', () => {
 
   // One review surface serves both submit paths, so the screen has to send the operator to the
   // right confirmation afterwards. The count comes from the answers, not from which screen the
-  // operator arrived from.
-  it('reports the failures and lands on the fail confirmation when an item failed', async () => {
+  // operator arrived from. The server's result decides the destination, not the client's own
+  // failSeverity guess: a WARNING-only failure still lands on the generic fail confirmation.
+  it('reports the failures and lands on the fail confirmation when the result is FAIL_WARNING', async () => {
+    seedDraft({
+      answers: {
+        forks: { kind: 'BOOLEAN', passed: true },
+        horn: { kind: 'BOOLEAN', passed: false },
+        remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
+      },
+      failureDocs: {
+        horn: {
+          notes: 'horn is faint but audible',
+          notesSource: 'VOICE_TRANSCRIBED',
+          photoIds: ['33333333-3333-3333-3333-333333333333'],
+        },
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okInspection('FAIL_WARNING')));
+
+    renderReview();
+    expect(screen.getByRole('status', { name: /attestation summary/i }).textContent).toContain(
+      '1 failed',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /confirm and submit/i }));
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith(`/checklist/${EQUIPMENT_ID}/submitted/fail`),
+    );
+  });
+
+  // DEV-132: a FAIL_BLOCKING result must reach the lockout tag screen (DEV-22), not the generic
+  // fail confirmation. The blocking defects and the server's submittedAt travel as query params
+  // since there is no endpoint to fetch them after the fact (lockout page's own comment).
+  it('lands on the lockout screen with the blocking defects when the result is FAIL_BLOCKING', async () => {
     seedDraft({
       answers: {
         forks: { kind: 'BOOLEAN', passed: false },
@@ -177,15 +210,16 @@ describe('review and confirm screen', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okInspection('FAIL_BLOCKING')));
 
     renderReview();
-    expect(screen.getByRole('status', { name: /attestation summary/i }).textContent).toContain(
-      '1 failed',
-    );
-
     await userEvent.click(screen.getByRole('button', { name: /confirm and submit/i }));
 
-    await waitFor(() =>
-      expect(push).toHaveBeenCalledWith(`/checklist/${EQUIPMENT_ID}/submitted/fail`),
-    );
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    const [destination] = push.mock.calls[0] as [string];
+    expect(destination.startsWith(`/lockout/${EQUIPMENT_ID}?`)).toBe(true);
+    const url = new URL(destination, 'http://localhost');
+    expect(url.searchParams.getAll('defect')).toEqual([
+      'Forks intact?: left fork cracked at the heel',
+    ]);
+    expect(url.searchParams.get('lockedAt')).toBe('2026-07-27T15:00:00.000Z');
   });
 
   // ADR 0007 calls this step "a deliberate safety check before commit". Counts alone are not
