@@ -70,15 +70,15 @@ describe('dashboard settings page', () => {
     expect(logoutRedirect).toHaveBeenCalledTimes(1);
   });
 
-  it('toggles the Email and Teams notification switches', async () => {
+  // The Teams channel is a single org-wide webhook (one channel, no per-user routing) and email
+  // alerts go to a fixed supervisor list, so a per-user on/off toggle here would control nothing.
+  // This is read-only, matching the existing Failure Notifications copy pattern.
+  it('describes notifications as automatic and site-wide, with no toggle to control them', () => {
     render(<SettingsPage />);
 
-    const [email, teams] = screen.getAllByRole('switch');
-    expect(email.getAttribute('aria-checked')).toBe('true');
-    expect(teams.getAttribute('aria-checked')).toBe('true');
-
-    await userEvent.click(email);
-    expect(email.getAttribute('aria-checked')).toBe('false');
-    expect(teams.getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(
+      screen.getByText(/sent automatically by email and to the equipment's teams channel/i),
+    ).toBeTruthy();
   });
 });
