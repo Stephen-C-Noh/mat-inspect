@@ -2,6 +2,7 @@
 
 import type { ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
+import { ALLOWED_ROLES } from '@/lib/auth';
 
 function AuditContent(): ReactElement {
   return (
@@ -22,7 +23,7 @@ function AuditContent(): ReactElement {
 // DEV-113 will build out; auditor gets exactly this and nothing else.
 export default function AuditPage(): ReactElement {
   return (
-    <AuthGuard allowedRoles={['supervisor', 'manager', 'admin', 'auditor']}>
+    <AuthGuard allowedRoles={ALLOWED_ROLES}>
       <AuditContent />
     </AuthGuard>
   );

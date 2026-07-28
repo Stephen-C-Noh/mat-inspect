@@ -5,6 +5,7 @@ import { useMsal } from '@azure/msal-react';
 import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
 import { FailureQueue } from '@/components/dashboard/failure-queue';
+import { OPERATIONAL_ROLES } from '@/lib/auth';
 
 function DashboardContent(): ReactElement {
   const { accounts } = useMsal();
@@ -32,7 +33,7 @@ function DashboardContent(): ReactElement {
 // Failure Queue that auditor must not reach.
 export default function DashboardPage(): ReactElement {
   return (
-    <AuthGuard allowedRoles={['supervisor', 'manager', 'admin']}>
+    <AuthGuard allowedRoles={OPERATIONAL_ROLES}>
       <DashboardContent />
     </AuthGuard>
   );

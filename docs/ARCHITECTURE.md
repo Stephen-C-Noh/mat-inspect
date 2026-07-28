@@ -559,7 +559,7 @@ This isolation is enforced by the fact that AI Service is a separate container w
 - Framework: Next.js 15+ App Router, same monorepo, separate route group.
 - Server-side rendering for initial load; client-side for interactive grids.
 - Charts and tables: hand-rolled components on shadcn/ui primitives. Recharts and TanStack Table are not installed; adopt them only if a grid or chart outgrows the hand-rolled versions.
-- Auth: the same single Entra ID app registration serves both the PWA and the dashboard. Access is separated by App Roles (dashboard: supervisor, manager, admin), not by client ID or scope.
+- Auth: the same single Entra ID app registration serves both the PWA and the dashboard. Access is separated by App Roles, not by client ID or scope. The dashboard app itself admits supervisor, manager, admin, and auditor; auditor is read-only and lands on a separate Audit section rather than the operational pages (supervisor, manager, admin only), which gate per page (ADR 0021, DEV-112).
 
 ### 10.3 Accessibility
 

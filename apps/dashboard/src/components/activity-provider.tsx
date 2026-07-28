@@ -5,8 +5,9 @@ import type { ReactElement, ReactNode } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 import { activityFeedSchema, type ActivityInspection } from '@mat-inspect/shared-schemas';
-import { acquireAccessToken, acquireAccessTokenSilent } from '@/lib/auth';
+import { acquireAccessToken, acquireAccessTokenSilent, hasOperationalRole } from '@/lib/auth';
 import { ACTIVITY_POLL_INTERVAL_MS } from '@/lib/polling';
 import { EQUIPMENT_QUERY_KEY } from '@/hooks/use-equipment';
 import { DEFECTS_QUERY_KEY } from '@/hooks/use-defects';
@@ -31,6 +32,12 @@ const ActivityContext = createContext<ActivityContextValue | null>(null);
 export const ActivityProvider = ({ children }: { children: ReactNode }): ReactElement => {
   const { instance, accounts } = useMsal();
   const queryClient = useQueryClient();
+
+  // /api/v1/activity is an operator-activity feed for supervisor/manager/admin; it does not
+  // accept auditor (read-only, and not about "what did operators just do"). Without this gate
+  // an auditor session polled it every ACTIVITY_POLL_INTERVAL_MS, each call landing a 403
+  // (DEV-112 follow-up).
+  const isOperational = hasOperationalRole(getRolesFromAccount(accounts[0] ?? null));
 
   // Ids this provider has already reacted to. The feed repeats an undismissed inspection on every
   // poll by design, so "is anything here new" is answered against what was seen, not against a
@@ -83,7 +90,7 @@ export const ActivityProvider = ({ children }: { children: ReactNode }): ReactEl
 
       return body;
     },
-    enabled: accounts.length > 0,
+    enabled: accounts.length > 0 && isOperational,
     // Stop the timer once the session needs the user, rather than retrying every 2 seconds against
     // an expired token. The next thing the manager clicks takes the interactive path and signs
     // them back in; polling resumes with the remounted provider.

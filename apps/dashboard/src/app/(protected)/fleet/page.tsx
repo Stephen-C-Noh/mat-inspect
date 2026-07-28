@@ -3,6 +3,7 @@
 import type { ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { FleetGrid } from '@/components/fleet/fleet-grid';
+import { OPERATIONAL_ROLES } from '@/lib/auth';
 
 function FleetContent(): ReactElement {
   return (
@@ -27,7 +28,7 @@ function FleetContent(): ReactElement {
 // must not reach.
 export default function FleetPage(): ReactElement {
   return (
-    <AuthGuard allowedRoles={['supervisor', 'manager', 'admin']}>
+    <AuthGuard allowedRoles={OPERATIONAL_ROLES}>
       <FleetContent />
     </AuthGuard>
   );

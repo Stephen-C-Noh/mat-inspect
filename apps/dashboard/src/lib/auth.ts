@@ -34,32 +34,40 @@ export const acquireAccessTokenSilent = (
   accounts: AccountInfo[],
 ): Promise<string> => acquireApiTokenSilent(instance, accounts, tokenRequest);
 
-// Roles permitted into the dashboard app at all (login page, root redirect, and the
-// (protected) layout's default AuthGuard). This is an app-entry gate, not a per-page one: it
-// says nothing about which pages a role can see once inside. Auditor is here so DEV-112's
-// entry point exists, but auditor must not gain the operational pages this gate used to imply
-// access to (dashboard, fleet) — those pages now carry their own explicit allowedRoles
-// override (see their page.tsx) so adding a role here never silently opens write-adjacent
-// screens to it (ADR 0021 amendment). Values must match the Entra app role values, which are
-// lowercase (see core-api requireRole and shared-types UserRole).
-export const ALLOWED_ROLES = [
+// Roles that may see the write-adjacent operational pages (dashboard, fleet): each such page
+// carries its own explicit AuthGuard allowedRoles override equal to this list, rather than
+// inheriting the (protected) layout's default. Exported so ALLOWED_ROLES below is derived from
+// it instead of listed separately, and so other role-aware call sites (ActivityProvider, TopBar)
+// use the same source instead of a fourth copy of "supervisor, manager, admin".
+export const OPERATIONAL_ROLES = [
   'supervisor',
   'manager',
   'admin',
+] as const satisfies readonly UserRole[];
+
+export const hasOperationalRole = (roles: readonly string[]): boolean =>
+  roles.some((role) => (OPERATIONAL_ROLES as readonly string[]).includes(role));
+
+// Roles permitted into the dashboard app at all (login page, root redirect, and the
+// (protected) layout's default AuthGuard). This is an app-entry gate, not a per-page one: it
+// says nothing about which pages a role can see once inside. Derived from OPERATIONAL_ROLES
+// plus auditor (DEV-112) so the two lists cannot drift apart; a role added only here would
+// silently gain nothing beyond app entry, not the operational pages, since those check
+// OPERATIONAL_ROLES directly. Values must match the Entra app role values, which are lowercase
+// (see core-api requireRole and shared-types UserRole).
+export const ALLOWED_ROLES = [
+  ...OPERATIONAL_ROLES,
   'auditor',
 ] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
-// Pages an auditor may land on. Kept separate from ALLOWED_ROLES so a future role added to
-// the app-entry gate does not automatically inherit dashboard/fleet access.
-const OPERATIONAL_ROLES = ['supervisor', 'manager', 'admin'] as const satisfies readonly UserRole[];
-
 // Where to send a signed-in, role-allowed user with no more specific destination (root page,
-// login page). An auditor holding no operational role lands on the read-only Audit section
-// instead of the write-adjacent dashboard home.
-export const resolveLandingPath = (roles: readonly string[]): string =>
-  roles.some((role) => (OPERATIONAL_ROLES as readonly string[]).includes(role))
-    ? '/dashboard'
-    : roles.includes('auditor')
-      ? '/audit'
-      : '/dashboard';
+// login page). Every role in ALLOWED_ROLES is either operational or auditor, so the final
+// '/dashboard' is not a guessed default: it is what a role holding neither case reaches only if
+// it was let past the ALLOWED_ROLES check by a bug in that check itself, not a case this
+// function is expected to handle correctly on its own.
+export const resolveLandingPath = (roles: readonly string[]): string => {
+  if (hasOperationalRole(roles)) return '/dashboard';
+  if (roles.includes('auditor')) return '/audit';
+  return '/dashboard';
+};
