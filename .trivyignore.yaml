@@ -2,7 +2,18 @@
 # min-release-age=7 in .npmrc, so an advisory whose only fix is younger than 7 days cannot
 # be installed yet and blocks CI with no way to fix it. Each entry carries expired_at; once
 # the fix ages past the cooldown Trivy re-surfaces the finding until the fix is applied.
-# Keep these in sync with scripts/audit-allowlist.json. Tracked in DEV-102.
+# Keep these in sync with scripts/audit-allowlist.json, but not by copying the dates. The two
+# gates read their boundary differently: audit-gate.mjs compares with `today > expires`, so the
+# expiry day is still tolerated, while Trivy drops an entry from 00:00Z of expired_at. A date that
+# is identical in both files therefore fails Trivy one day earlier. To make both gates turn red on
+# the same day, expired_at here must be one day past the matching `expires` in audit-allowlist.json.
+#
+# Set expired_at from the cooldown release timestamp, not from the publish date plus seven days.
+# min-release-age is evaluated against the publish time, so a fix published late in the day on
+# 2026-07-21 is not installable until late on 2026-07-28. Rounding that down to a whole day is what
+# left CI red and unfixable for ~17 hours on 2026-07-28 (see DEV-132).
+#
+# Tracked in DEV-102.
 vulnerabilities:
   - id: CVE-2026-59892
     expired_at: 2026-07-29
@@ -14,26 +25,26 @@ vulnerabilities:
     expired_at: 2026-07-29
     statement: 'fast-uri 3.1.4 fix published 2026-07-19; same as CVE-2026-13676. Held to the DEV-102 batch date. Extended from 2026-07-27 in DEV-130. Transitive via fastify/ajv.'
   - id: GHSA-8r6m-32jq-jx6q
-    expired_at: 2026-07-28
-    statement: 'fast-xml-parser 5.10.1 fix (published 2026-07-16) is installable but the override is held for the DEV-102 batch regen on ~2026-07-28 so a lockfile rewrite does not land mid sprint-5 demo. Transitive via the @azure SDKs.'
+    expired_at: 2026-07-29
+    statement: 'fast-xml-parser 5.10.1 fix (published 2026-07-16) is installable but the override is held for the DEV-102 batch regen so a lockfile rewrite does not land mid sprint-5 demo. Extended from 2026-07-28 in DEV-132 to match the batch window. Transitive via the @azure SDKs.'
   - id: CVE-2026-47219
-    expired_at: 2026-07-28
-    statement: 'find-my-way 9.7.0 fix (DDoS with HTTP2) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Transitive via fastify (router). Disclosed after the first DEV-102 batch.'
+    expired_at: 2026-07-29
+    statement: 'find-my-way 9.7.0 fix (DDoS with HTTP2) published 2026-07-21T16:45Z, so min-release-age clears it at 2026-07-28T16:45Z, not at the start of that day. Extended from 2026-07-28 in DEV-132. Transitive via fastify (router). Disclosed after the first DEV-102 batch.'
   - id: GHSA-f88m-g3jw-g9cj
     expired_at: 2026-07-29
     statement: 'sharp 0.35.0 fix is published but next 15.5.19 cannot resolve its 0.35.x binaries cleanly under min-release-age. Transitive via next image optimization (dashboard).'
   - id: CVE-2026-64641
-    expired_at: 2026-07-28
-    statement: 'next 15.5.21 fix (Denial of Service in App Router using Server Actions) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+    expired_at: 2026-07-29
+    statement: 'next 15.5.21 fix (Denial of Service in App Router using Server Actions) published 2026-07-21T15:59Z, so min-release-age clears it at 2026-07-28T15:59Z, not at the start of that day. Extended from 2026-07-28 in DEV-132. Affects apps/dashboard and apps/pwa.'
   - id: CVE-2026-64645
-    expired_at: 2026-07-28
-    statement: 'next 15.5.21 fix (SSRF in rewrites via attacker-controlled destination hostname) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+    expired_at: 2026-07-29
+    statement: 'next 15.5.21 fix (SSRF in rewrites via attacker-controlled destination hostname); same cooldown as CVE-2026-64641. Extended from 2026-07-28 in DEV-132. Affects apps/dashboard and apps/pwa.'
   - id: CVE-2026-64649
-    expired_at: 2026-07-28
-    statement: 'next 15.5.21 fix (SSRF in Server Actions on custom servers) published 2026-07-21; blocked by min-release-age until ~2026-07-28. Affects apps/dashboard and apps/pwa.'
+    expired_at: 2026-07-29
+    statement: 'next 15.5.21 fix (SSRF in Server Actions on custom servers); same cooldown as CVE-2026-64641. Extended from 2026-07-28 in DEV-132. Affects apps/dashboard and apps/pwa.'
   - id: GHSA-r28c-9q8g-f849
-    expired_at: 2026-07-28
-    statement: 'postcss 8.5.18 fix (path traversal via source map auto-loading) is installable, but postcss is pinned to 8.5.15 by a root override and is held for the DEV-102 batch regen on ~2026-07-28 so a lockfile rewrite does not land mid sprint-5 demo. Build-time only (next/tailwind/autoprefixer), not reachable at runtime.'
+    expired_at: 2026-07-29
+    statement: 'postcss 8.5.18 fix (path traversal via source map auto-loading) is installable, but postcss is pinned to 8.5.15 by a root override and is held for the DEV-102 batch regen so a lockfile rewrite does not land mid sprint-5 demo. Extended from 2026-07-28 in DEV-132. Build-time only (next/tailwind/autoprefixer), not reachable at runtime.'
   # starlette CVEs in the AI image (fastapi 0.111.0 pulls starlette 0.37.2). Clearing them needs
   # starlette >= 1.3.1, a fastapi 0.111 -> ~0.140 major jump that also re-ports the FOIP multipart
   # disk-spool guard (max_file_size -> spool_max_size, plus the new 1 MB max_part_size cap). Tracked
