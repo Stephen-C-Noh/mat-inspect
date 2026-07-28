@@ -8,7 +8,10 @@ import type { InspectionResult } from '@mat-inspect/shared-types';
 export type SubmittedFailure = {
   prompt: string;
   notes: string;
-  photoUrl: string | null;
+  // The Media blob id (ADR 0023), not a blob: preview URL: a blob: URL is revoked on unload and
+  // cannot be persisted (DEV-125), so the confirmation screen fetches the photo Media-direct by
+  // this id instead (ADR 0020, DEV-131).
+  photoId: string | null;
 };
 
 // The result of the POST, handed to the confirmation screens so they render the real inspection
