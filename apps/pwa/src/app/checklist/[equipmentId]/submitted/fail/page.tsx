@@ -15,7 +15,22 @@ import {
 import { useMsal } from '@azure/msal-react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
+import { usePhoto } from '@/hooks/use-photo';
 import { useInspectionDraft, type SubmittedFailure } from '@/components/inspection-draft-provider';
+
+function EvidencePhoto({ photoId }: { photoId: string | null }): ReactElement {
+  const { data: photoUrl } = usePhoto(photoId);
+
+  return (
+    <div className="flex h-36 items-center justify-center overflow-hidden rounded-sm bg-muted">
+      {photoUrl ? (
+        <img src={photoUrl} alt="Evidence" className="h-full w-full object-cover" />
+      ) : (
+        <ImageIcon className="size-8 text-muted-foreground" />
+      )}
+    </div>
+  );
+}
 
 function FailureCard({
   failure,
@@ -38,13 +53,7 @@ function FailureCard({
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Evidence Photo
           </p>
-          <div className="flex h-36 items-center justify-center overflow-hidden rounded-sm bg-muted">
-            {failure.photoUrl ? (
-              <img src={failure.photoUrl} alt="Evidence" className="h-full w-full object-cover" />
-            ) : (
-              <ImageIcon className="size-8 text-muted-foreground" />
-            )}
-          </div>
+          <EvidencePhoto photoId={failure.photoId} />
         </div>
 
         {failure.notes.trim().length > 0 && (

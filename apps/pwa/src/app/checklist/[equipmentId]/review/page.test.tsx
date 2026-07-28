@@ -5,7 +5,10 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 import type { ChecklistItem } from '@mat-inspect/shared-types';
-import { InspectionDraftProvider } from '@/components/inspection-draft-provider';
+import {
+  InspectionDraftProvider,
+  useInspectionDraft,
+} from '@/components/inspection-draft-provider';
 import { loadDraft, saveDraft } from '@/lib/inspection-draft-storage';
 import ReviewPage from './page';
 
@@ -87,11 +90,21 @@ const seedDraft = (overrides: Partial<Parameters<typeof saveDraft>[1]> = {}): vo
   );
 };
 
+// Reads the result the provider hands to the confirmation screens, so a test can observe what
+// review/page.tsx actually put there without reaching into its internals.
+const ResultPhotoIdProbe = (): ReactElement => {
+  const { result } = useInspectionDraft();
+  return <div data-testid="probe-photo-id">{result?.failures[0]?.photoId ?? 'none'}</div>;
+};
+
 const renderReview = (): ReturnType<typeof render> => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }): ReactElement => (
     <QueryClientProvider client={queryClient}>
-      <InspectionDraftProvider>{children}</InspectionDraftProvider>
+      <InspectionDraftProvider>
+        {children}
+        <ResultPhotoIdProbe />
+      </InspectionDraftProvider>
     </QueryClientProvider>
   );
   return render(<ReviewPage />, { wrapper });
@@ -214,6 +227,32 @@ describe('review and confirm screen', () => {
     expect(failures.textContent).toContain('1 evidence photo');
     // A passing item is not a failure and must not appear in this list.
     expect(failures.textContent).not.toContain('Horn sounds?');
+  });
+
+  // DEV-131: the confirmation screen fetches the evidence photo Media-direct by id, which only
+  // works if the submission result carries the real id instead of a hardcoded null.
+  it("carries the failed item's photo id into the submission result", async () => {
+    const PHOTO_ID = '33333333-3333-3333-3333-333333333333';
+    seedDraft({
+      answers: {
+        forks: { kind: 'BOOLEAN', passed: false },
+        horn: { kind: 'BOOLEAN', passed: true },
+        remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
+      },
+      failureDocs: {
+        forks: {
+          notes: 'left fork cracked at the heel',
+          notesSource: 'VOICE_TRANSCRIBED',
+          photoIds: [PHOTO_ID],
+        },
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okInspection('FAIL_BLOCKING')));
+
+    renderReview();
+    await userEvent.click(screen.getByRole('button', { name: /confirm and submit/i }));
+
+    await waitFor(() => expect(screen.getByTestId('probe-photo-id').textContent).toBe(PHOTO_ID));
   });
 
   // Declining to confirm is a real outcome, not a dead end: the operator goes back to fix an

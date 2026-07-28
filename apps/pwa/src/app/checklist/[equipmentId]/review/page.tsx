@@ -97,7 +97,7 @@ function ReviewView(): ReactElement {
         failures: failedItems.map((item) => ({
           prompt: item.prompt,
           notes: draft.failureDocs[item.itemKey]?.notes ?? '',
-          photoUrl: null,
+          photoId: draft.failureDocs[item.itemKey]?.photoIds[0] ?? null,
         })),
       });
 

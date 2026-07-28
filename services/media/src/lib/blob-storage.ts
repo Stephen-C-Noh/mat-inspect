@@ -80,6 +80,34 @@ export const storePhoto = async (
   };
 };
 
+// A stored photo's bytes and content type, as needed to serve GET /api/v1/media/photos/:photoId
+// (DEV-131). blobName === photoId (storePhoto), so the id alone locates the object.
+export type PhotoBlob = {
+  data: Buffer;
+  contentType: PhotoContentType;
+};
+
+// Returns null when no blob exists for the id, so the route can answer 404 rather than throw.
+export const getPhoto = async (photoId: string): Promise<PhotoBlob | null> => {
+  const container = await getContainerClient();
+  const blockBlob = container.getBlockBlobClient(photoId);
+
+  if (!(await blockBlob.exists())) {
+    return null;
+  }
+
+  const [data, properties] = await Promise.all([
+    blockBlob.downloadToBuffer(),
+    blockBlob.getProperties(),
+  ]);
+
+  return {
+    data,
+    // Set from a PhotoContentType at upload (storePhoto); no other writer touches this blob.
+    contentType: (properties.contentType ?? 'image/jpeg') as PhotoContentType,
+  };
+};
+
 // Test-only: drops the cached container client so a test can point at a fresh Azurite container.
 export const resetBlobClientForTest = (): void => {
   containerClientPromise = undefined;
