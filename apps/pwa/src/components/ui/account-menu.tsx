@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
-import { LogOut, User } from 'lucide-react';
+import { History, LogOut, Settings, User } from 'lucide-react';
 
 export const AccountMenu = (): ReactElement | null => {
   const { instance, accounts } = useMsal();
@@ -55,11 +56,29 @@ export const AccountMenu = (): ReactElement | null => {
             <p className="truncate text-sm font-semibold">{activeAccount.name}</p>
             <p className="truncate text-xs text-muted-foreground">{activeAccount.username}</p>
           </div>
+          <Link
+            href="/settings"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+          >
+            <Settings className="size-4" />
+            Settings
+          </Link>
+          <Link
+            href="/history"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+          >
+            <History className="size-4" />
+            History
+          </Link>
           <button
             type="button"
             role="menuitem"
             onClick={handleSignOut}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
+            className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
           >
             <LogOut className="size-4" />
             Sign out

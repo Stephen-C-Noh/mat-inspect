@@ -52,6 +52,20 @@ describe('AccountMenu', () => {
     });
   });
 
+  it('links to Settings and Help and closes the menu on click', async () => {
+    render(<AccountMenu />);
+
+    await userEvent.click(screen.getByRole('button', { name: /account menu/i }));
+
+    const settingsLink = screen.getByRole('menuitem', { name: /settings/i });
+    expect(settingsLink).toHaveProperty('href', expect.stringContaining('/settings'));
+    const helpLink = screen.getByRole('menuitem', { name: /help/i });
+    expect(helpLink).toHaveProperty('href', expect.stringContaining('/help'));
+
+    await userEvent.click(settingsLink);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
   it('closes the menu on an outside click', async () => {
     render(
       <div>
