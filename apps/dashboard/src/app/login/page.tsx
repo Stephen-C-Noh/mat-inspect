@@ -1,24 +1,35 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
+import { InteractionStatus } from '@azure/msal-browser';
 import { hasAllowedRole } from '@mat-inspect/shared-auth';
 import { ALLOWED_ROLES, loginRequest } from '@/lib/auth';
+import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 
-export default function LoginPage() {
-  const { instance, accounts } = useMsal();
+function LoginContent() {
+  const { instance, accounts, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Clicking while MSAL is still restoring the cached session (Startup) or processing a
+  // just-completed Entra redirect (HandleRedirect) throws BrowserAuthError:
+  // interaction_in_progress, which the catch below swallows silently, so the button would look
+  // dead (DEV-128). Disable it instead of letting that click happen.
+  const msalInitializing =
+    inProgress === InteractionStatus.Startup || inProgress === InteractionStatus.HandleRedirect;
 
   useEffect(() => {
     if (!isAuthenticated) return;
     if (hasAllowedRole(accounts[0] ?? null, ALLOWED_ROLES)) {
-      router.replace('/dashboard');
+      // AuthGuard sends unauthenticated deep links here as ?redirect=<path> (DEV-128); honor
+      // it so a supervisor lands back where they asked to go, not always on the dashboard home.
+      router.replace(sanitizeRedirectPath(searchParams.get('redirect')) ?? '/dashboard');
     } else {
       router.replace('/unauthorized');
     }
-  }, [isAuthenticated, accounts, router]);
+  }, [isAuthenticated, accounts, router, searchParams]);
 
   const handleSignIn = async () => {
     try {
@@ -39,13 +50,22 @@ export default function LoginPage() {
         <p className="mb-6 text-sm text-gray-500">Manager Dashboard</p>
         <button
           onClick={handleSignIn}
-          className="flex w-full items-center justify-center gap-3 rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={msalInitializing}
+          className="flex w-full items-center justify-center gap-3 rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <MicrosoftLogo />
           Sign in with Microsoft
         </button>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }
 
