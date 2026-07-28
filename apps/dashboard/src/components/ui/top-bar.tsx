@@ -4,13 +4,17 @@ import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
 import type { ReactElement } from 'react';
 import { User } from 'lucide-react';
+import { hasAllowedRole } from '@mat-inspect/shared-auth';
 import { NotificationBell } from '@/components/ui/notification-bell';
+import { ADMIN_ROLES } from '@/lib/auth';
 
 export const TopBar = function (): ReactElement | null {
   const { accounts } = useMsal();
   const activeAccount = accounts[0];
 
   if (!activeAccount) return null;
+
+  const isAdmin = hasAllowedRole(activeAccount, ADMIN_ROLES);
 
   return (
     <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
@@ -29,6 +33,11 @@ export const TopBar = function (): ReactElement | null {
           <Link href="/defects" className="hover:opacity-80">
             Defects
           </Link>
+          {isAdmin && (
+            <Link href="/admin/templates" className="hover:opacity-80">
+              Admin
+            </Link>
+          )}
         </nav>
       </div>
 

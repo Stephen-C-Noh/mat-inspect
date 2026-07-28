@@ -44,3 +44,6 @@ export const ALLOWED_ROLES = [
   'admin',
 ] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
+
+// Gates the Admin nav entry and the /admin/* screens (checklist template management).
+export const ADMIN_ROLES = ['admin'] as const satisfies readonly UserRole[];
