@@ -46,7 +46,13 @@ export const TopBar = function (): ReactElement | null {
     <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
       <div className="flex items-center gap-3">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <Image src="/sait-logo.png" alt="SAIT" width={116} height={32} className="h-8 w-auto" />
+          <Image
+            src="/sait-logo.png"
+            alt="SAIT"
+            width={116}
+            height={32}
+            className="h-5 w-auto shrink-0"
+          />
           <h1 className="font-bold text-lg tracking-wide">SCHOOL OF MAT</h1>
         </Link>
         <nav className="flex gap-4 pl-4 text-sm font-semibold">
