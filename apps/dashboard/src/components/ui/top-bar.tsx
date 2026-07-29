@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
+import Image from 'next/image';
 import type { ReactElement } from 'react';
-import { User } from 'lucide-react';
 import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 import type { UserRole } from '@mat-inspect/shared-types';
 import { NotificationBell } from '@/components/ui/notification-bell';
+import { AccountMenu } from '@/components/ui/account-menu';
 import { ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } from '@/lib/auth';
 
 // Mirrors each page's own AuthGuard allowedRoles (dashboard/fleet/defects/audit page.tsx).
@@ -43,10 +44,10 @@ export const TopBar = function (): ReactElement | null {
   return (
     <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
       <div className="flex items-center gap-3">
-        <div className="bg-card p-1 rounded font-bold text-primary text-xs text-center">
-          <span className="block text-[10px] text-red-600">SAIT</span>
-        </div>
-        <h1 className="font-bold text-lg tracking-wide">MAT SCHOOL</h1>
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <Image src="/sait-logo.png" alt="SAIT" width={116} height={32} className="h-8 w-auto" />
+          <h1 className="font-bold text-lg tracking-wide">SCHOOL OF MAT</h1>
+        </Link>
         <nav className="flex gap-4 pl-4 text-sm font-semibold">
           {visibleLinks.map((link) => (
             <Link key={link.href} href={link.href} className="hover:opacity-80">
@@ -59,8 +60,7 @@ export const TopBar = function (): ReactElement | null {
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium">{activeAccount.name}</span>
         {isOperational && <NotificationBell />}
-        {/* TODO: Flagged - Replace with 'darker-primary' token once defined */}
-        <User className="size-6 bg-muted-foreground p-1 rounded-full cursor-pointer" />
+        <AccountMenu />
       </div>
     </header>
   );

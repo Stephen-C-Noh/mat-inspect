@@ -31,3 +31,11 @@ export const acquireAccessToken = (
 // which are lowercase (see core-api requireRole and shared-types UserRole).
 export const ALLOWED_ROLES = ['operator', 'supervisor'] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
+
+// Roles that see the home screen's "Dashboard" link out to the separate apps/dashboard app.
+// Plain operators have no use for it: the manager dashboard is not part of their job.
+export const DASHBOARD_LINK_ROLES = [
+  'supervisor',
+  'manager',
+  'admin',
+] as const satisfies readonly UserRole[];

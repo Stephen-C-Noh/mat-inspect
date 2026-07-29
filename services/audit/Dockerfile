@@ -75,10 +75,6 @@ COPY --from=build /repo/services/audit/dist services/audit/dist
 # nothing else, so without this the image ships dist/db/migrate.js pointing at a migrations folder
 # that is not there, and a box with only the images cannot create its schema (DEV-97).
 COPY --from=build /repo/services/audit/db/migrations services/audit/dist/db/migrations
-# fastify-type-provider-zod pins a peer range that blocks npm from hoisting it to the root
-# node_modules (same issue core-api hits, DEV-58), so it stays in the workspace-local
-# node_modules. Ship that too.
-COPY --from=prod-deps /repo/services/audit/node_modules services/audit/node_modules
 USER appuser
 WORKDIR /repo/services/audit
 EXPOSE 3000

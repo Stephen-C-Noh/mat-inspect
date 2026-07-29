@@ -12,10 +12,11 @@ const TEMPLATE_ID = '22222222-2222-2222-2222-222222222222';
 const USER_ID = '55555555-5555-5555-5555-555555555555';
 
 const push = vi.fn();
+const back = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ equipmentId: EQUIPMENT_ID }),
-  useRouter: () => ({ push, back: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push, back, replace: vi.fn() }),
   usePathname: () => `/inspect/${EQUIPMENT_ID}`,
 }));
 
@@ -99,8 +100,21 @@ beforeEach(() => {
   cleanup();
   window.sessionStorage.clear();
   push.mockClear();
+  back.mockClear();
   fetchMock.mockClear();
   vi.stubGlobal('fetch', fetchMock);
+});
+
+describe('checklist screen header', () => {
+  // DEV-116: an installed (standalone) PWA has no browser back chrome, so an operator who scanned
+  // the wrong equipment had no way off this screen.
+  it('has a back button that navigates back', async () => {
+    renderChecklist();
+
+    await userEvent.click(await screen.findByRole('button', { name: /go back/i }));
+
+    expect(back).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('checklist screen submit action', () => {

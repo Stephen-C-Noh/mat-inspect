@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
 import { useActiveChecklist } from '@/hooks/use-active-checklist';
@@ -160,7 +161,17 @@ function ChecklistView(): ReactElement {
   return (
     <main className="min-h-screen bg-muted pb-28">
       <header className="flex items-center justify-between bg-primary px-4 py-3 text-primary-foreground">
-        <span className="text-sm font-extrabold uppercase tracking-wide">SAIT MAT School</span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="rounded-sm p-1.5 hover:bg-primary-foreground/10 transition-colors"
+            aria-label="Go back"
+          >
+            <ChevronRight className="size-5 rotate-180" />
+          </button>
+          <span className="text-sm font-extrabold uppercase tracking-wide">SAIT MAT School</span>
+        </div>
         <span className="text-xs font-semibold opacity-80">{equipment.assetTag}</span>
       </header>
 

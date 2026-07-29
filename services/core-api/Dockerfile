@@ -72,11 +72,6 @@ COPY --from=build /repo/packages/shared-crypto/package.json packages/shared-cryp
 COPY --from=build /repo/packages/shared-crypto/dist packages/shared-crypto/dist
 COPY --from=build /repo/services/core-api/package.json services/core-api/
 COPY --from=build /repo/services/core-api/dist services/core-api/dist
-# fastify-type-provider-zod pins a peer range that blocks npm from hoisting it to
-# the root node_modules, so it stays in the workspace-local node_modules. The root
-# copy above misses it and the runtime crashes with ERR_MODULE_NOT_FOUND. Ship the
-# workspace-local node_modules too (DEV-58).
-COPY --from=prod-deps /repo/services/core-api/node_modules services/core-api/node_modules
 # core-api imports the Drizzle schema via the @mat-inspect/db workspace package.
 # prod-deps symlinks node_modules/@mat-inspect/db -> ../../db, so ship the package
 # manifest and its emitted output at that target.
