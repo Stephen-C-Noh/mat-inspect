@@ -83,7 +83,7 @@ function HelpContent(): ReactElement {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Contact Support</p>
-              <p className="text-xs text-muted-foreground">chair holder email / phone number</p>
+              <p className="text-xs text-muted-foreground">supervisor email / phone number</p>
             </div>
           </div>
         </div>
