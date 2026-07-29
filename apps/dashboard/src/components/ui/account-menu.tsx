@@ -18,8 +18,17 @@ export const AccountMenu = (): ReactElement | null => {
         setOpen(false);
       }
     };
+    // Mouse-only close was the gap: a keyboard user who opens the menu with Enter had no way
+    // to dismiss it without a pointer.
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [open]);
 
   if (!activeAccount) return null;
@@ -42,6 +51,7 @@ export const AccountMenu = (): ReactElement | null => {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
+        className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
       >
         {/* TODO: Flagged - Replace with 'darker-primary' token once defined */}
         <User className="size-6 bg-muted-foreground p-1 rounded-full cursor-pointer" />
