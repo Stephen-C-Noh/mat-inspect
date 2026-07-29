@@ -3,13 +3,8 @@ import { reportExportRequestSchema, reportJobAcceptedSchema } from '@mat-inspect
 import { db, reportJobs } from '../../db/index.js';
 import { requireRole } from '../../middleware/auth.js';
 import { generateReport } from '../../lib/generate-report.js';
+import { REPORT_ROLES } from '../../lib/report-access.js';
 import { logger } from '../../lib/logger.js';
-
-// Auditor and manager exports, per the ticket description; supervisor and admin included too
-// (API_REFERENCE.md's documented icon and the general "who manages compliance" set). operator is
-// deliberately excluded - an operator has no reason to pull a compliance export (least privilege,
-// same reasoning as ai/transcribe.ts restricting the reverse case to operator only).
-const REPORT_ROLES = ['supervisor', 'manager', 'auditor', 'admin'] as const;
 
 // A rough estimate returned to the client for UX only (e.g. "ready in about Ns"); it is not a
 // promise and nothing polls against it. Actual completion is signaled by status transitioning to

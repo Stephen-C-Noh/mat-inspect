@@ -480,8 +480,10 @@ export const reportJobResponseSchema = z.discriminatedUnion('status', [
   z.object({
     jobId: uuidSchema,
     status: z.literal('READY'),
-    downloadUrl: z.string().url(),
-    expiresAt: z.string().datetime(),
+    // A same-origin path (e.g. /api/v1/reports/:jobId/download), not an absolute URL: it is
+    // served by this service's own authenticated download route, not a signed link to external
+    // storage, so there is no separate expiry to report either (DEV-113 follow-up).
+    downloadUrl: z.string().min(1),
     format: reportFormatSchema,
     inspectionCount: z.number().int().nonnegative(),
     fileBytes: z.number().int().nonnegative(),

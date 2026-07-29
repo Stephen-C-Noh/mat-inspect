@@ -2,18 +2,11 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { reportJobResponseSchema, uuidSchema } from '@mat-inspect/shared-schemas';
-import type { UserRole } from '@mat-inspect/shared-types';
 import { db, reportJobs } from '../../db/index.js';
 import { requireRole } from '../../middleware/auth.js';
 import { httpError } from '../../lib/http-error.js';
-import { generateReportDownloadUrl } from '../../lib/blob-storage.js';
+import { REPORT_ROLES, canViewAnyReportJob } from '../../lib/report-access.js';
 import { logger } from '../../lib/logger.js';
-
-const REPORT_ROLES = ['supervisor', 'manager', 'auditor', 'admin'] as const;
-// Roles that may view any job, not only their own - a manager/auditor/admin auditing what
-// exports have been run needs to see other people's jobs; supervisor does not get this override
-// (it can start an export but not inspect anyone else's).
-const VIEW_ANY_JOB_ROLES: readonly UserRole[] = ['manager', 'auditor', 'admin'];
 
 const paramsSchema = z.object({ jobId: uuidSchema });
 
@@ -37,8 +30,7 @@ export const getReportJobRoute: FastifyPluginAsync = async (app) => {
       }
 
       const isOwner = job.requestedBy === req.user.id;
-      const canViewAny = req.user.roles.some((role) => VIEW_ANY_JOB_ROLES.includes(role));
-      if (!isOwner && !canViewAny) {
+      if (!isOwner && !canViewAnyReportJob(req.user.roles)) {
         throw httpError(403, 'FORBIDDEN', 'You may only view your own export jobs');
       }
 
@@ -70,15 +62,17 @@ export const getReportJobRoute: FastifyPluginAsync = async (app) => {
         throw httpError(500, 'INTERNAL_ERROR', 'Report job is in an inconsistent state');
       }
 
-      const { url, expiresAt } = await generateReportDownloadUrl(job.blobName);
-
       logger.info({ reqId: req.id, userId: req.user.id, jobId }, 'report job polled');
 
+      // Relative, not a raw Azure Blob SAS URL: served by this service's own /download route
+      // (DEV-113 follow-up), same origin as the rest of /api/v1, so it resolves correctly behind
+      // Caddy (dev), Azure Front Door (demo, ADR 0024), or any future host - unlike a SAS URL,
+      // which pointed at Azurite's Docker-internal hostname in dev and was unreachable from a
+      // browser outside the compose network.
       return reply.code(200).send({
         jobId: job.id,
         status: 'READY',
-        downloadUrl: url,
-        expiresAt: expiresAt.toISOString(),
+        downloadUrl: `/api/v1/reports/${job.id}/download`,
         format: job.format,
         inspectionCount: job.inspectionCount,
         fileBytes: job.fileBytes,

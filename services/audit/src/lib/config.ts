@@ -29,7 +29,6 @@ const STORAGE_MARKERS = ['AccountName=', 'BlobEndpoint=', 'UseDevelopmentStorage
 const DEFAULT_REPORTS_BLOB_CONTAINER = 'mat-inspect-reports';
 const DEFAULT_MEDIA_BLOB_CONTAINER = 'mat-inspect-media';
 const DEFAULT_CORE_API_INTERNAL_URL = 'http://core-api:3000';
-const DEFAULT_SAS_EXPIRY_MINUTES = 60;
 
 const rawSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -49,7 +48,6 @@ const rawSchema = z.object({
   // Read-only from the Audit Service's point of view: it never writes here, only fetches a
   // defect's evidence photo by photoId when building a PDF.
   MEDIA_BLOB_CONTAINER: z.string().trim().default(DEFAULT_MEDIA_BLOB_CONTAINER),
-  REPORT_SAS_EXPIRY_MINUTES: z.coerce.number().int().positive().default(DEFAULT_SAS_EXPIRY_MINUTES),
   // PEM. May arrive with literal "\n" two-character sequences (common for secrets stored as a
   // single-line env value); normalized before use in report-signing.ts.
   REPORT_SIGNING_PRIVATE_KEY: z.string().trim().optional(),
@@ -89,7 +87,6 @@ export type AppConfig = {
   azureStorageConnectionString: string;
   reportsBlobContainer: string;
   mediaBlobContainer: string;
-  reportSasExpiryMinutes: number;
   // Normalized PEM (literal "\n" already converted to real newlines), or undefined only under
   // NODE_ENV=test.
   reportSigningPrivateKey: string | undefined;
@@ -230,7 +227,6 @@ export const loadConfig = (raw: NodeJS.ProcessEnv = process.env): AppConfig => {
     azureStorageConnectionString: storage ?? '',
     reportsBlobContainer: env.REPORTS_BLOB_CONTAINER,
     mediaBlobContainer: env.MEDIA_BLOB_CONTAINER,
-    reportSasExpiryMinutes: env.REPORT_SAS_EXPIRY_MINUTES,
     reportSigningPrivateKey,
     coreApiInternalUrl: env.CORE_API_INTERNAL_URL,
     coreApiInternalToken,
