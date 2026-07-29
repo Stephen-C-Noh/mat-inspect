@@ -358,6 +358,9 @@ services:
       args:
         NEXT_PUBLIC_AZURE_TENANT_ID: ${ENTRA_TENANT_ID}
         NEXT_PUBLIC_AZURE_CLIENT_ID: ${ENTRA_CLIENT_ID}
+        # The dashboard's own origin (DEV-116), so a signed-in supervisor can follow the PWA
+        # home screen's "Dashboard" link out to the separate apps/dashboard app.
+        NEXT_PUBLIC_DASHBOARD_URL: ${DASHBOARD_URL}
         # Baked into routes-manifest.json by next.config rewrites(), so it is a build arg, not a
         # runtime variable. In Compose the browser reaches Caddy directly and this rewrite carries
         # no traffic; it points at the gateway anyway, never at a service (ADR 0020).

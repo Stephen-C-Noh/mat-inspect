@@ -3,6 +3,7 @@
 import type { ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { FleetGrid } from '@/components/fleet/fleet-grid';
+import { OPERATIONAL_ROLES } from '@/lib/auth';
 
 function FleetContent(): ReactElement {
   return (
@@ -22,9 +23,12 @@ function FleetContent(): ReactElement {
   );
 }
 
+// Explicit override, not the (protected) layout's default: the layout's AuthGuard is now an
+// app-entry gate that includes auditor (DEV-112), and Fleet is an operational page auditor
+// must not reach.
 export default function FleetPage(): ReactElement {
   return (
-    <AuthGuard>
+    <AuthGuard allowedRoles={OPERATIONAL_ROLES}>
       <FleetContent />
     </AuthGuard>
   );

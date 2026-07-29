@@ -17,7 +17,22 @@ const makeAccount = (claims?: Record<string, unknown>): AccountInfo =>
 // The two callers of hasAllowedRole pass different allowed sets. Cover both so the
 // shared helper is exercised the way each app uses it.
 const PWA_ROLES = ['operator', 'supervisor'] as const satisfies readonly UserRole[];
-const DASHBOARD_ROLES = ['supervisor', 'manager', 'admin'] as const satisfies readonly UserRole[];
+// The dashboard app-entry gate (apps/dashboard/src/lib/auth.ts ALLOWED_ROLES). Auditor is
+// allowed in here (DEV-112); it is a per-page override, not this set, that keeps auditor off
+// the write-adjacent dashboard/fleet pages (see OPERATIONAL_PAGE_ROLES below).
+const DASHBOARD_ROLES = [
+  'supervisor',
+  'manager',
+  'admin',
+  'auditor',
+] as const satisfies readonly UserRole[];
+// A representative operational page's explicit AuthGuard override (dashboard/fleet page.tsx).
+// Auditor is deliberately absent here even though it passes the app-entry gate above.
+const OPERATIONAL_PAGE_ROLES = [
+  'supervisor',
+  'manager',
+  'admin',
+] as const satisfies readonly UserRole[];
 
 describe('getRolesFromAccount', () => {
   it('returns [] for a null account', () => {
@@ -45,12 +60,26 @@ describe('getRolesFromAccount', () => {
 });
 
 describe('hasAllowedRole', () => {
-  it.each(['supervisor', 'manager', 'admin'])('allows the %s dashboard role', (role) => {
-    expect(hasAllowedRole(makeAccount({ roles: [role] }), DASHBOARD_ROLES)).toBe(true);
+  it.each(['supervisor', 'manager', 'admin', 'auditor'])(
+    'allows the %s role into the dashboard app',
+    (role) => {
+      expect(hasAllowedRole(makeAccount({ roles: [role] }), DASHBOARD_ROLES)).toBe(true);
+    },
+  );
+
+  it('denies the operator role entry to the dashboard app', () => {
+    expect(hasAllowedRole(makeAccount({ roles: ['operator'] }), DASHBOARD_ROLES)).toBe(false);
   });
 
-  it.each(['operator', 'auditor'])('denies the %s role on the dashboard', (role) => {
-    expect(hasAllowedRole(makeAccount({ roles: [role] }), DASHBOARD_ROLES)).toBe(false);
+  it.each(['supervisor', 'manager', 'admin'])(
+    'allows the %s role on an operational page',
+    (role) => {
+      expect(hasAllowedRole(makeAccount({ roles: [role] }), OPERATIONAL_PAGE_ROLES)).toBe(true);
+    },
+  );
+
+  it.each(['operator', 'auditor'])('denies the %s role on an operational page', (role) => {
+    expect(hasAllowedRole(makeAccount({ roles: [role] }), OPERATIONAL_PAGE_ROLES)).toBe(false);
   });
 
   it.each(['operator', 'supervisor'])('allows the %s pwa role', (role) => {

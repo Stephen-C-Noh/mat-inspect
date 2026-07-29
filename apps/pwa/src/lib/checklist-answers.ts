@@ -5,8 +5,7 @@ import type { ChecklistItem } from '@mat-inspect/shared-types';
 // SIGNATURE or MEASUREMENT type: a drawn signature is rejected by ADR 0007, and abnormal
 // readings go in free-text notes, not structured numeric data (FRS).
 export type ChecklistAnswer =
-  | { kind: 'BOOLEAN'; passed: boolean }
-  | { kind: 'TEXT'; value: string };
+  { kind: 'BOOLEAN'; passed: boolean } | { kind: 'TEXT'; value: string };
 
 export type ChecklistAnswers = Record<string, ChecklistAnswer>;
 

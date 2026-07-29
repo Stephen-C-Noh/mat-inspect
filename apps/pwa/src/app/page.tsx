@@ -2,7 +2,10 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useMsal } from '@azure/msal-react';
+import { hasAllowedRole } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
+import { DASHBOARD_LINK_ROLES } from '@/lib/auth';
 import { useEquipmentList } from '../hooks/use-equipment';
 import { useMyInspections } from '@/hooks/use-my-inspections';
 import { RESULT_DISPLAY, formatInspectionDate } from '@/lib/inspection-display';
@@ -33,10 +36,16 @@ function EquipmentIcon({ name }: { name: string }) {
 }
 
 function LandingPageContent() {
+  const { accounts } = useMsal();
   const { data: equipmentList, isLoading } = useEquipmentList();
   const { data: recentInspections } = useMyInspections({ limit: 3 });
   const [searchTerm, setSearchTerm] = useState('');
   const [showAll, setShowAll] = useState(false);
+
+  // Operators have no manager dashboard to go to; supervisors (and, in principle, manager/admin,
+  // though those roles never reach the PWA per its own ALLOWED_ROLES) do.
+  const canSeeDashboard = hasAllowedRole(accounts[0] ?? null, DASHBOARD_LINK_ROLES);
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
 
   const equipmentById = useMemo(
     () => new Map((equipmentList ?? []).map((e) => [e.id, e])),
@@ -184,7 +193,14 @@ function LandingPageContent() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <NavButton icon={LayoutDashboard} label="Dashboard" href="/" />
+          {canSeeDashboard && dashboardUrl && (
+            <a
+              href={dashboardUrl}
+              className="flex items-center justify-center gap-2 bg-card py-4 rounded-sm border border-border shadow-card transition-all font-semibold text-sm text-foreground"
+            >
+              <LayoutDashboard className="size-5 text-accent" /> Dashboard
+            </a>
+          )}
           <NavButton icon={History} label="History" href="/history" />
           <NavButton icon={Settings} label="Settings" href="/settings" />
           <NavButton icon={HelpCircle} label="Help Center" href="/help" />

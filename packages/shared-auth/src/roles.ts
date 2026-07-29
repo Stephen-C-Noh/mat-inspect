@@ -11,10 +11,13 @@ export const getRolesFromAccount = (account: AccountInfo | null): string[] => {
   return Array.isArray(roles) ? (roles as string[]) : [];
 };
 
-// True when the account holds at least one role in allowedRoles. Each app passes
-// its own ALLOWED_ROLES (PWA: operator, supervisor; dashboard: supervisor,
-// manager, admin). Values are lowercase to match the Entra app role values, so the
-// comparison is a plain case-sensitive match (see shared-types UserRole).
+// True when the account holds at least one role in allowedRoles. Each app passes its own
+// allowed set: the PWA's ALLOWED_ROLES (operator, supervisor) at every call site, the
+// dashboard's ALLOWED_ROLES (supervisor, manager, admin, auditor) only at its app-entry gate
+// (login, root redirect, protected layout default), and its narrower OPERATIONAL_ROLES
+// (supervisor, manager, admin) on each operational page's own AuthGuard override (ADR 0021,
+// DEV-112). Values are lowercase to match the Entra app role values, so the comparison is a
+// plain case-sensitive match (see shared-types UserRole).
 export const hasAllowedRole = (
   account: AccountInfo | null,
   allowedRoles: readonly UserRole[],
