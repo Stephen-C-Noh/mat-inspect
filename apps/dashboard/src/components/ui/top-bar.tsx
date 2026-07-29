@@ -47,8 +47,8 @@ export const TopBar = function (): ReactElement | null {
   const isOperational = hasOperationalRole(roles);
 
   return (
-    <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
-      <div className="flex items-center gap-3 min-w-0">
+    <header className="bg-primary text-primary-foreground p-3 sm:p-4 flex items-center justify-between w-full">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetTrigger asChild>
             <Button
@@ -78,15 +78,15 @@ export const TopBar = function (): ReactElement | null {
             </nav>
           </SheetContent>
         </Sheet>
-        <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
+        <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Image
             src="/sait-logo.png"
             alt="SAIT"
             width={116}
             height={32}
-            className="h-7 w-auto shrink-0"
+            className="h-5 sm:h-7 w-auto shrink-0"
           />
-          <h1 className="font-bold text-lg tracking-wide truncate">SCHOOL OF MAT</h1>
+          <h1 className="font-bold text-sm sm:text-lg tracking-wide truncate">SCHOOL OF MAT</h1>
         </Link>
         <nav className="hidden md:flex gap-4 pl-4 text-sm font-semibold">
           {visibleLinks.map((link) => (
