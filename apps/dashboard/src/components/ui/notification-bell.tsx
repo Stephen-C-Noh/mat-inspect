@@ -63,7 +63,7 @@ export const NotificationBell = (): ReactElement => {
             ? 'Notifications, none new'
             : `Notifications, ${count} new ${count === 1 ? 'inspection' : 'inspections'}`
         }
-        className="relative rounded-sm p-1 hover:bg-primary-foreground/10"
+        className="relative rounded-sm p-1 outline-none hover:bg-primary-foreground/10 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
       >
         <Bell className="size-6" aria-hidden />
         {count > 0 && (

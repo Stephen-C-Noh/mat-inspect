@@ -42,7 +42,7 @@ function SettingsContent(): ReactElement {
   };
 
   return (
-    <main className="min-h-screen bg-muted">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-muted">
       <header className="flex items-center gap-3 bg-primary px-4 py-3 text-primary-foreground">
         <button
           type="button"

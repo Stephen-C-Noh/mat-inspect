@@ -6,7 +6,7 @@ import { TemplatesOverview } from '@/components/admin/templates/templates-overvi
 
 function AdminTemplatesContent(): ReactElement {
   return (
-    <main className="min-h-screen bg-muted px-6 py-8">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-muted px-6 py-8">
       <div className="mx-auto max-w-4xl">
         <h1 className="text-2xl font-extrabold text-foreground">Checklist Templates</h1>
         <p className="mt-1 text-sm text-muted-foreground">

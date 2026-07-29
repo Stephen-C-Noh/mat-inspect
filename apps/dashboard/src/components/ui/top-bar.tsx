@@ -87,7 +87,7 @@ export const TopBar = function (): ReactElement | null {
                     key={link.href}
                     href={link.href}
                     className={cn(
-                      'flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-muted',
+                      'flex items-center gap-3 px-4 py-3 text-sm font-semibold outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                       active && 'bg-accent/10 text-accent',
                     )}
                     onClick={() => setNavOpen(false)}
@@ -112,7 +112,11 @@ export const TopBar = function (): ReactElement | null {
         </Link>
         <nav className="hidden md:flex gap-4 pl-4 text-sm font-semibold">
           {visibleLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="hover:opacity-80">
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-sm outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            >
               {link.label}
             </Link>
           ))}
