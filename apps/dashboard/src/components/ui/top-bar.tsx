@@ -8,9 +8,9 @@ import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 import type { UserRole } from '@mat-inspect/shared-types';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { AccountMenu } from '@/components/ui/account-menu';
-import { ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } from '@/lib/auth';
+import { ADMIN_ROLES, ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } from '@/lib/auth';
 
-// Mirrors each page's own AuthGuard allowedRoles (dashboard/fleet/defects/audit page.tsx).
+// Mirrors each page's own AuthGuard allowedRoles (dashboard/fleet/defects/audit/admin page.tsx).
 // Dashboard, Fleet, and Audit reuse the shared OPERATIONAL_ROLES / ALLOWED_ROLES constants so
 // they cannot drift from the pages they link to; Defects keeps its own literal because that
 // page's gate diverges from both (excludes admin today) for reasons specific to it, not a
@@ -24,6 +24,7 @@ const NAV_LINKS: ReadonlyArray<{
   { href: '/fleet', label: 'Fleet', allowedRoles: OPERATIONAL_ROLES },
   { href: '/defects', label: 'Defects', allowedRoles: ['supervisor', 'manager'] },
   { href: '/audit', label: 'Audit', allowedRoles: ALLOWED_ROLES },
+  { href: '/admin/templates', label: 'Admin', allowedRoles: ADMIN_ROLES },
 ];
 
 export const TopBar = function (): ReactElement | null {

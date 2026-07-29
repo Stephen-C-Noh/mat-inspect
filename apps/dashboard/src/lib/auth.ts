@@ -61,6 +61,9 @@ export const ALLOWED_ROLES = [
 ] as const satisfies readonly UserRole[];
 export type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
+// Gates the Admin nav entry and the /admin/* screens (checklist template management).
+export const ADMIN_ROLES = ['admin'] as const satisfies readonly UserRole[];
+
 // Where to send a signed-in, role-allowed user with no more specific destination (root page,
 // login page). Every role in ALLOWED_ROLES is either operational or auditor, so the final
 // '/dashboard' is not a guessed default: it is what a role holding neither case reaches only if

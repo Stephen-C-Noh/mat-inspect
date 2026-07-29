@@ -38,6 +38,15 @@
   --input: 0 0% 85%;
   --ring: 206 100% 38%; /* focus ring = action blue */
 
+  /* shadcn/ui primitives not covered by the Figma palette: secondary surface
+     (neutral, distinct from the blue primary/accent) and popover (dialog and
+     select-content backgrounds). Aliased to existing surfaces rather than
+     introducing new brand colors. */
+  --secondary: 240 24% 96%;
+  --secondary-foreground: 0 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
+
   /* Radius: cards 2px (sm), buttons/pills 6px (lg) */
   --radius: 6px;
 
@@ -57,6 +66,11 @@
   --muted-foreground: 0 0% 60%;
   --border: 222 30% 22%;
   --input: 222 30% 22%;
+
+  --secondary: 222 30% 16%;
+  --secondary-foreground: 0 0% 95%;
+  --popover: 222 47% 13%;
+  --popover-foreground: 0 0% 95%;
 
   /* Elevation (softer in dark) */
   --shadow-card: 0 4px 4px 0 rgb(0 0 0 / 0.5);

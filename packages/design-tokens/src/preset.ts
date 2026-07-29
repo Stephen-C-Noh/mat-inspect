@@ -46,6 +46,14 @@ export const tokensPreset: Partial<Config> = {
           DEFAULT: hsl('muted'),
           foreground: hsl('muted-foreground'),
         },
+        secondary: {
+          DEFAULT: hsl('secondary'),
+          foreground: hsl('secondary-foreground'),
+        },
+        popover: {
+          DEFAULT: hsl('popover'),
+          foreground: hsl('popover-foreground'),
+        },
         border: hsl('border'),
         input: hsl('input'),
         ring: hsl('ring'),
