@@ -10,6 +10,8 @@ import { useInspectionDetail } from '@/hooks/use-inspection-detail';
 import { useMyReportExports } from '@/hooks/use-my-report-exports';
 import { useRequestReportExport } from '@/hooks/use-request-report-export';
 import { useReportJob } from '@/hooks/use-report-job';
+import { useReportDownload } from '@/hooks/use-report-download';
+import { useObjectUrl } from '@/hooks/use-object-url';
 import { findEquipment, formatDate, categoryFor } from '@/lib/defect-queue';
 import { Checkbox } from '@/components/ui/checkbox';
 import { InspectionResultTag, JobStatusBadge } from './audit-tags';
@@ -153,6 +155,11 @@ const ExportTab = ({ onExported }: { onExported: () => void }): ReactElement => 
 
   const requestExport = useRequestReportExport();
   const job = useReportJob(jobId);
+  // The download route requires an Entra Bearer token (DEV-113 follow-up), which only a fetch
+  // with an Authorization header can attach; a bare <a href> cannot. Fetched once the job is
+  // READY and rendered as an object URL a real anchor can point at.
+  const download = useReportDownload(job.data?.status === 'READY' ? jobId : null);
+  const downloadHref = useObjectUrl(download.data);
 
   const toggleEquipment = (id: string): void => {
     setSelectedEquipment((prev) => {
@@ -261,16 +268,20 @@ const ExportTab = ({ onExported }: { onExported: () => void }): ReactElement => 
           {job.data.status === 'PROCESSING' && (
             <span className="text-sm text-foreground">Generating the signed file...</span>
           )}
-          {job.data.status === 'READY' && (
-            <a
-              href={job.data.downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-bold text-accent underline"
-            >
-              Download signed {job.data.format}
-            </a>
-          )}
+          {job.data.status === 'READY' &&
+            (downloadHref ? (
+              <a
+                href={downloadHref}
+                download={`mat-inspect-report-${jobId}.${job.data.format.toLowerCase()}`}
+                className="text-sm font-bold text-accent underline"
+              >
+                Download signed {job.data.format}
+              </a>
+            ) : download.isError ? (
+              <span className="text-sm text-destructive">Could not load the signed file.</span>
+            ) : (
+              <span className="text-sm text-foreground">Preparing download...</span>
+            ))}
           {job.data.status === 'FAILED' && (
             <span className="text-sm text-destructive">{job.data.errorDetail}</span>
           )}
@@ -283,13 +294,19 @@ const ExportTab = ({ onExported }: { onExported: () => void }): ReactElement => 
 const ExportRow = ({ job }: { job: ReportJobSummary }): ReactElement => {
   const [revealed, setRevealed] = useState(false);
   const full = useReportJob(revealed ? job.jobId : null);
+  const download = useReportDownload(full.data?.status === 'READY' ? job.jobId : null);
+  const downloadHref = useObjectUrl(download.data);
 
   useEffect(() => {
-    if (full.data?.status === 'READY') {
-      window.open(full.data.downloadUrl, '_blank', 'noopener,noreferrer');
-      setRevealed(false);
-    }
-  }, [full.data]);
+    if (!downloadHref) return;
+    // Object URLs need a real anchor click to trigger a save (window.open on a blob: URL just
+    // renders it in a new tab in most browsers); download is what makes it a save-as instead.
+    const link = document.createElement('a');
+    link.href = downloadHref;
+    link.download = `mat-inspect-report-${job.jobId}.${job.format.toLowerCase()}`;
+    link.click();
+    setRevealed(false);
+  }, [downloadHref, job.jobId, job.format]);
 
   return (
     <li className="flex items-center justify-between p-4">
@@ -376,7 +393,13 @@ export const AuditView = (): ReactElement => {
             >
               {t.label}
               {t.key === 'MY_EXPORTS' && jobs && jobs.length > 0 && (
-                <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">
+                <span
+                  className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${
+                    tab === t.key
+                      ? 'bg-accent-foreground/20 text-accent-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
                   {jobs.length}
                 </span>
               )}

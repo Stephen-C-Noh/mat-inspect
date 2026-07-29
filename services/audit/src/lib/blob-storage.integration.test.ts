@@ -55,19 +55,19 @@ describe('audit blob-storage against Azurite (DEV-38)', () => {
     expect(Buffer.compare(downloaded, pdfLikeBytes)).toBe(0);
   });
 
-  it('generates a SAS download URL that resolves the uploaded file', async () => {
-    const { storeReportFile, generateReportDownloadUrl } = await import('./blob-storage.js');
+  it('fetches a stored report file back by blob name', async () => {
+    const { storeReportFile, fetchReportFile } = await import('./blob-storage.js');
     const csvBytes = Buffer.from('equipmentAssetTag,result\r\nMAT-FL-001,PASS\r\n');
     const stored = await storeReportFile(csvBytes, 'text/csv');
 
-    const { url, expiresAt } = await generateReportDownloadUrl(stored.blobName);
+    const fetched = await fetchReportFile(stored.blobName);
+    expect(fetched && Buffer.compare(fetched, csvBytes)).toBe(0);
+  });
 
-    expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
-
-    const res = await fetch(url);
-    expect(res.status).toBe(200);
-    const downloaded = Buffer.from(await res.arrayBuffer());
-    expect(Buffer.compare(downloaded, csvBytes)).toBe(0);
+  it('returns undefined for a report blob that does not exist, rather than throwing', async () => {
+    const { fetchReportFile } = await import('./blob-storage.js');
+    const fetched = await fetchReportFile('00000000-0000-4000-8000-000000000000');
+    expect(fetched).toBeUndefined();
   });
 
   it('fetches a photo from the media container by id', async () => {

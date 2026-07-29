@@ -1,11 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  BlobServiceClient,
-  generateBlobSASQueryParameters,
-  BlobSASPermissions,
-  StorageSharedKeyCredential,
-  type ContainerClient,
-} from '@azure/storage-blob';
+import { BlobServiceClient, type ContainerClient } from '@azure/storage-blob';
 import { config } from './config.js';
 
 // Azure Blob Storage access for report exports (ADR 0004, DEV-38). Two containers on the same
@@ -78,73 +72,21 @@ export const storeReportFile = async (
   return { blobName, container: container.containerName };
 };
 
-// Azurite's well-known development account (public, documented Azurite defaults, not a secret).
-// UseDevelopmentStorage=true is shorthand for a full connection string against this account, so
-// resolve it to the same name/key a SAS signature needs.
-const AZURITE_DEV_ACCOUNT_NAME = 'devstoreaccount1';
-const AZURITE_DEV_ACCOUNT_KEY =
-  'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==';
-
-// Parses an Azure Storage connection string into its key=value pairs. The pair order is not
-// fixed (config.ts accepts AccountName=, BlobEndpoint=, or UseDevelopmentStorage=true in any
-// arrangement), so a positional regex is wrong; split on ';' instead and read fields by name.
-const parseConnectionString = (connectionString: string): Map<string, string> => {
-  const pairs = new Map<string, string>();
-  for (const segment of connectionString.split(';')) {
-    const eq = segment.indexOf('=');
-    if (eq === -1) continue;
-    // Value may itself contain '=' (base64 keys are padded with it), so split on the first only.
-    pairs.set(segment.slice(0, eq).trim(), segment.slice(eq + 1).trim());
-  }
-  return pairs;
-};
-
-// Resolves the shared-key credential a SAS signature needs, regardless of field order or the
-// UseDevelopmentStorage=true Azurite shorthand. Throws only when no shared key is present at all
-// (e.g. a managed-identity connection string), which cannot sign a SAS this way.
-const sharedKeyCredentialFrom = (connectionString: string): StorageSharedKeyCredential => {
-  const fields = parseConnectionString(connectionString);
-  if (fields.get('UseDevelopmentStorage')?.toLowerCase() === 'true') {
-    return new StorageSharedKeyCredential(AZURITE_DEV_ACCOUNT_NAME, AZURITE_DEV_ACCOUNT_KEY);
-  }
-  const accountName = fields.get('AccountName');
-  const accountKey = fields.get('AccountKey');
-  if (!accountName || !accountKey) {
-    throw new Error(
-      'AZURE_STORAGE_CONNECTION_STRING has no AccountName/AccountKey pair (or ' +
-        'UseDevelopmentStorage=true); cannot sign a SAS URL with a shared key',
-    );
-  }
-  return new StorageSharedKeyCredential(accountName, accountKey);
-};
-
-// A short-lived, read-only SAS URL for a generated report. Generated fresh on every call rather
-// than stored, so a client that polls GET /reports/:jobId after a delay never receives a link
-// that already expired.
-export const generateReportDownloadUrl = async (
-  blobName: string,
-): Promise<{
-  url: string;
-  expiresAt: Date;
-}> => {
-  const cfg = config();
+// Fetches a finished report's bytes by blob name, for the audit service's own authenticated
+// download route (DEV-113 follow-up). Replaces an earlier SAS-URL approach: a SAS pointed the
+// browser directly at Azure Blob Storage, which is a real public host in production but Azurite's
+// Docker-internal hostname in dev, unreachable from outside the compose network. Serving the
+// bytes ourselves (same pattern as media's get-photo.ts, ADR 0020/0023) works identically in
+// every environment. Returns undefined only when the blob is unexpectedly missing; the caller
+// treats that as a data-consistency bug (a READY job always has a blob), not a normal 404.
+export const fetchReportFile = async (blobName: string): Promise<Buffer | undefined> => {
   const container = await getReportsContainer();
   const blockBlob = container.getBlockBlobClient(blobName);
-
-  const credential = sharedKeyCredentialFrom(cfg.azureStorageConnectionString);
-
-  const expiresAt = new Date(Date.now() + cfg.reportSasExpiryMinutes * 60 * 1000);
-  const sas = generateBlobSASQueryParameters(
-    {
-      containerName: container.containerName,
-      blobName,
-      permissions: BlobSASPermissions.parse('r'),
-      expiresOn: expiresAt,
-    },
-    credential,
-  ).toString();
-
-  return { url: `${blockBlob.url}?${sas}`, expiresAt };
+  try {
+    return await blockBlob.downloadToBuffer();
+  } catch {
+    return undefined;
+  }
 };
 
 // Fetches a defect evidence photo by id for embedding in a PDF. Returns undefined (not a throw)

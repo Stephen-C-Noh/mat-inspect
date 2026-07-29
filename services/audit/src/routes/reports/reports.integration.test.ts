@@ -221,7 +221,7 @@ describe('report export routes (DEV-38)', () => {
 
     const settled = await waitForJobToSettle(jobId, auditorToken);
     expect(settled['status']).toBe('READY');
-    expect(settled['downloadUrl']).toMatch(/^https?:\/\//);
+    expect(settled['downloadUrl']).toBe(`/api/v1/reports/${jobId}/download`);
     expect(settled['sha256']).toHaveLength(64);
     expect(typeof settled['signature']).toBe('string');
     expect(settled['signingKeyFingerprint']).toHaveLength(64);
@@ -357,6 +357,80 @@ describe('report export routes (DEV-38)', () => {
       headers: { authorization: `Bearer ${otherToken}` },
     });
     expect(notMine.json().some((job: { jobId: string }) => job.jobId === jobId)).toBe(false);
+  });
+
+  it('downloads a ready PDF report with the right content type and disposition (DEV-113)', async () => {
+    const auditorToken = await makeToken('auditor', OWNER_ID);
+    const submit = await app.inject({
+      method: 'POST',
+      url: '/api/v1/reports/export',
+      headers: { authorization: `Bearer ${auditorToken}` },
+      payload: {
+        format: 'PDF',
+        filters: {
+          equipmentIds: [EQUIPMENT_ID],
+          dateFrom: '2026-01-01T00:00:00Z',
+          dateTo: '2026-12-31T23:59:59Z',
+        },
+      },
+    });
+    const { jobId } = submit.json();
+    await waitForJobToSettle(jobId, auditorToken);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/reports/${jobId}/download`,
+      headers: { authorization: `Bearer ${auditorToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect(res.headers['content-disposition']).toBe(
+      `attachment; filename="mat-inspect-report-${jobId}.pdf"`,
+    );
+    expect(res.rawPayload.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('rejects an unauthenticated download and a stranger without an override role (DEV-113)', async () => {
+    const ownerToken = await makeToken('supervisor', OWNER_ID);
+    const submit = await app.inject({
+      method: 'POST',
+      url: '/api/v1/reports/export',
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: {
+        format: 'CSV',
+        filters: {
+          equipmentIds: [EQUIPMENT_ID],
+          dateFrom: '2026-01-01T00:00:00Z',
+          dateTo: '2026-12-31T23:59:59Z',
+        },
+      },
+    });
+    const { jobId } = submit.json();
+    await waitForJobToSettle(jobId, ownerToken);
+
+    const unauthed = await app.inject({ method: 'GET', url: `/api/v1/reports/${jobId}/download` });
+    expect(unauthed.statusCode).toBe(401);
+
+    const otherSupervisorToken = await makeToken(
+      'supervisor',
+      '77777777-7777-4777-8777-777777777777',
+    );
+    const denied = await app.inject({
+      method: 'GET',
+      url: `/api/v1/reports/${jobId}/download`,
+      headers: { authorization: `Bearer ${otherSupervisorToken}` },
+    });
+    expect(denied.statusCode).toBe(403);
+  });
+
+  it('returns 404 for a download of an unknown job id (DEV-113)', async () => {
+    const auditorToken = await makeToken('auditor', OWNER_ID);
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/reports/99999999-9999-4999-8999-999999999999/download',
+      headers: { authorization: `Bearer ${auditorToken}` },
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   it('marks a job FAILED, with a generic error, when core-api is unreachable', async () => {

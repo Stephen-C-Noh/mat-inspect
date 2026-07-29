@@ -79,12 +79,12 @@ export const buildInspectionsPdf = async (params: BuildReportPdfParams): Promise
       .text(`Submitted: ${inspection.submittedAt}`)
       .text(`Result: ${inspection.result}`)
       .text(
-        'Attestation: operator identity from the validated token, confirmed after reviewing a ' +
-          'summary of their answers, server timestamp (ADR 0007). No signature column by design.',
+        'Attestation: operator identity from the validated login token, confirmed after ' +
+          'reviewing a summary of their answers, and a server-recorded timestamp.',
       );
 
     doc.moveDown();
-    doc.fontSize(11).text('Content-digest verification (ADR 0008):');
+    doc.fontSize(11).text('Content-digest verification:');
     doc.fontSize(10).text(digest === undefined ? 'Not checked' : digestLine(digest.digestMatches));
 
     doc.moveDown();
@@ -172,7 +172,7 @@ export const buildInspectionsPdf = async (params: BuildReportPdfParams): Promise
   doc
     .fontSize(9)
     .text(
-      'This file has no embedded PDF signature (ADR 0022). Its SHA-256 and a detached RSA-SHA256 ' +
+      'This file has no embedded PDF signature. Its SHA-256 and a detached RSA-SHA256 ' +
         "signature over this file's bytes are recorded on the export job and returned by " +
         'GET /api/v1/reports/:jobId. Verify by running an RSA-SHA256 verify of the signature over ' +
         "this file's bytes with the public key whose fingerprint is published there; the SHA-256 " +

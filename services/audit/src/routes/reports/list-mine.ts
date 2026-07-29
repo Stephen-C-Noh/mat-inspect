@@ -4,9 +4,8 @@ import { desc, eq } from 'drizzle-orm';
 import { reportJobSummarySchema } from '@mat-inspect/shared-schemas';
 import { db, reportJobs } from '../../db/index.js';
 import { requireRole } from '../../middleware/auth.js';
+import { REPORT_ROLES } from '../../lib/report-access.js';
 import { logger } from '../../lib/logger.js';
-
-const REPORT_ROLES = ['supervisor', 'manager', 'auditor', 'admin'] as const;
 
 // Unpaginated, matching the existing precedent in core-api's defects/list.ts and
 // equipment/list.ts: the capstone's export volume is small enough that a filtered set fits one
