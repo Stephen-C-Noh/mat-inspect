@@ -11,7 +11,7 @@ function AuditContent(): ReactElement {
       <div className="mx-auto max-w-6xl">
         <h1 className="text-2xl font-extrabold text-foreground">Audit</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Inspection history, signed exports, and chain integrity (ADR 0007, ADR 0008).
+          Inspection history, signed exports, and chain integrity.
         </p>
 
         <div className="mt-6">

@@ -267,7 +267,7 @@ export const FailureQueue = (): ReactElement => {
 
       <p className="hidden border-t border-border p-3 text-center text-xs text-muted-foreground sm:block">
         Queue persists across sessions &middot; entries clear when resolved and approved for return
-        to service &middot; email &amp; Teams notifications are supplemental (ADR 0013)
+        to service &middot; email &amp; Teams notifications are supplemental
       </p>
     </section>
   );
