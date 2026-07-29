@@ -1,16 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import Image from 'next/image';
-import { Menu } from 'lucide-react';
-import { useState, type ReactElement } from 'react';
+import { LayoutDashboard, Menu, ScrollText, Settings, TriangleAlert, Truck } from 'lucide-react';
+import { useState, type ComponentType, type ReactElement } from 'react';
 import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 import type { UserRole } from '@mat-inspect/shared-types';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { AccountMenu } from '@/components/ui/account-menu';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 import { ADMIN_ROLES, ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } from '@/lib/auth';
 
 // Mirrors each page's own AuthGuard allowedRoles (dashboard/fleet/defects/audit/admin page.tsx).
@@ -21,19 +23,31 @@ import { ADMIN_ROLES, ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } fro
 const NAV_LINKS: ReadonlyArray<{
   href: string;
   label: string;
+  icon: ComponentType<{ className?: string }>;
   allowedRoles: readonly UserRole[];
 }> = [
-  { href: '/dashboard', label: 'Dashboard', allowedRoles: OPERATIONAL_ROLES },
-  { href: '/fleet', label: 'Fleet', allowedRoles: OPERATIONAL_ROLES },
-  { href: '/defects', label: 'Defects', allowedRoles: ['supervisor', 'manager'] },
-  { href: '/audit', label: 'Audit', allowedRoles: ALLOWED_ROLES },
-  { href: '/admin/templates', label: 'Admin', allowedRoles: ADMIN_ROLES },
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    allowedRoles: OPERATIONAL_ROLES,
+  },
+  { href: '/fleet', label: 'Fleet', icon: Truck, allowedRoles: OPERATIONAL_ROLES },
+  {
+    href: '/defects',
+    label: 'Defects',
+    icon: TriangleAlert,
+    allowedRoles: ['supervisor', 'manager'],
+  },
+  { href: '/audit', label: 'Audit', icon: ScrollText, allowedRoles: ALLOWED_ROLES },
+  { href: '/admin/templates', label: 'Admin', icon: Settings, allowedRoles: ADMIN_ROLES },
 ];
 
 export const TopBar = function (): ReactElement | null {
   const { accounts } = useMsal();
   const activeAccount = accounts[0];
   const [navOpen, setNavOpen] = useState(false);
+  const pathname = usePathname();
 
   if (!activeAccount) return null;
 
@@ -60,21 +74,29 @@ export const TopBar = function (): ReactElement | null {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left">
-            <SheetHeader>
-              <SheetTitle>Menu</SheetTitle>
+          <SheetContent side="left" className="flex w-72 flex-col gap-0 p-0">
+            <SheetHeader className="border-b border-border p-4 text-left">
+              <SheetTitle>Navigation</SheetTitle>
             </SheetHeader>
-            <nav className="flex flex-col gap-1 mt-4">
-              {visibleLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="rounded-md px-3 py-2 text-sm font-semibold hover:bg-muted"
-                  onClick={() => setNavOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
+            <nav className="flex flex-col divide-y divide-border">
+              {visibleLinks.map((link) => {
+                const Icon = link.icon;
+                const active = pathname?.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-muted',
+                      active && 'bg-accent/10 text-accent',
+                    )}
+                    onClick={() => setNavOpen(false)}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
           </SheetContent>
         </Sheet>
