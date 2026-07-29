@@ -256,8 +256,39 @@ Run `db/seed.ts` against `core_db`. This is the only data source for the demo (A
 
 ### B.11 Teardown
 
-At the end of the demo window: `az group delete -n $RG --yes`. Confirm the PostgreSQL server, the
-Storage account, and the Front Door profile are gone so no synthetic data or spend remains.
+At the end of a demo window, run `scripts/azure/teardown.sh` with the same `RG`/`ACA_ENV`/`ACR`/`SA`/
+`PG`/`FD` values used to provision (see `.env.azure`). It deletes the Front Door profile, the ACA
+environment (and every app in it), the container registry, the storage account, and the PostgreSQL
+server, by name.
+
+It does **not** delete the resource group. The RG holds pre-existing resources (the shared Application
+Insights), so `az group delete` is wrong here and would take those down too. The Log Analytics
+workspace also survives by default (`DELETE_LAW=true` removes it if the demo created its own). Confirm
+the PostgreSQL server, the storage account, and the Front Door profile are gone so no synthetic data or
+spend remains, then remove the demo redirect URIs from the Entra app registration (Part A.2) and any
+Front Door custom-domain DNS records.
+
+### B.12 Re-provisioning after a teardown
+
+Running `scripts/azure/provision.sh` again after a teardown recreates the stack, but four things need
+manual follow-up; the script does not, and cannot, handle them on its own.
+
+- **Front Door hostnames change.** The default `azurefd.net` endpoint hostname carries a random suffix
+  assigned by Azure at creation, so a fresh Front Door profile gets a fresh hostname even with the same
+  `FD` name. Update the Entra app's SPA redirect URIs (Part A.2) with the new hostnames before anyone
+  can log in; the old ones are dead now that the origin Front Door profile is gone.
+- **AI model weights are gone.** Teardown deletes the storage account, so the `ai-models` Azure Files
+  share is gone with it. Re-upload the weights (Part B.4) before the `ai` app can serve advisory checks
+  or transcription.
+- **The database is empty.** Teardown deletes the PostgreSQL server, so the new one has no schema and
+  no data. Re-run migrations (B.6) and re-seed (B.9) before smoke testing.
+- **Build from the commit you actually want live.** `provision.sh` defaults `BUILD_IMAGES=true` and
+  builds from the local working tree, so check out and pull the branch that should ship (usually `main`)
+  before running it.
+
+Resource names (`ACR`, `SA`, `PG`) default to a `$RANDOM` suffix, so a rerun without overrides creates
+differently-named resources than the ones that were torn down. That is fine functionally; set the same
+names via environment variables only if continuity of naming matters to you.
 
 ---
 
