@@ -12,7 +12,7 @@ export const listEquipmentRoute: FastifyPluginAsync = async (app) => {
   app.get(
     '/equipment',
     {
-      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin')],
+      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin', 'auditor')],
       schema: { response: { 200: z.array(equipmentWithLastInspectionSchema) } },
     },
     async (req, reply) => {

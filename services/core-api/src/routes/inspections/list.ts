@@ -20,7 +20,7 @@ export const listInspectionsRoute: FastifyPluginAsync = async (app) => {
   app.get(
     '/inspections',
     {
-      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin')],
+      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin', 'auditor')],
       schema: {
         querystring: listInspectionsQuerySchema,
         response: { 200: z.array(inspectionListItemSchema) },

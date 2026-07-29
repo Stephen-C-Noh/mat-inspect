@@ -11,16 +11,16 @@ import { serializeInspectionDetail } from './serialize.js';
 const paramsSchema = z.object({ id: uuidSchema });
 
 // One inspection's responses in checklist order, including voice-transcript text and per-response
-// photo references. The dashboard drilldown (supervisor/manager/admin) reads any inspection
-// (DEV-37); an operator reads only their own (DEV-115). response.notes can hold VOICE_TRANSCRIBED
-// text (biometric-derived PII under FOIP, CLAUDE.md), so an operator requesting another operator's
-// inspection is answered 404, not 403: existence itself is not disclosed. Same exclusion the report
-// export path applies.
+// photo references. The dashboard drilldown (supervisor/manager/admin) and the read-only audit
+// page (auditor, ADR 0021/DEV-113) read any inspection (DEV-37); an operator reads only their own
+// (DEV-115). response.notes can hold VOICE_TRANSCRIBED text (biometric-derived PII under FOIP,
+// CLAUDE.md), so an operator requesting another operator's inspection is answered 404, not 403:
+// existence itself is not disclosed. Same exclusion the report export path applies.
 export const getInspectionByIdRoute: FastifyPluginAsync = async (app) => {
   app.get(
     '/inspections/:id',
     {
-      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin')],
+      preHandler: [requireRole('operator', 'supervisor', 'manager', 'admin', 'auditor')],
       schema: { params: paramsSchema, response: { 200: inspectionDetailSchema } },
     },
     async (req, reply) => {

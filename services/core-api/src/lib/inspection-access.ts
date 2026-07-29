@@ -5,7 +5,12 @@ import type { UserRole } from '@mat-inspect/shared-types';
 // list can enumerate any operator by operatorId, and a detail carries VOICE_TRANSCRIBED notes,
 // which are biometric-derived PII under FOIP (CLAUDE.md). Roles are not hierarchical (ADR/DEV-30),
 // so this is an explicit membership test, not a rank comparison.
-const ALL_INSPECTIONS_READ_ROLES: readonly UserRole[] = ['supervisor', 'manager', 'admin'];
+const ALL_INSPECTIONS_READ_ROLES: readonly UserRole[] = [
+  'supervisor',
+  'manager',
+  'admin',
+  'auditor',
+];
 
 // True when the caller may read inspections belonging to any operator. False for an operator-only
 // caller, who must be restricted to their own operatorId.

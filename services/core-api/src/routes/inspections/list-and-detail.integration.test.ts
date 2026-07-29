@@ -17,6 +17,7 @@ const ADMIN_ID = '11111111-1111-1111-1111-111111111111';
 const OPERATOR_ID = '22222222-2222-2222-2222-222222222222';
 const OTHER_OPERATOR_ID = '33333333-3333-3333-3333-333333333333';
 const MANAGER_ID = '44444444-4444-4444-4444-444444444444';
+const AUDITOR_ID = '55555555-5555-5555-5555-555555555555';
 
 const makeToken = async (role: string, sub: string) =>
   new SignJWT({ sub, oid: sub, roles: [role], tid: 'test-tenant' })
@@ -48,6 +49,7 @@ describe('GET /inspections and GET /inspections/:id', () => {
   let app: Awaited<ReturnType<(typeof import('../../app.js'))['buildApp']>>;
   let operatorToken: string;
   let managerToken: string;
+  let auditorToken: string;
   let equipmentId: string;
   let quietEquipmentId: string;
   let templateId: string;
@@ -75,6 +77,7 @@ describe('GET /inspections and GET /inspections/:id', () => {
       { id: OPERATOR_ID, displayName: 'Jane Operator', email: 'operator-list@example.com' },
       { id: OTHER_OPERATOR_ID, displayName: 'Other Operator', email: 'other-list@example.com' },
       { id: MANAGER_ID, displayName: 'Manager User', email: 'manager-list@example.com' },
+      { id: AUDITOR_ID, displayName: 'Ada Auditor', email: 'auditor-list@example.com' },
     ]);
 
     const [equipmentRow] = await migrationDb
@@ -109,6 +112,7 @@ describe('GET /inspections and GET /inspections/:id', () => {
 
     operatorToken = await makeToken('operator', OPERATOR_ID);
     managerToken = await makeToken('manager', MANAGER_ID);
+    auditorToken = await makeToken('auditor', AUDITOR_ID);
   }, 120_000);
 
   afterAll(async () => {
@@ -348,5 +352,42 @@ describe('GET /inspections and GET /inspections/:id', () => {
     });
     expect(res.statusCode).toBe(404);
     expect(res.json().title).toBe('INSPECTION_NOT_FOUND');
+  });
+
+  // Auditor is a read-only, non-operational role (ADR 0021) that backs the dashboard's /audit
+  // page (DEV-113). It must read fleet-wide, the same as supervisor/manager/admin, not be
+  // scoped to its own (nonexistent) operatorId like an operator caller would be.
+  it('lets an auditor list inspections fleet-wide, unscoped, on GET /inspections (DEV-113)', async () => {
+    const mine = await submit({ operatorToken, passed: true });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/inspections',
+      headers: { authorization: `Bearer ${auditorToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Array<{ id: string; operatorId: string }>;
+    expect(body.some((row) => row.id === mine.id)).toBe(true);
+    expect(body.some((row) => row.operatorId !== AUDITOR_ID)).toBe(true);
+  });
+
+  it('lets an auditor read a single inspection detail on GET /inspections/:id (DEV-113)', async () => {
+    const created = await submit({ operatorToken, passed: false });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/inspections/${created.id}`,
+      headers: { authorization: `Bearer ${auditorToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().operatorDisplayName).toBe('Jane Operator');
+  });
+
+  it('lets an auditor list equipment on GET /equipment (DEV-113)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/equipment',
+      headers: { authorization: `Bearer ${auditorToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.json())).toBe(true);
   });
 });
