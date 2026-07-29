@@ -58,7 +58,7 @@ const DefectDetailPanel = ({
 
       <h2 className="mt-3 text-xl font-bold text-foreground">{defect.description}</h2>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 rounded-sm bg-muted p-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 rounded-sm bg-muted p-4 sm:grid-cols-2">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
             Equipment
