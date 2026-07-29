@@ -161,9 +161,9 @@ export const FailureQueue = (): ReactElement => {
                 <th className="p-3 font-bold">Priority</th>
                 <th className="p-3 font-bold">Equipment</th>
                 <th className="p-3 font-bold">Defect</th>
-                <th className="p-3 font-bold">Inspection</th>
+                <th className="hidden p-3 font-bold md:table-cell">Inspection</th>
                 <th className="p-3 font-bold">Status</th>
-                <th className="p-3 font-bold">Age</th>
+                <th className="hidden p-3 font-bold md:table-cell">Age</th>
                 <th className="p-3" />
               </tr>
             </thead>
@@ -187,13 +187,15 @@ export const FailureQueue = (): ReactElement => {
                         {defect.description}
                       </p>
                     </td>
-                    <td className="p-3 text-muted-foreground">
+                    <td className="hidden p-3 text-muted-foreground md:table-cell">
                       {shortCode('INS', defect.inspectionId)}
                     </td>
                     <td className="p-3">
                       <DefectStatusTag status={defect.status} />
                     </td>
-                    <td className="p-3 text-muted-foreground">{formatAge(defect.openedAt)}</td>
+                    <td className="hidden p-3 text-muted-foreground md:table-cell">
+                      {formatAge(defect.openedAt)}
+                    </td>
                     <td className="p-3">
                       <Link
                         href={`/defects?id=${defect.id}`}
