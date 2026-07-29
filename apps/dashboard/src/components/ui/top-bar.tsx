@@ -4,13 +4,41 @@ import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
 import type { ReactElement } from 'react';
 import { User } from 'lucide-react';
+import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import type { UserRole } from '@mat-inspect/shared-types';
 import { NotificationBell } from '@/components/ui/notification-bell';
+import { ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } from '@/lib/auth';
+
+// Mirrors each page's own AuthGuard allowedRoles (dashboard/fleet/defects/audit page.tsx).
+// Dashboard, Fleet, and Audit reuse the shared OPERATIONAL_ROLES / ALLOWED_ROLES constants so
+// they cannot drift from the pages they link to; Defects keeps its own literal because that
+// page's gate diverges from both (excludes admin today) for reasons specific to it, not a
+// shared source of truth. This list exists only to avoid showing a link that 403s.
+const NAV_LINKS: ReadonlyArray<{
+  href: string;
+  label: string;
+  allowedRoles: readonly UserRole[];
+}> = [
+  { href: '/dashboard', label: 'Dashboard', allowedRoles: OPERATIONAL_ROLES },
+  { href: '/fleet', label: 'Fleet', allowedRoles: OPERATIONAL_ROLES },
+  { href: '/defects', label: 'Defects', allowedRoles: ['supervisor', 'manager'] },
+  { href: '/audit', label: 'Audit', allowedRoles: ALLOWED_ROLES },
+];
 
 export const TopBar = function (): ReactElement | null {
   const { accounts } = useMsal();
   const activeAccount = accounts[0];
 
   if (!activeAccount) return null;
+
+  const roles = getRolesFromAccount(activeAccount);
+  const visibleLinks = NAV_LINKS.filter((link) =>
+    link.allowedRoles.some((role) => roles.includes(role)),
+  );
+  // /api/v1/activity (behind NotificationBell, via ActivityProvider) does not accept auditor;
+  // showing a bell that can never carry data reads as "nothing has happened" rather than "this
+  // isn't for your role" (DEV-112 follow-up).
+  const isOperational = hasOperationalRole(roles);
 
   return (
     <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
@@ -20,21 +48,17 @@ export const TopBar = function (): ReactElement | null {
         </div>
         <h1 className="font-bold text-lg tracking-wide">MAT SCHOOL</h1>
         <nav className="flex gap-4 pl-4 text-sm font-semibold">
-          <Link href="/dashboard" className="hover:opacity-80">
-            Dashboard
-          </Link>
-          <Link href="/fleet" className="hover:opacity-80">
-            Fleet
-          </Link>
-          <Link href="/defects" className="hover:opacity-80">
-            Defects
-          </Link>
+          {visibleLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="hover:opacity-80">
+              {link.label}
+            </Link>
+          ))}
         </nav>
       </div>
 
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium">{activeAccount.name}</span>
-        <NotificationBell />
+        {isOperational && <NotificationBell />}
         {/* TODO: Flagged - Replace with 'darker-primary' token once defined */}
         <User className="size-6 bg-muted-foreground p-1 rounded-full cursor-pointer" />
       </div>
