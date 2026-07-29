@@ -156,12 +156,12 @@ function SettingsContent(): ReactElement {
           <AccordionRow
             icon={AlertTriangle}
             label="Failure Notifications"
-            preview="Auto — submitted to chair holder"
+            preview="Auto — submitted to supervisor"
           >
             <div className="flex items-start gap-3 py-2">
               <CheckCircle className="mt-0.5 size-4 shrink-0 text-accent" />
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Failed inspections are automatically submitted to the chair holder. No additional
+                Failed inspections are automatically submitted to the supervisor. No additional
                 configuration required.
               </p>
             </div>

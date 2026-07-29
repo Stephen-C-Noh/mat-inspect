@@ -53,6 +53,8 @@ RUN apk --no-cache upgrade \
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=build /repo/apps/dashboard/.next/standalone ./
 COPY --from=build /repo/apps/dashboard/.next/static ./apps/dashboard/.next/static
+# Next.js standalone output does not include public/ on its own; copy it separately.
+COPY --from=build /repo/apps/dashboard/public ./apps/dashboard/public
 # The standalone server binds to HOSTNAME; Docker sets that to the container id,
 # which leaves localhost unreachable. Bind all interfaces so the healthcheck works.
 ENV HOSTNAME=0.0.0.0 PORT=3000

@@ -45,6 +45,8 @@ RUN apk --no-cache upgrade \
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=build /repo/apps/pwa/.next/standalone ./
 COPY --from=build /repo/apps/pwa/.next/static ./apps/pwa/.next/static
+# Next.js standalone output does not include public/ on its own; copy it separately.
+COPY --from=build /repo/apps/pwa/public ./apps/pwa/public
 ENV HOSTNAME=0.0.0.0 PORT=3000
 USER appuser
 EXPOSE 3000

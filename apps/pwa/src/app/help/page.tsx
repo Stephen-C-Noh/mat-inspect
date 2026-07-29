@@ -85,7 +85,7 @@ function HelpContent(): ReactElement {
           </FaqItem>
           <FaqItem question="What happens if I fail an item?">
             Failed items are flagged at the end of the checklist. You must document each failure
-            with notes before submitting. The chair holder is notified automatically once the
+            with notes before submitting. The supervisor is notified automatically once the
             inspection is submitted.
           </FaqItem>
           <FaqItem question="Why can I not submit the inspection?">
@@ -94,8 +94,8 @@ function HelpContent(): ReactElement {
           </FaqItem>
           <FaqItem question="What does FAIL BLOCKING mean?">
             A blocking failure means the equipment must be taken out of service immediately. The
-            equipment status is set to OUT OF SERVICE and the chair holder is notified. Do not
-            operate the equipment until a return-to-service inspection is completed.
+            equipment status is set to OUT OF SERVICE and the supervisor is notified. Do not operate
+            the equipment until a return-to-service inspection is completed.
           </FaqItem>
           <FaqItem question="How do I add a photo to a defect?">
             On the Document Failures screen, tap the photo placeholder below a failure card. Your
@@ -129,7 +129,7 @@ function HelpContent(): ReactElement {
             <ContactCard
               icon={Mail}
               title="Contact Support"
-              subtitle="chair holder email / phone number"
+              subtitle="supervisor email / phone number"
             />
           </button>
         </div>

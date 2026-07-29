@@ -87,7 +87,7 @@ function SubmittedFailContent(): ReactElement {
           </h1>
           <span className="flex items-center gap-1.5 rounded-full bg-warning px-4 py-1.5 text-xs font-bold text-warning-foreground">
             <AlertTriangle className="size-3.5" />
-            CHAIR HOLDERS NOTIFIED
+            SUPERVISOR NOTIFIED
           </span>
         </div>
 
