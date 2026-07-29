@@ -48,6 +48,21 @@ it. There is no centralized permission matrix in this codebase (each route decla
 own roles inline); a future route that should be auditor-visible and forgets the role
 is not caught structurally, only by review.
 
+## Amendment (2026-07-28, DEV-112)
+
+This ADR's Decision section covers the code-side role but did not say whether an auditor
+account can sign into the dashboard app at all. It could not: the dashboard's app-entry gate
+(`ALLOWED_ROLES` in `apps/dashboard/src/lib/auth.ts`) was `supervisor | manager | admin`, so an
+auditor authenticated successfully and was bounced to `/unauthorized`. DEV-112 fixes this.
+
+Auditor is now in that app-entry gate. It does not gain access to any operational page by
+that alone: dashboard and fleet each carry their own explicit `AuthGuard allowedRoles`
+override that excludes `auditor`, so entry to the app and entry to a given page are two
+separate checks. Auditor lands on a new, read-only `/audit` route instead of the shared
+dashboard home, and the top bar only lists the pages a signed-in role is allowed to open.
+`/audit`'s full content (inspection history, signed export, chain verification) is DEV-113;
+this amendment covers only that an auditor now has somewhere to land.
+
 ## Alternatives Considered
 
 Gate export routes on `manager` (and `admin`) only, deferring a formal auditor role to

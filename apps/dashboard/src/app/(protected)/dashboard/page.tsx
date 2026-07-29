@@ -1,10 +1,13 @@
 'use client';
 
+import type { ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import { AuthGuard } from '@/components/auth-guard';
 import { FailureQueue } from '@/components/dashboard/failure-queue';
+import { OPERATIONAL_ROLES } from '@/lib/auth';
 
-export default function DashboardPage() {
+function DashboardContent(): ReactElement {
   const { accounts } = useMsal();
   const account = accounts[0] ?? null;
   const roles = getRolesFromAccount(account);
@@ -22,5 +25,16 @@ export default function DashboardPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// Explicit override, not the (protected) layout's default: the layout's AuthGuard is now an
+// app-entry gate that includes auditor (DEV-112), and this page shows the write-adjacent
+// Failure Queue that auditor must not reach.
+export default function DashboardPage(): ReactElement {
+  return (
+    <AuthGuard allowedRoles={OPERATIONAL_ROLES}>
+      <DashboardContent />
+    </AuthGuard>
   );
 }

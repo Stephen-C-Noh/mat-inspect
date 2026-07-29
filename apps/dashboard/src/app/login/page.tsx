@@ -4,8 +4,8 @@ import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { hasAllowedRole } from '@mat-inspect/shared-auth';
-import { ALLOWED_ROLES, loginRequest } from '@/lib/auth';
+import { getRolesFromAccount, hasAllowedRole } from '@mat-inspect/shared-auth';
+import { ALLOWED_ROLES, hasOperationalRole, loginRequest, resolveLandingPath } from '@/lib/auth';
 import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 
 function LoginContent() {
@@ -22,10 +22,19 @@ function LoginContent() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (hasAllowedRole(accounts[0] ?? null, ALLOWED_ROLES)) {
-      // AuthGuard sends unauthenticated deep links here as ?redirect=<path> (DEV-128); honor
-      // it so a supervisor lands back where they asked to go, not always on the dashboard home.
-      router.replace(sanitizeRedirectPath(searchParams.get('redirect')) ?? '/dashboard');
+    const activeAccount = accounts[0] ?? null;
+    if (hasAllowedRole(activeAccount, ALLOWED_ROLES)) {
+      const roles = getRolesFromAccount(activeAccount);
+      // AuthGuard sends unauthenticated deep links here as ?redirect=<path> (DEV-128); honor it
+      // so a supervisor lands back where they asked to go. Only for an operational role: there
+      // is no central permission matrix to check an arbitrary redirect target against (CLAUDE.md
+      // section 8), and an auditor's one legitimate destination is already known, so a bookmarked
+      // ?redirect=/dashboard must not send an auditor into a page its own AuthGuard will reject
+      // (DEV-112 follow-up: that dead-ended at /unauthorized).
+      const requestedPath = hasOperationalRole(roles)
+        ? sanitizeRedirectPath(searchParams.get('redirect'))
+        : null;
+      router.replace(requestedPath ?? resolveLandingPath(roles));
     } else {
       router.replace('/unauthorized');
     }
