@@ -20,13 +20,15 @@ export const TopBar = function (): ReactElement | null {
           alt="SAIT"
           width={116}
           height={32}
-          className="h-5 w-auto shrink-0"
+          className="h-7 w-auto shrink-0"
         />
         <h1 className="font-bold text-lg tracking-wide">SCHOOL OF MAT</h1>
       </Link>
 
       <div className="flex items-center gap-4">
-        <span className="text-sm font-medium">{activeAccount.name}</span>
+        {/* The account menu's dropdown repeats the name (account-menu.tsx), so this is
+            redundant on a narrow header; keep it only where there's room to spare. */}
+        <span className="hidden text-sm font-medium sm:inline">{activeAccount.name}</span>
         <AccountMenu />
       </div>
     </header>
