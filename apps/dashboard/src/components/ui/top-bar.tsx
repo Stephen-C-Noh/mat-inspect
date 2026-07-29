@@ -1,13 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import Image from 'next/image';
-import type { ReactElement } from 'react';
+import { LayoutDashboard, Menu, ScrollText, Settings, TriangleAlert, Truck } from 'lucide-react';
+import { useState, type ComponentType, type ReactElement } from 'react';
 import { getRolesFromAccount } from '@mat-inspect/shared-auth';
 import type { UserRole } from '@mat-inspect/shared-types';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { AccountMenu } from '@/components/ui/account-menu';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 import { ADMIN_ROLES, ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } from '@/lib/auth';
 
 // Mirrors each page's own AuthGuard allowedRoles (dashboard/fleet/defects/audit/admin page.tsx).
@@ -18,18 +23,31 @@ import { ADMIN_ROLES, ALLOWED_ROLES, OPERATIONAL_ROLES, hasOperationalRole } fro
 const NAV_LINKS: ReadonlyArray<{
   href: string;
   label: string;
+  icon: ComponentType<{ className?: string }>;
   allowedRoles: readonly UserRole[];
 }> = [
-  { href: '/dashboard', label: 'Dashboard', allowedRoles: OPERATIONAL_ROLES },
-  { href: '/fleet', label: 'Fleet', allowedRoles: OPERATIONAL_ROLES },
-  { href: '/defects', label: 'Defects', allowedRoles: ['supervisor', 'manager'] },
-  { href: '/audit', label: 'Audit', allowedRoles: ALLOWED_ROLES },
-  { href: '/admin/templates', label: 'Admin', allowedRoles: ADMIN_ROLES },
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    allowedRoles: OPERATIONAL_ROLES,
+  },
+  { href: '/fleet', label: 'Fleet', icon: Truck, allowedRoles: OPERATIONAL_ROLES },
+  {
+    href: '/defects',
+    label: 'Defects',
+    icon: TriangleAlert,
+    allowedRoles: ['supervisor', 'manager'],
+  },
+  { href: '/audit', label: 'Audit', icon: ScrollText, allowedRoles: ALLOWED_ROLES },
+  { href: '/admin/templates', label: 'Admin', icon: Settings, allowedRoles: ADMIN_ROLES },
 ];
 
 export const TopBar = function (): ReactElement | null {
   const { accounts } = useMsal();
   const activeAccount = accounts[0];
+  const [navOpen, setNavOpen] = useState(false);
+  const pathname = usePathname();
 
   if (!activeAccount) return null;
 
@@ -43,19 +61,56 @@ export const TopBar = function (): ReactElement | null {
   const isOperational = hasOperationalRole(roles);
 
   return (
-    <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between w-full">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="flex items-center gap-3">
+    <header className="bg-primary text-primary-foreground p-3 sm:p-4 flex items-center justify-between w-full">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <Sheet open={navOpen} onOpenChange={setNavOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground md:hidden"
+              aria-label="Open navigation menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="flex w-72 flex-col gap-0 p-0">
+            <SheetHeader className="border-b border-border p-4 text-left">
+              <SheetTitle>Navigation</SheetTitle>
+            </SheetHeader>
+            <nav className="flex flex-col divide-y divide-border">
+              {visibleLinks.map((link) => {
+                const Icon = link.icon;
+                const active = pathname?.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-muted',
+                      active && 'bg-accent/10 text-accent',
+                    )}
+                    onClick={() => setNavOpen(false)}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </SheetContent>
+        </Sheet>
+        <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Image
             src="/sait-logo.png"
             alt="SAIT"
             width={116}
             height={32}
-            className="h-7 w-auto shrink-0"
+            className="h-5 sm:h-7 w-auto shrink-0"
           />
-          <h1 className="font-bold text-lg tracking-wide">SCHOOL OF MAT</h1>
+          <h1 className="font-bold text-sm sm:text-lg tracking-wide truncate">SCHOOL OF MAT</h1>
         </Link>
-        <nav className="flex gap-4 pl-4 text-sm font-semibold">
+        <nav className="hidden md:flex gap-4 pl-4 text-sm font-semibold">
           {visibleLinks.map((link) => (
             <Link key={link.href} href={link.href} className="hover:opacity-80">
               {link.label}
@@ -64,7 +119,7 @@ export const TopBar = function (): ReactElement | null {
         </nav>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         {/* The account menu's dropdown repeats the name (account-menu.tsx), so this is
             redundant on a narrow header; keep it only where there's room to spare. */}
         <span className="hidden text-sm font-medium sm:inline">{activeAccount.name}</span>

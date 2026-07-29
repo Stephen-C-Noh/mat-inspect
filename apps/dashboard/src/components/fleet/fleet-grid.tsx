@@ -131,7 +131,7 @@ const MachineDetailPanel = ({
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{equipment.assetTag}</p>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 rounded-sm bg-muted p-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 rounded-sm bg-muted p-4 sm:grid-cols-2">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Type</p>
           <p className="text-sm text-foreground">{categoryFor(equipment.type)}</p>

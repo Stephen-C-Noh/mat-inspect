@@ -77,7 +77,7 @@ export const NotificationBell = (): ReactElement => {
         <div
           role="region"
           aria-label="New inspections"
-          className="absolute right-0 z-50 mt-2 w-80 rounded-lg border border-border bg-card text-foreground shadow-card"
+          className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-border bg-card text-foreground shadow-card"
         >
           <div className="flex items-center justify-between border-b border-border px-4 py-2">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
