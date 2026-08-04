@@ -19,24 +19,15 @@ const nextConfig: NextConfig = {
   devIndicators: false,
 
   async rewrites() {
-    const rewrites = [
+    // The PWA acquires a real Entra access token through MSAL (DEV-26) and sends it to the API. The
+    // dev-only /dev/token issuer it once called was removed once real auth was proven (DEV-61,
+    // ADR 0021), so there is no /dev/* rewrite to add.
+    return [
       {
         source: '/api/v1/:path*',
         destination: `${gatewayUrl}/api/v1/:path*`,
       },
     ];
-
-    // The /dev/token issuer is dev-only scaffolding (DEV-7). The gateway serves /dev/* on the dev
-    // listener alone, never on a site a browser can open, so a deployed PWA has no path to it. The
-    // production guard here stays as a second lock.
-    if (process.env.NODE_ENV !== 'production') {
-      rewrites.push({
-        source: '/dev/:path*',
-        destination: `${gatewayUrl}/dev/:path*`,
-      });
-    }
-
-    return rewrites;
   },
 };
 

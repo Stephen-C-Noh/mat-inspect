@@ -2,9 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { AUTH_PREHANDLER } from '@mat-inspect/shared-auth-server';
 
 // Routes that intentionally carry no auth preHandler. Kept explicit so the fail-closed
-// guard can tell a public route from a forgotten one. /health is the liveness probe; the
-// /dev/* routes are the dev-only JWKS and token issuer (registered only outside production).
-export const PUBLIC_ROUTES: readonly string[] = ['/health', '/dev/jwks', '/dev/token'];
+// guard can tell a public route from a forgotten one. /health is the liveness probe. The
+// dev-only /dev/token and /dev/jwks issuer was removed once real Entra auth was proven
+// (DEV-61, ADR 0021); adding a public route back here is a deliberate, reviewable act.
+export const PUBLIC_ROUTES: readonly string[] = ['/health'];
 
 const isAuthPreHandler = (handler: unknown): boolean =>
   typeof handler === 'function' &&

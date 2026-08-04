@@ -63,8 +63,9 @@ docker compose up -d
 
 Open http://localhost:3000 for the PWA and http://localhost:3001 for the
 dashboard. Any authenticated screen redirects to a real "Sign in with
-Microsoft" (MSAL) flow; there is no dev-token bypass once Entra values are
-set, which they must be for boot to succeed.
+Microsoft" (MSAL) flow. There is no dev-token bypass: the `/dev/token`
+endpoint was removed (DEV-61, ADR 0021), and Entra values must be set for
+boot to succeed.
 
 ## Path B: Hybrid, for active development
 

@@ -138,10 +138,5 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   // Audit Service's report generator is the sole caller; see requireInternalReportsToken.
   await app.register(reportsDataRoute);
 
-  if (process.env['NODE_ENV'] !== 'production') {
-    const { devTokenRoutes } = await import('./routes/dev-token.js');
-    await app.register(devTokenRoutes);
-  }
-
   return app;
 };
