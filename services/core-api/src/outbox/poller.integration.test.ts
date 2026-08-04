@@ -167,4 +167,77 @@ describe('outbox poller', () => {
     expect(body['resourceId']).toBe(inspectionId);
     expect(typeof body['sourceEventId']).toBe('string');
   });
+
+  // DEV-142: return-to-service.ts's payload has approvedBy + equipmentId, no operatorId or
+  // inspectionId. buildIngestBody's INSPECTION_SUBMITTED-shaped defaults sent both as undefined,
+  // which the Audit Service's ingest schema rejects with 400 (non-optional uuidSchema on both
+  // actorId and resourceId), so these rows retried forever and never reached audit_events.
+  it('maps EQUIPMENT_STATUS_CHANGED/RETURN_TO_SERVICE to approvedBy + equipmentId', async () => {
+    stubStatusCode = 200;
+    const { db, outbox } = await import('../db/index.js');
+    const approvedBy = randomUUID();
+    const equipmentId = randomUUID();
+    const [row] = await db
+      .insert(outbox)
+      .values({
+        eventType: 'EQUIPMENT_STATUS_CHANGED',
+        payload: {
+          equipmentId,
+          from: 'OUT_OF_SERVICE',
+          to: 'AWAITING_INSPECTION',
+          reason: 'RETURN_TO_SERVICE',
+          approvedBy,
+          defectId: randomUUID(),
+        },
+      })
+      .returning();
+
+    const { runOutboxPollTick } = await import('./poller.js');
+    await runOutboxPollTick();
+
+    const body = lastRequestBody as Record<string, unknown>;
+    expect(body['action']).toBe('EQUIPMENT_STATUS_CHANGED');
+    expect(body['actorId']).toBe(approvedBy);
+    expect(body['resourceType']).toBe('EQUIPMENT');
+    expect(body['resourceId']).toBe(equipmentId);
+
+    const { eq } = await import('drizzle-orm');
+    const [updated] = await db.select().from(outbox).where(eq(outbox.id, row!.id));
+    expect(updated?.processedAt).toBeTruthy();
+  });
+
+  // DEV-142: defects/resolve.ts's payload uses resolvedBy, not operatorId, for the actor. Same
+  // failure mode as RETURN_TO_SERVICE above, confirmed against 3 permanently-stuck rows in the
+  // dev-stack DB.
+  it('maps DEFECT_RESOLVED to resolvedBy', async () => {
+    stubStatusCode = 200;
+    const { db, outbox } = await import('../db/index.js');
+    const resolvedBy = randomUUID();
+    const inspectionId = randomUUID();
+    const [row] = await db
+      .insert(outbox)
+      .values({
+        eventType: 'DEFECT_RESOLVED',
+        payload: {
+          defectId: randomUUID(),
+          equipmentId: randomUUID(),
+          inspectionId,
+          resolvedBy,
+        },
+      })
+      .returning();
+
+    const { runOutboxPollTick } = await import('./poller.js');
+    await runOutboxPollTick();
+
+    const body = lastRequestBody as Record<string, unknown>;
+    expect(body['action']).toBe('DEFECT_RESOLVED');
+    expect(body['actorId']).toBe(resolvedBy);
+    expect(body['resourceType']).toBe('INSPECTION');
+    expect(body['resourceId']).toBe(inspectionId);
+
+    const { eq } = await import('drizzle-orm');
+    const [updated] = await db.select().from(outbox).where(eq(outbox.id, row!.id));
+    expect(updated?.processedAt).toBeTruthy();
+  });
 });
