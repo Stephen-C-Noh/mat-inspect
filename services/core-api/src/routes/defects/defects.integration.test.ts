@@ -6,7 +6,7 @@ import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
-import type { ChecklistItem } from '@mat-inspect/shared-schemas';
+import { auditEventIngestSchema, type ChecklistItem } from '@mat-inspect/shared-schemas';
 import { setJwksForTest } from '../../middleware/auth.js';
 
 const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
@@ -363,6 +363,71 @@ describe('defect lifecycle API (DEV-20, ADR 0006)', () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().title).toBe('NO_RESOLVED_DEFECT');
     expect(await getStatus(equipment.id)).toBe('OUT_OF_SERVICE');
+  });
+
+  it('a lockout cycle with two resolved blocking defects: one approval stamps and clears both (DEV-101)', async () => {
+    const equipment = await makeEquipment('FORK-RTS-MULTI');
+
+    // First blocking failure locks the equipment out.
+    const d1 = await openBlockingDefect(equipment.id);
+    expect(await getStatus(equipment.id)).toBe('OUT_OF_SERVICE');
+
+    // A follow-up inspection during the same lockout opens a second BLOCKING defect in the same
+    // cycle: submit.ts inserts a Defect on every FAIL_BLOCKING submission and only skips the
+    // status write (equipment is already OUT_OF_SERVICE), not the defect insert.
+    const d2 = await openBlockingDefect(equipment.id);
+    expect(d2.id).not.toBe(d1.id);
+    expect(await getStatus(equipment.id)).toBe('OUT_OF_SERVICE');
+
+    for (const defect of [d1, d2]) {
+      await post(`/api/v1/defects/${defect.id}/acknowledge`, supervisorToken);
+      await post(`/api/v1/defects/${defect.id}/start-repair`, supervisorToken);
+      expect(
+        (
+          await post(`/api/v1/defects/${defect.id}/resolve`, supervisorToken, {
+            resolutionNotes: 'Repaired',
+          })
+        ).statusCode,
+      ).toBe(200);
+    }
+
+    // A single approval must clear the whole cycle: both defects stamped, not just the most
+    // recently resolved one.
+    const rts = await post(`/api/v1/equipment/${equipment.id}/return-to-service`, supervisorToken);
+    expect(rts.statusCode).toBe(200);
+    expect(rts.json().status).toBe('AWAITING_INSPECTION');
+
+    const { db, defects } = await import('../../db/index.js');
+    const [row1] = await db.select().from(defects).where(eq(defects.id, d1.id));
+    const [row2] = await db.select().from(defects).where(eq(defects.id, d2.id));
+    expect(row1!.returnToServiceApprovedBy).toBe(SUPERVISOR_ID);
+    expect(row2!.returnToServiceApprovedBy).toBe(SUPERVISOR_ID);
+
+    // The outbox payload must stay a valid payloadSummary scalar (DEV-142): an array of defect
+    // ids would fail auditEventIngestSchema's string/boolean/null record and the Audit Service
+    // would reject the ingest with 400, the same stuck-forever failure DEV-142 fixed for the
+    // missing actor/resource fields.
+    const { outbox } = await import('../../db/index.js');
+    const allRows = await db.select().from(outbox);
+    const [rtsEvent] = allRows.filter(
+      (r) =>
+        r.eventType === 'EQUIPMENT_STATUS_CHANGED' &&
+        (r.payload as { equipmentId?: string; reason?: string }).equipmentId === equipment.id &&
+        (r.payload as { reason?: string }).reason === 'RETURN_TO_SERVICE',
+    );
+    const payload = rtsEvent!.payload as { defectIds?: unknown };
+    expect(typeof payload.defectIds).toBe('string');
+    expect(payload.defectIds).toBe([d1.id, d2.id].join(','));
+    expect(() => auditEventIngestSchema.shape.payloadSummary.parse(payload)).not.toThrow();
+
+    // No pending-approval defect is left to force a retry; the equipment already left
+    // OUT_OF_SERVICE, so a second attempt correctly 409s instead of being needed to "catch" d2.
+    const retry = await post(
+      `/api/v1/equipment/${equipment.id}/return-to-service`,
+      supervisorToken,
+    );
+    expect(retry.statusCode).toBe(409);
+    expect(retry.json().title).toBe('EQUIPMENT_NOT_OUT_OF_SERVICE');
   });
 
   it('rejects an operator approving return-to-service with 403', async () => {
