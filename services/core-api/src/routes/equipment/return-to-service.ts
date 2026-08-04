@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import { equipmentSchema, uuidSchema } from '@mat-inspect/shared-schemas';
 import { db, equipment, defects, outbox } from '../../db/index.js';
 import { computeReadiness } from '../../lib/equipment-readiness.js';
@@ -84,14 +84,17 @@ export const returnToServiceRoute: FastifyPluginAsync = async (app) => {
           );
         }
 
-        // Stamp the approval on the most recently resolved blocking defect.
-        const [approvedDefect] = resolved.sort(
-          (a, b) => (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0),
-        );
+        // Stamp the approval on every resolved blocking defect in this cycle, not just the most
+        // recent: submit.ts opens a new Defect on each FAIL_BLOCKING submission without checking
+        // for an existing one, so a lockout can accumulate more than one before it is repaired.
+        // Approval closes the whole cycle, so every resolved defect in it must clear together
+        // (DEV-101); otherwise the others sit in the queue forever with returnToServiceApprovedBy
+        // still null even though the equipment is already back in service.
+        const resolvedIds = resolved.map((d) => d.id);
         await tx
           .update(defects)
           .set({ returnToServiceApprovedBy: req.user.id })
-          .where(eq(defects.id, approvedDefect!.id));
+          .where(inArray(defects.id, resolvedIds));
 
         // Set the watermark from Postgres now() (the transaction timestamp), not a JS Date.
         // readiness_baseline_at is compared against inspection submitted_at, which is also a
@@ -117,7 +120,7 @@ export const returnToServiceRoute: FastifyPluginAsync = async (app) => {
             to: 'AWAITING_INSPECTION',
             reason: 'RETURN_TO_SERVICE',
             approvedBy: req.user.id,
-            defectId: approvedDefect!.id,
+            defectIds: resolvedIds,
           },
         });
 
