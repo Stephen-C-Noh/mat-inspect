@@ -8,6 +8,10 @@ faster-whisper==1.1.1
 requests==2.32.3
 httpx==0.27.0
 azure-monitor-opentelemetry==1.6.4
+# Transitive via azure-monitor-opentelemetry -> azure-identity/msal, which otherwise resolve
+# cryptography 49.0.0 (CVE-2026-69247, PKCS#7 EnvelopedData decryption). Pin the fix explicitly;
+# msal caps it at <51 and azure-identity has no upper bound, so 50.0.0 satisfies both.
+cryptography>=50.0.0
 # The on-prem advisory model runtime (DEV-83, ADR 0018). Same version the mini-PC benchmark ran,
 # so the deployed runtime is the one the numbers in benchmark/RESULTS.md came from. No wheel is
 # published on PyPI, so this builds llama.cpp from source; see the Dockerfile for the build deps
