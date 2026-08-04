@@ -6,6 +6,7 @@ import { config } from './lib/config.js';
 import { setupZodValidation } from './lib/zod-validation.js';
 import { registerAuthRouteGuard } from './middleware/auth-route-guard.js';
 import { uploadPhotoRoute } from './routes/media/upload.js';
+import { getPhotoRoute } from './routes/media/get-photo.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
@@ -85,6 +86,7 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   app.get('/health', async () => ({ status: 'ok', service: 'media' }));
 
   await app.register(uploadPhotoRoute, { prefix: '/api/v1/media' });
+  await app.register(getPhotoRoute, { prefix: '/api/v1/media' });
 
   return app;
 };

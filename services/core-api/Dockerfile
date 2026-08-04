@@ -52,6 +52,13 @@ RUN npm ci --omit=dev --ignore-scripts
 # ---- runtime: minimal image, non-root, prod node_modules + built JS ----
 FROM node:${NODE_VERSION}-alpine AS runtime
 WORKDIR /repo
+# Security hardening (DEV-42). apk upgrade pulls the patched OpenSSL (libssl3/libcrypto3,
+# CVE-2026-45447) from the alpine branch. Removing the bundled npm CLI clears the HIGH/CRITICAL
+# CVEs in npm's own vendored deps (tar, sigstore, brace-expansion, picomatch): the runtime only
+# runs `node`, never npm, so npm is dead weight. Not version-pinned on purpose, so each base-image
+# security bump is picked up instead of frozen at the tag's first build.
+RUN apk --no-cache upgrade \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=prod-deps /repo/package.json ./
@@ -65,11 +72,6 @@ COPY --from=build /repo/packages/shared-crypto/package.json packages/shared-cryp
 COPY --from=build /repo/packages/shared-crypto/dist packages/shared-crypto/dist
 COPY --from=build /repo/services/core-api/package.json services/core-api/
 COPY --from=build /repo/services/core-api/dist services/core-api/dist
-# fastify-type-provider-zod pins a peer range that blocks npm from hoisting it to
-# the root node_modules, so it stays in the workspace-local node_modules. The root
-# copy above misses it and the runtime crashes with ERR_MODULE_NOT_FOUND. Ship the
-# workspace-local node_modules too (DEV-58).
-COPY --from=prod-deps /repo/services/core-api/node_modules services/core-api/node_modules
 # core-api imports the Drizzle schema via the @mat-inspect/db workspace package.
 # prod-deps symlinks node_modules/@mat-inspect/db -> ../../db, so ship the package
 # manifest and its emitted output at that target.

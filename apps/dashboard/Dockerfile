@@ -43,9 +43,18 @@ RUN npm run build --workspace=@mat-inspect/dashboard
 # server.js lives at apps/dashboard/server.js with node_modules at the root.
 FROM node:${NODE_VERSION}-alpine AS runtime
 WORKDIR /repo
+# Security hardening (DEV-42). apk upgrade pulls the patched OpenSSL (libssl3/libcrypto3,
+# CVE-2026-45447) from the alpine branch. Removing the bundled npm CLI clears the HIGH/CRITICAL
+# CVEs in npm's own vendored deps (tar, sigstore, brace-expansion, picomatch): the runtime only
+# runs `node`, never npm, so npm is dead weight. Not version-pinned on purpose, so each base-image
+# security bump is picked up instead of frozen at the tag's first build.
+RUN apk --no-cache upgrade \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=build /repo/apps/dashboard/.next/standalone ./
 COPY --from=build /repo/apps/dashboard/.next/static ./apps/dashboard/.next/static
+# Next.js standalone output does not include public/ on its own; copy it separately.
+COPY --from=build /repo/apps/dashboard/public ./apps/dashboard/public
 # The standalone server binds to HOSTNAME; Docker sets that to the container id,
 # which leaves localhost unreachable. Bind all interfaces so the healthcheck works.
 ENV HOSTNAME=0.0.0.0 PORT=3000

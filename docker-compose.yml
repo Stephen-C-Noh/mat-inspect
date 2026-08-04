@@ -154,6 +154,19 @@ services:
       # Transcription proxy target (ADR 0019). Internal address only: the AI Service is not
       # published to the browser, and core-api is the only client that authenticates in front of it.
       AI_SERVICE_URL: 'http://ai:8000'
+      # Guards POST /internal/reports-data (DEV-38); the Audit Service's report generator is the
+      # only intended caller, over the internal network, never through the gateway.
+      CORE_API_INTERNAL_TOKEN: ${CORE_API_INTERNAL_TOKEN}
+      # Failure notifications (DEV-39 Teams, DEV-21 email; ADR 0013). All optional: core-api reads
+      # them in config.ts and falls back to the dashboard failure queue (the guaranteed channel)
+      # when unset. Without these mappings the values in .env never reach the container, so the
+      # Teams card and the supervisor email never fire.
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SUPERVISOR_ALERT_EMAILS: ${SUPERVISOR_ALERT_EMAILS}
     depends_on:
       postgres:
         condition: service_healthy
@@ -192,6 +205,50 @@ services:
     networks:
       - mat-internal
 
+  # Daily raw voice-audio retention purge for dev staging (DEV-41, ARCHITECTURE.md 8.4). Reuses the
+  # already-built media image (no build block of its own) and overrides the entrypoint to the
+  # scheduler, which invokes the compiled purge job in that image. The job deletes only raw clips
+  # past the 90-day window from the voice Blob Storage container; it never touches the transcript,
+  # the inspection record, or any database row (it opens no database connection).
+  #
+  # Prod does not run this service: there the 90-day purge is a container lifecycle-management
+  # policy on the Azure Storage account (ADR 0004), the same way the 7-day pg backup window is
+  # managed by Azure in prod (see db-backup).
+  voice-retention:
+    image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/media:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      # Storage is the only dependency the job uses. Entra and Application Insights are required by
+      # the shared media config loader (ADR 0015) but unused by the job; passed through so the boot
+      # validation passes with the same values the media service already uses.
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+      # Schedule and window. Defaults match ARCHITECTURE.md 8.4 (90 days) and run in the small hours
+      # after the 02:00 db backup so the two jobs do not overlap. Overridable from .env.
+      RETENTION_TIME: ${VOICE_RETENTION_TIME:-03:30}
+      MEDIA_VOICE_RETENTION_DAYS: ${MEDIA_VOICE_RETENTION_DAYS:-90}
+      # Set true to preview a run (log what would be purged) without deleting. Use on first deploy.
+      RETENTION_DRY_RUN: ${VOICE_RETENTION_DRY_RUN:-false}
+    entrypoint: ['/bin/sh', '/opt/retention/voice-retention-scheduler.sh']
+    volumes:
+      - ./infra/retention/voice-retention-scheduler.sh:/opt/retention/voice-retention-scheduler.sh:ro
+    depends_on:
+      azurite:
+        condition: service_healthy
+    healthcheck:
+      # The scheduler touches the heartbeat every 30s. If it is older than 2 min the loop is wedged.
+      # This proves the scheduler is alive, not that a purge is fresh: a daily job is idle most of
+      # the day, so purge freshness is the wrong liveness signal (same rule as db-backup).
+      test: ['CMD-SHELL', 'find /tmp/voice-retention-heartbeat -mmin -2 2>/dev/null | grep -q .']
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - mat-internal
+
   audit:
     image: ghcr.io/${REGISTRY_OWNER}/mat-inspect/audit:${TAG:-latest}
     build:
@@ -201,11 +258,32 @@ services:
     environment:
       PORT: '3000'
       OTEL_SERVICE_NAME: audit
-      # Runtime connection: audit_writer (INSERT + SELECT only on audit_events; DEV-23). Migrations
-      # run separately via AUDIT_MIGRATOR_DB_URL (see services/audit/db/migrate.ts), never this one.
+      # Runtime connection: audit_writer (INSERT + SELECT on audit_events; INSERT + SELECT + UPDATE
+      # on report_jobs, DEV-38). Migrations run separately via AUDIT_MIGRATOR_DB_URL (see
+      # services/audit/db/migrate.ts), never this one.
       DATABASE_URL: ${AUDIT_API_DB_URL}
       AUDIT_INGEST_TOKEN: ${AUDIT_INGEST_TOKEN}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+      # Report routes are the first human-facing (requireRole) routes on this service (DEV-38);
+      # same Entra verification as core-api and media.
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+      # Same storage account media uses. REPORTS_BLOB_CONTAINER is this service's own container
+      # (generated PDFs/CSVs); MEDIA_BLOB_CONTAINER is read-only here, must match media's value,
+      # for embedding defect evidence photos in a PDF.
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+      REPORTS_BLOB_CONTAINER: ${REPORTS_BLOB_CONTAINER:-mat-inspect-reports}
+      MEDIA_BLOB_CONTAINER: ${MEDIA_BLOB_CONTAINER:-mat-inspect-media}
+      # Detached report signature (ADR 0022), not an embedded PDF signature.
+      REPORT_SIGNING_PRIVATE_KEY: ${REPORT_SIGNING_PRIVATE_KEY}
+      # The report generator's only path to core_db data (ADR 0001: no cross-service SQL).
+      CORE_API_INTERNAL_URL: 'http://core-api:3000'
+      CORE_API_INTERNAL_TOKEN: ${CORE_API_INTERNAL_TOKEN}
+      # Nightly full-chain verification (DEV-40). CHAIN_VERIFY_TIME is HH:MM in LAB_TIMEZONE, not
+      # the container's ambient TZ (UTC on the alpine image); the service resolves the zone via
+      # ICU, so no tzdata package is needed. Default 02:30 stays clear of db-backup's 02:00.
+      CHAIN_VERIFY_TIME: ${CHAIN_VERIFY_TIME:-02:30}
+      LAB_TIMEZONE: ${LAB_TIMEZONE:-America/Edmonton}
     depends_on:
       postgres:
         condition: service_healthy
@@ -280,6 +358,9 @@ services:
       args:
         NEXT_PUBLIC_AZURE_TENANT_ID: ${ENTRA_TENANT_ID}
         NEXT_PUBLIC_AZURE_CLIENT_ID: ${ENTRA_CLIENT_ID}
+        # The dashboard's own origin (DEV-116), so a signed-in supervisor can follow the PWA
+        # home screen's "Dashboard" link out to the separate apps/dashboard app.
+        NEXT_PUBLIC_DASHBOARD_URL: ${DASHBOARD_URL}
         # Baked into routes-manifest.json by next.config rewrites(), so it is a build arg, not a
         # runtime variable. In Compose the browser reaches Caddy directly and this rewrite carries
         # no traffic; it points at the gateway anyway, never at a service (ADR 0020).

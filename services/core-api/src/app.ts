@@ -15,6 +15,10 @@ import { getChecklistTemplateByIdRoute } from './routes/checklists/get-by-id.js'
 import { listChecklistTemplatesRoute } from './routes/checklists/list.js';
 import { diffChecklistTemplatesRoute } from './routes/checklists/diff.js';
 import { submitInspectionRoute } from './routes/inspections/submit.js';
+import { listInspectionsRoute } from './routes/inspections/list.js';
+import { activityFeedRoute } from './routes/activity/feed.js';
+import { dismissNotificationsRoute } from './routes/activity/dismiss.js';
+import { getInspectionByIdRoute } from './routes/inspections/get-by-id.js';
 import { listDefectsRoute } from './routes/defects/list.js';
 import { getDefectByIdRoute } from './routes/defects/get-by-id.js';
 import { acknowledgeDefectRoute } from './routes/defects/acknowledge.js';
@@ -22,6 +26,7 @@ import { startRepairDefectRoute } from './routes/defects/start-repair.js';
 import { resolveDefectRoute } from './routes/defects/resolve.js';
 import { rejectDefectRoute } from './routes/defects/reject.js';
 import { transcribeRoute } from './routes/ai/transcribe.js';
+import { reportsDataRoute } from './routes/internal/reports-data.js';
 
 export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   const app = Fastify({ loggerInstance: logger });
@@ -111,6 +116,13 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   await app.register(getChecklistTemplateByIdRoute, { prefix: '/api/v1' });
   await app.register(diffChecklistTemplatesRoute, { prefix: '/api/v1' });
   await app.register(submitInspectionRoute, { prefix: '/api/v1' });
+  // Inspection list is registered before the /inspections/:id parameter route; Fastify's radix
+  // router handles the static-vs-parameter ordering, so registration order is not load-bearing.
+  await app.register(listInspectionsRoute, { prefix: '/api/v1' });
+  await app.register(getInspectionByIdRoute, { prefix: '/api/v1' });
+  // The dashboard's change signal, polled every couple of seconds per open dashboard (ADR 0026).
+  await app.register(activityFeedRoute, { prefix: '/api/v1' });
+  await app.register(dismissNotificationsRoute, { prefix: '/api/v1' });
   // Defect list is registered before the /defects/:id parameter route; Fastify's radix router
   // handles the static-vs-parameter ordering, so registration order is not load-bearing here.
   await app.register(listDefectsRoute, { prefix: '/api/v1' });
@@ -122,6 +134,9 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
   // Transcription is proxied, not implemented here: core-api authenticates the operator and passes
   // the clip to the AI Service, which is not reachable from the browser (ADR 0019).
   await app.register(transcribeRoute, { prefix: '/api/v1' });
+  // Internal only (DEV-38): no /api/v1 prefix, never reachable through the Caddy gateway. The
+  // Audit Service's report generator is the sole caller; see requireInternalReportsToken.
+  await app.register(reportsDataRoute);
 
   return app;
 };

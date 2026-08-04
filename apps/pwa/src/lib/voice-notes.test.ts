@@ -3,18 +3,18 @@ import {
   applyTextEdit,
   applyTranscript,
   clipFilename,
-  emptyFailureEntry,
+  emptyItemNote,
   formatElapsed,
   parseTranscript,
   transcriptionErrorMessage,
-  type FailureEntry,
+  type ItemNote,
 } from './voice-notes';
 
-const typed = (notes: string): FailureEntry => ({ ...emptyFailureEntry(), notes });
+const typed = (notes: string): ItemNote => ({ ...emptyItemNote(), notes });
 
 describe('applyTranscript', () => {
   it('takes the transcript as the whole note when the field is empty', () => {
-    const next = applyTranscript(emptyFailureEntry(), 'hydraulic leak on the mast');
+    const next = applyTranscript(emptyItemNote(), 'hydraulic leak on the mast');
 
     expect(next.notes).toBe('hydraulic leak on the mast');
     expect(next.notesSource).toBe('VOICE_TRANSCRIBED');
@@ -46,19 +46,19 @@ describe('applyTranscript', () => {
   });
 
   it('does not mark a note VOICE_TRANSCRIBED when nothing was transcribed', () => {
-    expect(applyTranscript(emptyFailureEntry(), '').notesSource).toBe('TYPED');
+    expect(applyTranscript(emptyItemNote(), '').notesSource).toBe('TYPED');
   });
 });
 
 describe('applyTextEdit', () => {
   it('keeps a hand-typed note TYPED', () => {
-    const next = applyTextEdit(emptyFailureEntry(), 'chain guard missing');
+    const next = applyTextEdit(emptyItemNote(), 'chain guard missing');
 
     expect(next.notesSource).toBe('TYPED');
   });
 
   it('marks an edited transcript VOICE_EDITED', () => {
-    const transcribed = applyTranscript(emptyFailureEntry(), 'hydraulic leak');
+    const transcribed = applyTranscript(emptyItemNote(), 'hydraulic leak');
     const next = applyTextEdit(transcribed, 'hydraulic leak at the base of the mast');
 
     expect(next.notesSource).toBe('VOICE_EDITED');
@@ -67,7 +67,7 @@ describe('applyTextEdit', () => {
   it('restores VOICE_TRANSCRIBED when an edit is undone back to the machine output', () => {
     // Deliberate: notesSource describes the stored text, and this text is the untouched machine
     // output. The audit trail should not claim a human wrote words the model produced.
-    const transcribed = applyTranscript(emptyFailureEntry(), 'hydraulic leak');
+    const transcribed = applyTranscript(emptyItemNote(), 'hydraulic leak');
     const edited = applyTextEdit(transcribed, 'hydraulic leak at the base');
     const undone = applyTextEdit(edited, 'hydraulic leak');
 
@@ -77,7 +77,7 @@ describe('applyTextEdit', () => {
 
   it('marks a cleared transcript VOICE_EDITED, not TYPED', () => {
     // The operator deleted machine output. That is an edit of a transcript, not a fresh typed note.
-    const transcribed = applyTranscript(emptyFailureEntry(), 'hydraulic leak');
+    const transcribed = applyTranscript(emptyItemNote(), 'hydraulic leak');
 
     expect(applyTextEdit(transcribed, '').notesSource).toBe('VOICE_EDITED');
   });

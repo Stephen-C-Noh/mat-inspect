@@ -2,8 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useMsal } from '@azure/msal-react';
+import { hasAllowedRole } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
+import { DASHBOARD_LINK_ROLES } from '@/lib/auth';
 import { useEquipmentList } from '../hooks/use-equipment';
+import { useMyInspections } from '@/hooks/use-my-inspections';
+import { RESULT_DISPLAY, formatInspectionDate } from '@/lib/inspection-display';
 import {
   Search,
   ChevronRight,
@@ -31,9 +36,21 @@ function EquipmentIcon({ name }: { name: string }) {
 }
 
 function LandingPageContent() {
+  const { accounts } = useMsal();
   const { data: equipmentList, isLoading } = useEquipmentList();
+  const { data: recentInspections } = useMyInspections({ limit: 3 });
   const [searchTerm, setSearchTerm] = useState('');
   const [showAll, setShowAll] = useState(false);
+
+  // Operators have no manager dashboard to go to; supervisors (and, in principle, manager/admin,
+  // though those roles never reach the PWA per its own ALLOWED_ROLES) do.
+  const canSeeDashboard = hasAllowedRole(accounts[0] ?? null, DASHBOARD_LINK_ROLES);
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
+
+  const equipmentById = useMemo(
+    () => new Map((equipmentList ?? []).map((e) => [e.id, e])),
+    [equipmentList],
+  );
 
   const filteredAndSorted = useMemo(() => {
     if (!equipmentList) return [];
@@ -81,9 +98,47 @@ function LandingPageContent() {
           />
         </div>
 
+        {recentInspections && recentInspections.length > 0 && (
+          <div className="bg-card rounded-sm shadow-card border border-border overflow-hidden">
+            <div className="p-4 border-b border-border flex justify-between items-center">
+              <h3 className="font-semibold text-muted-foreground text-sm">RECENTLY INSPECTED</h3>
+              <Link href="/history" className="text-sm font-bold text-accent hover:text-accent/80">
+                View All
+              </Link>
+            </div>
+            <div className="divide-y divide-border">
+              {recentInspections.map((inspection) => {
+                const equipment = equipmentById.get(inspection.equipmentId);
+                const display = RESULT_DISPLAY[inspection.result];
+                return (
+                  <Link
+                    key={inspection.id}
+                    href={`/history/${inspection.id}`}
+                    className="p-4 flex items-center justify-between gap-3 hover:bg-muted transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <h4 className="truncate font-bold text-base text-foreground">
+                        {equipment?.name ?? 'Equipment'}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        {formatInspectionDate(inspection.submittedAt)}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-sm px-2 py-0.5 text-xs font-bold ${display.badgeClass}`}
+                    >
+                      {display.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="bg-card rounded-sm shadow-card border border-border overflow-hidden">
           <div className="p-4 border-b border-border flex justify-between items-center">
-            <h3 className="font-semibold text-muted-foreground text-sm">RECENTLY INSPECTED</h3>
+            <h3 className="font-semibold text-muted-foreground text-sm">SELECT EQUIPMENT</h3>
             {filteredAndSorted.length > 3 && (
               <button
                 onClick={() => setShowAll(!showAll)}
@@ -138,8 +193,15 @@ function LandingPageContent() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <NavButton icon={LayoutDashboard} label="Dashboard" href="/" />
-          <NavButton icon={History} label="History" href="/" />
+          {canSeeDashboard && dashboardUrl && (
+            <a
+              href={dashboardUrl}
+              className="flex items-center justify-center gap-2 bg-card py-4 rounded-sm border border-border shadow-card transition-all font-semibold text-sm text-foreground"
+            >
+              <LayoutDashboard className="size-5 text-accent" /> Dashboard
+            </a>
+          )}
+          <NavButton icon={History} label="History" href="/history" />
           <NavButton icon={Settings} label="Settings" href="/settings" />
           <NavButton icon={HelpCircle} label="Help Center" href="/help" />
         </div>

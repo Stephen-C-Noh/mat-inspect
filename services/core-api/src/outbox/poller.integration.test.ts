@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -70,7 +70,11 @@ describe('outbox poller', () => {
     await container.stop();
   });
 
-  const insertOutboxRow = async (operatorId = randomUUID(), inspectionId = randomUUID()) => {
+  const insertOutboxRow = async (
+    operatorId = randomUUID(),
+    inspectionId = randomUUID(),
+    createdAt?: Date,
+  ) => {
     const { db, outbox } = await import('../db/index.js');
     const [row] = await db
       .insert(outbox)
@@ -83,6 +87,7 @@ describe('outbox poller', () => {
           result: 'PASS',
           contentHash: 'a'.repeat(64),
         },
+        ...(createdAt && { createdAt }),
       })
       .returning();
     return row!;
@@ -114,6 +119,38 @@ describe('outbox poller', () => {
     expect(updated?.processedAt).toBeNull();
   });
 
+  it('logs a warn when the oldest unprocessed row exceeds the lag threshold', async () => {
+    // try/finally: if an assertion throws mid-test, OUTBOX_LAG_WARN_MS must still be cleared,
+    // or it leaks into every later test in this file (all of which use the real, unset default).
+    try {
+      stubStatusCode = 503; // leave the row unprocessed so lag is observable
+      process.env['OUTBOX_LAG_WARN_MS'] = '1000';
+      const { resetConfigForTest } = await import('../lib/config.js');
+      resetConfigForTest();
+
+      // Backdate createdAt deterministically rather than relying on real-time drift during the
+      // test (which could be a few ms either side of any threshold and flake).
+      await insertOutboxRow(undefined, undefined, new Date(Date.now() - 60_000));
+
+      const { logger } = await import('../lib/logger.js');
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      const { runOutboxPollTick } = await import('./poller.js');
+      await runOutboxPollTick();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ oldestLagMs: expect.any(Number) }),
+        'outbox backlog exceeds lag threshold',
+      );
+
+      warnSpy.mockRestore();
+    } finally {
+      delete process.env['OUTBOX_LAG_WARN_MS'];
+      const { resetConfigForTest } = await import('../lib/config.js');
+      resetConfigForTest();
+    }
+  });
+
   it('sends the correct payload to the audit stub', async () => {
     stubStatusCode = 200;
     const operatorId = randomUUID();
@@ -129,5 +166,78 @@ describe('outbox poller', () => {
     expect(body['resourceType']).toBe('INSPECTION');
     expect(body['resourceId']).toBe(inspectionId);
     expect(typeof body['sourceEventId']).toBe('string');
+  });
+
+  // DEV-142: return-to-service.ts's payload has approvedBy + equipmentId, no operatorId or
+  // inspectionId. buildIngestBody's INSPECTION_SUBMITTED-shaped defaults sent both as undefined,
+  // which the Audit Service's ingest schema rejects with 400 (non-optional uuidSchema on both
+  // actorId and resourceId), so these rows retried forever and never reached audit_events.
+  it('maps EQUIPMENT_STATUS_CHANGED/RETURN_TO_SERVICE to approvedBy + equipmentId', async () => {
+    stubStatusCode = 200;
+    const { db, outbox } = await import('../db/index.js');
+    const approvedBy = randomUUID();
+    const equipmentId = randomUUID();
+    const [row] = await db
+      .insert(outbox)
+      .values({
+        eventType: 'EQUIPMENT_STATUS_CHANGED',
+        payload: {
+          equipmentId,
+          from: 'OUT_OF_SERVICE',
+          to: 'AWAITING_INSPECTION',
+          reason: 'RETURN_TO_SERVICE',
+          approvedBy,
+          defectId: randomUUID(),
+        },
+      })
+      .returning();
+
+    const { runOutboxPollTick } = await import('./poller.js');
+    await runOutboxPollTick();
+
+    const body = lastRequestBody as Record<string, unknown>;
+    expect(body['action']).toBe('EQUIPMENT_STATUS_CHANGED');
+    expect(body['actorId']).toBe(approvedBy);
+    expect(body['resourceType']).toBe('EQUIPMENT');
+    expect(body['resourceId']).toBe(equipmentId);
+
+    const { eq } = await import('drizzle-orm');
+    const [updated] = await db.select().from(outbox).where(eq(outbox.id, row!.id));
+    expect(updated?.processedAt).toBeTruthy();
+  });
+
+  // DEV-142: defects/resolve.ts's payload uses resolvedBy, not operatorId, for the actor. Same
+  // failure mode as RETURN_TO_SERVICE above, confirmed against 3 permanently-stuck rows in the
+  // dev-stack DB.
+  it('maps DEFECT_RESOLVED to resolvedBy', async () => {
+    stubStatusCode = 200;
+    const { db, outbox } = await import('../db/index.js');
+    const resolvedBy = randomUUID();
+    const inspectionId = randomUUID();
+    const [row] = await db
+      .insert(outbox)
+      .values({
+        eventType: 'DEFECT_RESOLVED',
+        payload: {
+          defectId: randomUUID(),
+          equipmentId: randomUUID(),
+          inspectionId,
+          resolvedBy,
+        },
+      })
+      .returning();
+
+    const { runOutboxPollTick } = await import('./poller.js');
+    await runOutboxPollTick();
+
+    const body = lastRequestBody as Record<string, unknown>;
+    expect(body['action']).toBe('DEFECT_RESOLVED');
+    expect(body['actorId']).toBe(resolvedBy);
+    expect(body['resourceType']).toBe('INSPECTION');
+    expect(body['resourceId']).toBe(inspectionId);
+
+    const { eq } = await import('drizzle-orm');
+    const [updated] = await db.select().from(outbox).where(eq(outbox.id, row!.id));
+    expect(updated?.processedAt).toBeTruthy();
   });
 });

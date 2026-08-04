@@ -108,8 +108,8 @@ function LockoutContent() {
 
       {/* Footer warning */}
       <p className="text-center text-[11px] font-semibold text-muted-foreground mt-4 max-w-xs px-4">
-        This device has failed required safety limits. Navigation is restricted. A supervisor key or
-        clearance log is required to reset this layout.
+        This equipment failed a required safety inspection and is locked out. A supervisor must
+        resolve the defect and approve return-to-service before it can be inspected again.
       </p>
     </main>
   );

@@ -122,6 +122,18 @@ describe('POST /api/v1/events', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  // payloadSummary is a jsonb hash-input column; a number could hash differently on append than
+  // on verify (jsonb round-trip), so the schema rejects numbers at the edge. Callers stringify.
+  it('returns 400 when a payloadSummary value is a number', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/events',
+      headers: { authorization: `Bearer ${INGEST_TOKEN}` },
+      payload: makeBody({ payloadSummary: { inspectionId: RESOURCE_ID, attempt: 2 } }),
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('/health is accessible without auth', async () => {
     const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(200);

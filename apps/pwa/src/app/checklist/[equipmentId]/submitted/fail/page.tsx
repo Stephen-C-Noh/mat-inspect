@@ -3,39 +3,19 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, type ReactElement } from 'react';
-import {
-  CheckCircle,
-  Home,
-  History,
-  RotateCcw,
-  Forklift,
-  AlertTriangle,
-  ImageIcon,
-} from 'lucide-react';
+import { CheckCircle, Home, History, RotateCcw, Forklift, AlertTriangle } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
-
-const MOCK_FAILURES = [
-  {
-    id: '1',
-    question: 'Tire Condition & Pressure?',
-    description:
-      '"Flat tire observed on forklift. Tire has low/no air pressure and requires repair or replacement before safe operation"',
-  },
-  {
-    id: '2',
-    question: 'Brake Functionality?',
-    description: '"Breaks do not work as intended"',
-  },
-];
+import { EvidencePhoto } from '@/components/checklist/evidence-photo';
+import { useInspectionDraft, type SubmittedFailure } from '@/components/inspection-draft-provider';
 
 function FailureCard({
   failure,
   index,
   total,
 }: {
-  failure: (typeof MOCK_FAILURES)[0];
+  failure: SubmittedFailure;
   index: number;
   total: number;
 }): ReactElement {
@@ -45,23 +25,23 @@ function FailureCard({
         <p className="mb-1 text-xs font-bold text-warning">
           Failure {index + 1} of {total}
         </p>
-        <h3 className="text-base font-extrabold text-foreground">{failure.question}</h3>
+        <h3 className="text-base font-extrabold text-foreground">{failure.prompt}</h3>
 
         <div className="mt-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Evidence Photo
           </p>
-          <div className="flex h-36 items-center justify-center rounded-sm bg-muted">
-            <ImageIcon className="size-8 text-muted-foreground" />
-          </div>
+          <EvidencePhoto photoId={failure.photoId} />
         </div>
 
-        <div className="mt-3">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Description of Failure
-          </p>
-          <p className="text-sm italic text-muted-foreground">{failure.description}</p>
-        </div>
+        {failure.notes.trim().length > 0 && (
+          <div className="mt-3">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Description of Failure
+            </p>
+            <p className="text-sm italic text-muted-foreground">{failure.notes}</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -71,6 +51,12 @@ function SubmittedFailContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const { accounts } = useMsal();
   const { data: equipmentList } = useEquipmentList();
+  const { result } = useInspectionDraft();
+
+  // Real submission data from the POST, present when this screen follows a fresh submit. Absent on
+  // a direct navigation or hard refresh, in which case the reference and failure cards are hidden.
+  const submission = result?.equipmentId === params.equipmentId ? result : null;
+  const failures = submission?.failures ?? [];
 
   const equipment = useMemo(
     () => equipmentList?.find((e) => e.id === params.equipmentId),
@@ -101,7 +87,7 @@ function SubmittedFailContent(): ReactElement {
           </h1>
           <span className="flex items-center gap-1.5 rounded-full bg-warning px-4 py-1.5 text-xs font-bold text-warning-foreground">
             <AlertTriangle className="size-3.5" />
-            CHAIR HOLDERS NOTIFIED
+            SUPERVISOR NOTIFIED
           </span>
         </div>
 
@@ -135,8 +121,8 @@ function SubmittedFailContent(): ReactElement {
         </div>
 
         {/* Failure cards */}
-        {MOCK_FAILURES.map((f, i) => (
-          <FailureCard key={f.id} failure={f} index={i} total={MOCK_FAILURES.length} />
+        {failures.map((f, i) => (
+          <FailureCard key={i} failure={f} index={i} total={failures.length} />
         ))}
 
         {/* Actions */}
@@ -151,7 +137,7 @@ function SubmittedFailContent(): ReactElement {
             </button>
           </Link>
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/" className="block">
+            <Link href="/history" className="block">
               <button
                 type="button"
                 className="flex w-full items-center justify-center gap-1.5 rounded-sm border border-border bg-card py-3.5 text-sm font-semibold text-foreground"
@@ -172,9 +158,11 @@ function SubmittedFailContent(): ReactElement {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Submission reference #777-TX-2025
-        </p>
+        {submission && (
+          <p className="text-center text-xs text-muted-foreground">
+            Submission reference {submission.inspectionId}
+          </p>
+        )}
       </div>
     </main>
   );

@@ -16,7 +16,7 @@ import { config } from '../../lib/config.js';
 import { httpError } from '../../lib/http-error.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { requestDigest } from '../../lib/request-digest.js';
-import { computeInspectionContentHash } from '../../lib/content-hash.js';
+import { computeInspectionContentHash } from '@mat-inspect/shared-crypto';
 import { logger } from '../../lib/logger.js';
 import { requireRole } from '../../middleware/auth.js';
 import { deriveInspectionResult } from './derive-result.js';
@@ -188,6 +188,10 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
             passed: response.passed,
             notes: response.notes ?? null,
             notesSource: response.notesSource ?? null,
+            // Sealed into the content hash and stored on the immutable row (ADR 0023). Order is
+            // the operator's capture order and is preserved through the uuid[] column, so a later
+            // verifier reconstructs the same bytes.
+            photoIds: response.photoIds,
           }));
 
           if (normalizedResponses.length > 0) {

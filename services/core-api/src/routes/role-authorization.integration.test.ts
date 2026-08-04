@@ -27,6 +27,12 @@ const USER_IDS: Record<UserRole, string> = {
   supervisor: '55555555-5555-5555-5555-555555555555',
   manager: '66666666-6666-6666-6666-666666666666',
   admin: '33333333-3333-3333-3333-333333333333',
+  // Added for DEV-38 / ADR 0021: read-only, never inherited by manager or admin. GET /equipment
+  // gained auditor (DEV-113: the dashboard's read-only Audit page needs it for its equipment
+  // filter); GET /checklists/active and POST /checklists did not, since nothing in DEV-113's
+  // scope reads checklist templates - the point of including auditor in every case here is to
+  // confirm each route's access matches what it actually needs, not a blanket allow or deny.
+  auditor: '77777777-7777-7777-7777-777777777777',
 };
 
 const ALL_ROLES = Object.keys(USER_IDS) as UserRole[];
@@ -125,7 +131,10 @@ describe('role-to-permission authorization matrix', () => {
     }
   });
 
-  // GET /api/v1/equipment is operator-only (requireRole('operator')).
+  // GET /api/v1/equipment allows the original four App Roles (DEV-36 widened it from
+  // operator-only so the dashboard's Failure Queue can join equipment names/locations onto
+  // defects), plus auditor (DEV-113: the dashboard's read-only Audit page needs the equipment
+  // list for its History tab's filter). Every seeded role reaches 200 here.
   it.each(ALL_ROLES)('GET /equipment: %s', async (role) => {
     const res = await app.inject({
       method: 'GET',
@@ -133,22 +142,26 @@ describe('role-to-permission authorization matrix', () => {
       headers: { authorization: `Bearer ${tokens[role]}` },
     });
 
-    if (role === 'operator') {
-      expect(res.statusCode).toBe(200);
-    } else {
-      expect(res.statusCode).toBe(403);
-      expect(res.json().title).toBe('FORBIDDEN');
-    }
+    expect(res.statusCode).toBe(200);
   });
 
-  // GET /api/v1/checklists/active accepts all four App Roles.
-  it.each(ALL_ROLES)('GET /checklists/active allows %s', async (role) => {
+  // GET /api/v1/checklists/active accepts the original four App Roles (requireRole('operator',
+  // 'supervisor', 'manager', 'admin')). auditor is deliberately not one of them - it is scoped to
+  // the Audit Service's export routes only (ADR 0021) - so this asserts 403 for it, same as the
+  // non-matching branch on the other routes above, rather than the old "always 200" blanket check
+  // that predates the role existing.
+  it.each(ALL_ROLES)('GET /checklists/active: %s', async (role) => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/checklists/active?type=FORKLIFT',
       headers: { authorization: `Bearer ${tokens[role]}` },
     });
 
-    expect(res.statusCode).toBe(200);
+    if (role === 'auditor') {
+      expect(res.statusCode).toBe(403);
+      expect(res.json().title).toBe('FORBIDDEN');
+    } else {
+      expect(res.statusCode).toBe(200);
+    }
   });
 });

@@ -9,9 +9,11 @@ export const auditActionEnum = pgEnum('audit_action', [
 
 // Append-only hash chain (ADR 0008; ARCHITECTURE.md 8.4). Only the Audit Service has INSERT on
 // this table (audit_writer role, INSERT+SELECT only; see infra/docker/postgres-init.sh); UPDATE
-// and DELETE are never granted, so there is no defense-in-depth trigger to add here the way
-// inspections/inspection_responses needed one (those tables are owned by a role that could
-// otherwise UPDATE them).
+// and DELETE are never granted at the role level. Migration 0001 adds a defense-in-depth
+// BEFORE UPDATE/DELETE trigger on top of that (same pattern as
+// db/migrations/0004_inspection_immutability_triggers.sql), plus a format-only CHECK constraint
+// on prev_hash/this_hash (DEV-40; the full hash-recomputing CHECK from ARCHITECTURE.md 8.4 rule 6
+// remains deferred, see that rule's implementation note).
 //
 // Three identity-shaped columns, not one, because the conceptual "id (uuid, monotonic)" from
 // ARCHITECTURE.md's data model can't actually be a single column: the redelivery dedup key is
@@ -32,9 +34,10 @@ export const auditEvents = pgTable('audit_events', {
   action: auditActionEnum('action').notNull(),
   resourceType: text('resource_type').notNull(),
   resourceId: uuid('resource_id').notNull(),
-  // Flat scalar values only (string | number | boolean | null), enforced by
-  // auditEventIngestSchema: a hash is not PII (ADR 0008), so this carries ids, enums, and
-  // digests, never free text.
+  // Flat scalar values only (string | boolean | null), enforced by auditEventIngestSchema: a
+  // hash is not PII (ADR 0008), so this carries ids, enums, and digests, never free text. Numbers
+  // are excluded: this column is part of the hash input, and jsonb numeric normalization would
+  // make verifyChain's recomputed hash diverge from the stored one (see auditEventIngestSchema).
   payloadSummary: jsonb('payload_summary').notNull(),
   // Ops/debug only; excluded from the hash input (rule 3 enumerates the input fields exactly,
   // and created_at is not one of them).

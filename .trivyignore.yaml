@@ -2,20 +2,42 @@
 # min-release-age=7 in .npmrc, so an advisory whose only fix is younger than 7 days cannot
 # be installed yet and blocks CI with no way to fix it. Each entry carries expired_at; once
 # the fix ages past the cooldown Trivy re-surfaces the finding until the fix is applied.
-# Keep these in sync with scripts/audit-allowlist.json. Tracked in DEV-102.
+# Keep these in sync with scripts/audit-allowlist.json, but not by copying the dates. The two
+# gates read their boundary differently: audit-gate.mjs compares with `today > expires`, so the
+# expiry day is still tolerated, while Trivy drops an entry from 00:00Z of expired_at. A date that
+# is identical in both files therefore fails Trivy one day earlier. To make both gates turn red on
+# the same day, expired_at here must be one day past the matching `expires` in audit-allowlist.json.
+#
+# Set expired_at from the cooldown release timestamp, not from the publish date plus seven days.
+# min-release-age is evaluated against the publish time, so a fix published late in the day on
+# 2026-07-21 is not installable until late on 2026-07-28. Rounding that down to a whole day is what
+# left CI red and unfixable for ~17 hours on 2026-07-28 (see DEV-132).
+#
+# The DEV-102 batch (2026-07-29) applied real overrides for every advisory previously listed here
+# except the brace-expansion 5.x line, which does not appear in Trivy's image scans at all: that
+# path (@typescript-eslint/typescript-estree's minimatch@10.2.5) is a devDependency, not present in
+# any built image, so it is tracked only in scripts/audit-allowlist.json (the npm audit gate, which
+# scans the whole install tree including devDependencies).
+#
+# Tracked in DEV-102.
 vulnerabilities:
-  - id: CVE-2026-59892
-    expired_at: 2026-07-29
-    statement: '@opentelemetry/propagator-jaeger 2.9.0 fix published 2026-07-21; blocked by min-release-age until ~2026-07-28. Transitive via @azure/monitor-opentelemetry; JaegerPropagator is not used (W3C TraceContext).'
-  - id: CVE-2026-13676
-    expired_at: 2026-07-27
-    statement: 'fast-uri fix (3.1.3/3.1.4) published 2026-07-19; blocked by min-release-age until ~2026-07-26. Transitive via fastify/ajv.'
-  - id: CVE-2026-16221
-    expired_at: 2026-07-27
-    statement: 'fast-uri 3.1.4 fix published 2026-07-19; blocked by min-release-age until ~2026-07-26. Transitive via fastify/ajv.'
-  - id: GHSA-8r6m-32jq-jx6q
-    expired_at: 2026-07-24
-    statement: 'fast-xml-parser 5.10.1 fix published 2026-07-16; blocked by min-release-age until ~2026-07-23. Transitive via the @azure SDKs.'
-  - id: GHSA-f88m-g3jw-g9cj
-    expired_at: 2026-07-29
-    statement: 'sharp 0.35.0 fix is published but next 15.5.19 cannot resolve its 0.35.x binaries cleanly under min-release-age. Transitive via next image optimization (dashboard).'
+  # fast-uri (ajv dependency) in the core-api, media, and audit images. Fix is 3.1.5, published
+  # 2026-07-31; blocked by min-release-age until 2026-08-07 (see scripts/audit-allowlist.json
+  # GHSA-7p8r-x3mc-p8w7, expires 2026-08-07 there; one day later here per the note above).
+  - id: CVE-2026-18446
+    expired_at: 2026-08-08
+    statement: 'fast-uri 3.1.5 fix (host confusion via backslash authority introducer). Cooldown-blocked; mirrors scripts/audit-allowlist.json GHSA-7p8r-x3mc-p8w7.'
+  # starlette CVEs in the AI image (fastapi 0.111.0 pulls starlette 0.37.2). Clearing them needs
+  # starlette >= 1.3.1, a fastapi 0.111 -> ~0.140 major jump that also re-ports the FOIP multipart
+  # disk-spool guard (max_file_size -> spool_max_size, plus the new 1 MB max_part_size cap). Tracked
+  # as DEV-118. Accepted meanwhile: the AI Service has no unauthenticated browser path and is reached
+  # only by core-api over the internal network (ADR 0020). Expiry set past sprint 5 for the upgrade.
+  - id: CVE-2024-47874
+    expired_at: 2026-08-22
+    statement: 'starlette 0.40.0 fix (DoS via multipart). AI image only; internal-only service (ADR 0020). Upgrade tracked in DEV-118.'
+  - id: CVE-2026-48818
+    expired_at: 2026-08-22
+    statement: 'starlette 1.1.0 fix (SSRF and NTLM credential theft via UNC). AI image only; internal-only service (ADR 0020). Upgrade tracked in DEV-118.'
+  - id: CVE-2026-54283
+    expired_at: 2026-08-22
+    statement: 'starlette 1.3.1 fix (request.form limits silently ignored). AI image only; internal-only service (ADR 0020). Upgrade tracked in DEV-118.'

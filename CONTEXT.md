@@ -103,3 +103,14 @@ chained event, not by storing the answers in the log. The log holds no PII.
 
 A problem found during an Inspection. Has a severity. A blocking Defect forces the
 Equipment to Out of Service and requires Supervisor return-to-service approval.
+
+## Photo Evidence
+
+An image the Operator captures as evidence against one checklist item, for example a
+photo of the failed part. It belongs to the individual Inspection answer, not to the
+Inspection as a whole and not to the Defect: a warning-severity photo item opens no
+Defect, and several blocking failures collapse into one aggregate Defect, so neither
+the Inspection nor the Defect can hold per-item evidence faithfully. The bytes live on
+SAIT-controlled storage (the same FOIP boundary as voice clips); the Inspection answer
+holds only a reference to them. The reference is part of what the Audit Chain seals, so
+a swapped or removed photo reference is tamper-evident like any other answer content.

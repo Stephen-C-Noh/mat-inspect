@@ -7,12 +7,18 @@
 # the clip on the internal network (ADR 0019). Do not add a route to ai:8000. The audio it accepts is
 # biometric PII under FOIP and the service has no gate of its own.
 #
-# audit has no route either. It registers only the internal ingest route today; the report routes
-# (DEV-38) get their rule when they exist and carry requireRole.
+# audit's report routes (DEV-38) carry requireRole (ADR 0020's publishing rule: a service is
+# published here once it validates Entra tokens itself), so they get their own rule, same shape as
+# @media. audit's /audit/* read endpoints are not implemented yet and get no rule until they are.
 (api) {
 	@media path /api/v1/media/*
 	handle @media {
 		reverse_proxy media:3000
+	}
+
+	@reports path /api/v1/reports/*
+	handle @reports {
+		reverse_proxy audit:3000
 	}
 
 	handle /api/v1/* {

@@ -5,18 +5,20 @@
 
 export type NotesSource = 'TYPED' | 'VOICE_TRANSCRIBED' | 'VOICE_EDITED';
 
-export type FailureEntry = {
+// One item's note, typed and/or voice-captured (DEV-134 merges the two into a single per-item
+// field; there is no longer a separate "inline note" and "defect note"). Kept independent of any
+// photo-capture state: a note's lifecycle (typed, transcribed, edited) has nothing to do with
+// whether a photo has uploaded yet.
+export type ItemNote = {
   notes: string;
-  photo: string | null;
   notesSource: NotesSource;
   // The exact machine output, when the note is still exactly that. Null once the note is a mix of
   // typed and transcribed text, which no later edit can undo.
   rawTranscript: string | null;
 };
 
-export const emptyFailureEntry = (): FailureEntry => ({
+export const emptyItemNote = (): ItemNote => ({
   notes: '',
-  photo: null,
   notesSource: 'TYPED',
   rawTranscript: null,
 });
@@ -76,7 +78,7 @@ export const transcriptionErrorMessage = (status: number | 'network' | 'micropho
 //
 // An empty or whitespace-only transcript changes nothing. Recording silence must not clear the
 // field, which is what `data.text || ''` written straight into notes used to do.
-export const applyTranscript = (prev: FailureEntry, transcript: string): FailureEntry => {
+export const applyTranscript = (prev: ItemNote, transcript: string): ItemNote => {
   const text = transcript.trim();
   if (text.length === 0) return prev;
 
@@ -99,7 +101,7 @@ export const applyTranscript = (prev: FailureEntry, transcript: string): Failure
 // deliberate: notesSource records what the stored text is, not what the operator did on the way
 // there, and the stored text really is the untouched machine output. A note that was never
 // transcribed stays TYPED no matter what is typed into it.
-export const applyTextEdit = (prev: FailureEntry, text: string): FailureEntry => {
+export const applyTextEdit = (prev: ItemNote, text: string): ItemNote => {
   if (prev.notesSource === 'TYPED') return { ...prev, notes: text };
 
   const notesSource: NotesSource =

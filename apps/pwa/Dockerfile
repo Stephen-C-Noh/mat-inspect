@@ -22,8 +22,10 @@ COPY apps/pwa apps/pwa
 # NEXT_PUBLIC_* vars are inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_AZURE_TENANT_ID
 ARG NEXT_PUBLIC_AZURE_CLIENT_ID
+ARG NEXT_PUBLIC_DASHBOARD_URL
 ENV NEXT_PUBLIC_AZURE_TENANT_ID=$NEXT_PUBLIC_AZURE_TENANT_ID
 ENV NEXT_PUBLIC_AZURE_CLIENT_ID=$NEXT_PUBLIC_AZURE_CLIENT_ID
+ENV NEXT_PUBLIC_DASHBOARD_URL=$NEXT_PUBLIC_DASHBOARD_URL
 # next.config rewrites() bakes the /api/v1 proxy destination into routes-manifest.json
 # at build time, so GATEWAY_URL must be present here, not just at runtime. The destination is the
 # gateway, never a service (ADR 0020).
@@ -33,9 +35,18 @@ RUN npm run build --workspace=@mat-inspect/pwa
 
 FROM node:${NODE_VERSION}-alpine AS runtime
 WORKDIR /app
+# Security hardening (DEV-42). apk upgrade pulls the patched OpenSSL (libssl3/libcrypto3,
+# CVE-2026-45447) from the alpine branch. Removing the bundled npm CLI clears the HIGH/CRITICAL
+# CVEs in npm's own vendored deps (tar, sigstore, brace-expansion, picomatch): the runtime only
+# runs `node`, never npm, so npm is dead weight. Not version-pinned on purpose, so each base-image
+# security bump is picked up instead of frozen at the tag's first build.
+RUN apk --no-cache upgrade \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=build /repo/apps/pwa/.next/standalone ./
 COPY --from=build /repo/apps/pwa/.next/static ./apps/pwa/.next/static
+# Next.js standalone output does not include public/ on its own; copy it separately.
+COPY --from=build /repo/apps/pwa/public ./apps/pwa/public
 ENV HOSTNAME=0.0.0.0 PORT=3000
 USER appuser
 EXPOSE 3000

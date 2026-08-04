@@ -87,28 +87,6 @@ function AccordionRow({
   );
 }
 
-function ToggleRow({
-  label,
-  sublabel,
-  checked,
-  onChange,
-}: {
-  label: string;
-  sublabel?: string;
-  checked: boolean;
-  onChange: () => void;
-}): ReactElement {
-  return (
-    <div className="flex items-center justify-between py-2">
-      <div>
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        {sublabel && <p className="text-xs text-muted-foreground">{sublabel}</p>}
-      </div>
-      <Toggle checked={checked} onChange={onChange} />
-    </div>
-  );
-}
-
 function SectionLabel({ children }: { children: string }): ReactElement {
   return (
     <p className="px-1 pb-1 pt-5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
@@ -123,8 +101,6 @@ function SettingsContent(): ReactElement {
   const account = accounts[0];
   const { isDark, toggle: toggleDark } = useTheme();
 
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [pushAlerts, setPushAlerts] = useState(false);
   const [language, setLanguage] = useState<'en' | 'fr' | 'es'>('en');
 
   const handleSignOut = async () => {
@@ -167,39 +143,25 @@ function SettingsContent(): ReactElement {
         {/* Notifications */}
         <SectionLabel>Notifications</SectionLabel>
         <div className="overflow-hidden rounded-sm border border-border bg-card shadow-card divide-y divide-border">
-          <AccordionRow
-            icon={Bell}
-            label="Inspection Alerts"
-            preview={
-              [emailAlerts && 'Email', pushAlerts && 'Push'].filter(Boolean).join(' · ') ||
-              'All off'
-            }
-          >
-            <div className="divide-y divide-border">
-              <ToggleRow
-                label="Email"
-                sublabel="Send to your SAIT inbox"
-                checked={emailAlerts}
-                onChange={() => setEmailAlerts((v) => !v)}
-              />
-              <ToggleRow
-                label="Push Notifications"
-                sublabel="Browser push (requires permission)"
-                checked={pushAlerts}
-                onChange={() => setPushAlerts((v) => !v)}
-              />
+          <AccordionRow icon={Bell} label="Inspection Alerts" preview="Auto — Email and Teams">
+            <div className="flex items-start gap-3 py-2">
+              <CheckCircle className="mt-0.5 size-4 shrink-0 text-accent" />
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Sent automatically by email and to the equipment's Teams channel. This is configured
+                for the whole site, not per person.
+              </p>
             </div>
           </AccordionRow>
 
           <AccordionRow
             icon={AlertTriangle}
             label="Failure Notifications"
-            preview="Auto — submitted to chair holder"
+            preview="Auto — submitted to supervisor"
           >
             <div className="flex items-start gap-3 py-2">
               <CheckCircle className="mt-0.5 size-4 shrink-0 text-accent" />
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Failed inspections are automatically submitted to the chair holder. No additional
+                Failed inspections are automatically submitted to the supervisor. No additional
                 configuration required.
               </p>
             </div>

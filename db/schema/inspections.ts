@@ -57,6 +57,10 @@ export const inspections = pgTable(
       table.result,
       table.submittedAt,
     ),
+    // Supports the dashboard activity feed: WHERE submitted_at > ? ORDER BY submitted_at DESC,
+    // fleet-wide with no equipment filter, so the index above (which leads with equipment_id)
+    // does not serve it. Every open dashboard runs this query every couple of seconds (ADR 0026).
+    index('inspections_submitted_at_idx').on(table.submittedAt),
   ],
 );
 
@@ -71,4 +75,8 @@ export const inspectionResponses = pgTable('inspection_responses', {
   passed: boolean('passed').notNull(),
   notes: text('notes'),
   notesSource: notesSourceEnum('notes_source'),
+  // Per-response references to Media blobs (photo evidence for this checklist item; ADR 0023).
+  // Set once at INSERT; the UPDATE/DELETE-blocking trigger above keeps them immutable. Sealed
+  // into the inspection content hash, so a swapped or removed reference is tamper-evident.
+  photoIds: uuid('photo_ids').array().notNull().default([]),
 });

@@ -9,6 +9,7 @@ import type { UserRole } from '@mat-inspect/shared-types';
 export type AuthUser = {
   id: string; // Entra ID oid claim (stable object ID)
   email: string; // upn or preferred_username
+  name: string; // name claim (human display name); '' when the token omits it
   roles: UserRole[];
   tenantId: string; // tid claim
 };
@@ -106,6 +107,10 @@ export const createEntraAuth = ({ httpError, logger }: EntraAuthDeps): EntraAuth
     req.user = {
       id: oid,
       email: String(payload['upn'] ?? payload['preferred_username'] ?? ''),
+      // `name` is an optional Entra claim (must be enabled on the app registration). When present
+      // it is the human display name; core-api records it into the users shadow table so an
+      // inspection identifies the operator by name, not by an email or an oid (OHS s.257).
+      name: String(payload['name'] ?? ''),
       roles: Array.isArray(payload['roles']) ? (payload['roles'] as UserRole[]) : [],
       tenantId: String(payload['tid'] ?? ''),
     };

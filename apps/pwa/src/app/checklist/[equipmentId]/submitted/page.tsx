@@ -7,11 +7,17 @@ import { CheckCircle, Home, History, RotateCcw, Forklift } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
+import { useInspectionDraft } from '@/components/inspection-draft-provider';
 
 function SubmittedContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const { accounts } = useMsal();
   const { data: equipmentList } = useEquipmentList();
+  const { result } = useInspectionDraft();
+
+  // The submission reference is the real inspection id returned by core-api. It is absent only if
+  // this screen is reached without a fresh submit (e.g. a direct navigation or a hard refresh).
+  const reference = result?.equipmentId === params.equipmentId ? result.inspectionId : null;
 
   const equipment = useMemo(
     () => equipmentList?.find((e) => e.id === params.equipmentId),
@@ -87,7 +93,7 @@ function SubmittedContent(): ReactElement {
             </button>
           </Link>
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/" className="block">
+            <Link href="/history" className="block">
               <button
                 type="button"
                 className="flex w-full items-center justify-center gap-1.5 rounded-sm border border-border bg-card py-3.5 text-sm font-semibold text-foreground"
@@ -108,9 +114,11 @@ function SubmittedContent(): ReactElement {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Submission reference #777-TX-2025
-        </p>
+        {reference && (
+          <p className="text-center text-xs text-muted-foreground">
+            Submission reference {reference}
+          </p>
+        )}
       </div>
     </main>
   );

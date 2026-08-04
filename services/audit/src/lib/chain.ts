@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { asc, desc, eq, lte, sql } from 'drizzle-orm';
 import { canonicalJson, sha256Hex, toCanonicalTimestamp } from '@mat-inspect/shared-crypto';
 import type { AuditAction } from '@mat-inspect/shared-schemas';
 import { db, auditEvents } from '../db/index.js';
 import { isUniqueViolation } from './db-errors.js';
+import { httpError } from './http-error.js';
 
 // Documented genesis marker for the first row's prev_hash: a string the same length as a
 // SHA-256 hex digest, chosen so the genesis row is structurally indistinguishable from any
@@ -13,6 +14,25 @@ export const GENESIS_HASH = '0'.repeat(64);
 // The Postgres advisory lock key is a fixed string hashed into a lock id; one lock per chain,
 // shared by every appendAuditEvent caller (ARCHITECTURE.md 8.4 rule 5).
 const CHAIN_LOCK_KEY = 'audit_chain_v1';
+
+// Set when a full-chain verification (nightly job) discovers a break while the service is
+// already running (ARCHITECTURE.md 8.4 rule 7: "freezes new writes until manual review").
+// Startup verification achieves the same freeze by refusing to boot at all (server.ts); this
+// covers the case where the break is found later, in a live process. In-memory by design: there
+// is no unfreeze endpoint, a restart clears it, and if the underlying corruption is still there
+// startup verification will refuse to boot again (mirrors loadConfigOrExit's fail-fast-and-restart
+// philosophy elsewhere in this service).
+let writesFrozen: { reason: string } | undefined;
+
+export const isWritesFrozen = (): { reason: string } | undefined => writesFrozen;
+
+export const freezeWrites = (reason: string): void => {
+  writesFrozen = { reason };
+};
+
+export const resetWritesFrozenForTest = (): void => {
+  writesFrozen = undefined;
+};
 
 type HashInputFields = {
   id: string;
@@ -49,7 +69,10 @@ export type AppendAuditEventInput = {
   resourceType: string;
   resourceId: string;
   occurredAt: Date;
-  payloadSummary: Record<string, string | number | boolean | null>;
+  // No numbers: payloadSummary is a jsonb hash-input column, and jsonb numeric normalization
+  // would make the append-time hash (raw JS input) diverge from the verify-time hash (value
+  // re-read from jsonb), freezing the chain on a false positive. See auditEventIngestSchema.
+  payloadSummary: Record<string, string | boolean | null>;
 };
 
 export type AppendedAuditEvent = {
@@ -76,6 +99,14 @@ const findBySourceEventId = async (
 export const appendAuditEvent = async (
   input: AppendAuditEventInput,
 ): Promise<{ deduped: boolean; event: AppendedAuditEvent }> => {
+  if (writesFrozen) {
+    throw httpError(
+      503,
+      'CHAIN_FROZEN',
+      `audit chain writes are frozen pending manual review: ${writesFrozen.reason}`,
+    );
+  }
+
   try {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${CHAIN_LOCK_KEY}))`);
@@ -141,14 +172,25 @@ export type ChainVerificationResult =
   | { ok: true; checked: number }
   | { ok: false; checked: number; brokenAtSeq: number; reason: string };
 
-// Full table walk in seq order, recomputing each row's this_hash from its stored fields and
-// checking it both matches what's stored and chains to the previous row's this_hash. Run at
-// startup (server.ts); ARCHITECTURE.md 8.4 rule 7 calls for verifying the last 1000 events on
-// startup and a nightly full-chain job. This does a full walk every time instead: the dataset is
-// capstone-scale (the AC's own integrity test targets 10,000 events, milliseconds to walk), and
-// no scheduler exists in this codebase for a separate nightly job.
-export const verifyChain = async (): Promise<ChainVerificationResult> => {
-  const rows = await db.select().from(auditEvents).orderBy(asc(auditEvents.seq));
+export type AuditEventRow = typeof auditEvents.$inferSelect;
+
+export type ChainSegmentVerification =
+  | { ok: true; checked: number; rows: AuditEventRow[] }
+  | { ok: false; checked: number; brokenAtSeq: number; reason: string; rows: AuditEventRow[] };
+
+// Genesis-to-uptoSeq walk (or the full table when uptoSeq is omitted), recomputing each row's
+// this_hash from its stored fields and checking it both matches what's stored and chains to the
+// previous row's this_hash. Shared by verifyChain (startup, full table) and the report export
+// path (DEV-38, bounded by the newest relevant event's seq): both need the same walk, and the
+// report path additionally needs the rows themselves to embed as an independently verifiable
+// segment, which a filtered-by-resource-id query could not give without breaking the
+// prevHash/thisHash linkage (unrelated interleaved events would be missing from that view).
+export const verifyChainSegment = async (uptoSeq?: number): Promise<ChainSegmentVerification> => {
+  const rows = await db
+    .select()
+    .from(auditEvents)
+    .where(uptoSeq !== undefined ? lte(auditEvents.seq, uptoSeq) : undefined)
+    .orderBy(asc(auditEvents.seq));
 
   let expectedPrevHash = GENESIS_HASH;
   for (let i = 0; i < rows.length; i += 1) {
@@ -159,6 +201,7 @@ export const verifyChain = async (): Promise<ChainVerificationResult> => {
         checked: i,
         brokenAtSeq: row.seq,
         reason: `prev_hash mismatch at seq ${row.seq}: expected ${expectedPrevHash}, found ${row.prevHash}`,
+        rows,
       };
     }
 
@@ -178,11 +221,28 @@ export const verifyChain = async (): Promise<ChainVerificationResult> => {
         checked: i,
         brokenAtSeq: row.seq,
         reason: `this_hash at seq ${row.seq} does not match the recomputed hash`,
+        rows,
       };
     }
 
     expectedPrevHash = row.thisHash;
   }
 
-  return { ok: true, checked: rows.length };
+  return { ok: true, checked: rows.length, rows };
+};
+
+// Full table walk. Run at startup (server.ts); ARCHITECTURE.md 8.4 rule 7 calls for verifying the
+// last 1000 events on startup and a nightly full-chain job. This does a full walk every time
+// instead: the dataset is capstone-scale (the AC's own integrity test targets 10,000 events,
+// milliseconds to walk), and no scheduler exists in this codebase for a separate nightly job.
+export const verifyChain = async (): Promise<ChainVerificationResult> => {
+  const result = await verifyChainSegment();
+  return result.ok
+    ? { ok: true, checked: result.checked }
+    : {
+        ok: false,
+        checked: result.checked,
+        brokenAtSeq: result.brokenAtSeq,
+        reason: result.reason,
+      };
 };

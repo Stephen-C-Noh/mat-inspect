@@ -117,10 +117,15 @@ describe('hash chain integration', () => {
 
     await appendAuditEvent(makeInput());
 
-    // Corrupt one row directly, bypassing the app (uses the superuser test connection).
+    // Corrupt one row directly, bypassing the app (uses the superuser test connection). Migration
+    // 0001's immutability trigger blocks UPDATE even for this connection (DEV-40); disabling it
+    // for this one statement simulates the kind of privileged, deliberate override an incident
+    // responder would need, without weakening the trigger itself.
+    await db.execute(sql`ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_update`);
     await db.execute(
       sql`UPDATE audit_events SET this_hash = ${'0'.repeat(64)} WHERE seq = (SELECT max(seq) FROM audit_events)`,
     );
+    await db.execute(sql`ALTER TABLE audit_events ENABLE TRIGGER audit_events_no_update`);
 
     const result = await verifyChain();
     expect(result.ok).toBe(false);

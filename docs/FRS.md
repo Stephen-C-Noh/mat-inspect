@@ -223,7 +223,7 @@
 
 **Alternate Flows:**
 
-- Offline: PWA stores submission in IndexedDB queue; syncs when network returns
+- Short network drop during submission: the payload is held in memory and `sessionStorage` and retried with exponential backoff; after 15 minutes the operator is asked to retry manually (Section 9.1, ADR 0025). The PWA does not queue inspections for later offline sync.
 - Voice unavailable (AI Service down): notes field falls back to typed; `notesSource = TYPED`
 - Same Idempotency-Key replayed with a different body: 409 `IDEMPOTENCY_MISMATCH`; client treats as a bug
 
@@ -502,7 +502,9 @@ delivery guarantee; the persistent dashboard queue is the backstop.
 
 ## 9. CONNECTIVITY TOLERANCE (PWA)
 
-The PWA assumes reliable WiFi or LTE in the MAT lab (confirmed during the client meeting). It is tolerant of short network drops but is not a full offline-first application. If pilot reveals connectivity is unreliable, the offline scope can be upgraded in v2.
+The PWA assumes reliable WiFi or LTE in the MAT lab (confirmed during the client meeting; Section 6 of the meeting questions makes coverage at each of the 10 equipment locations a hard requirement for go-ahead, verified by a signal survey). It is tolerant of short network drops but is not a full offline-first application. If pilot reveals connectivity is unreliable, the offline scope can be upgraded in v2.
+
+This section is the single statement of the connectivity model. The decision, its reasons, and the conditions for revisiting it are recorded in ADR 0025. Other sections point here rather than restating it.
 
 ### 9.1 Short-Drop Submission Tolerance
 
@@ -667,16 +669,16 @@ If two operators submit inspections for the same equipment within seconds of eac
 
 If PWA crashes or phone dies during an inspection:
 
-- Partial state is preserved in IndexedDB for 24 hours
-- On next login, operator is offered to resume the in-progress inspection
-- If not resumed within 24 hours, partial state is discarded
+- Partial state (answers, inline notes, documented defects) is preserved in `sessionStorage` for the browser session. Returning to the checklist after a page load, a reload, or an interactive token renewal restores the in-progress inspection.
+- A hard device failure ends the browser session, so the in-progress inspection is lost and the operator re-answers. This is a deliberate limit of the short-drop connectivity model (ADR 0025), not a defect. Cross-session resume needs durable client storage and belongs to the v2 offline-first escalation.
+- `sessionStorage` also bounds the exposure of defect notes and evidence photos on a shared lab device: the draft does not outlive the session, so it does not carry to the next operator (FOIP).
 
 ### 13.3 Calendar Day Boundary
 
 If an operator starts an inspection at 11:58 PM but submits at 12:01 AM (after the lab-local day rolls over):
 
 - Inspection is accepted; `submittedAt` records the actual submission time
-- Inspection validity is determined by the lab-local calendar day of `submittedAt`, not `startedAt`, so this inspection is valid for the new day
+- Inspection validity is determined by the lab-local calendar day of `submittedAt`, so this inspection is valid for the new day. The time the operator started walking around is not recorded and does not affect validity
 - Equipment readiness for the new day is satisfied by this inspection (ADR 0006)
 
 ### 13.4 Daylight Saving Time

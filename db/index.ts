@@ -8,3 +8,4 @@ export * from './schema/inspections.js';
 export * from './schema/outbox.js';
 export * from './schema/idempotency-keys.js';
 export * from './schema/defects.js';
+export * from './schema/notification-dismissals.js';

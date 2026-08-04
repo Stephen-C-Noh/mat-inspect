@@ -190,6 +190,59 @@ describe('inspections API', () => {
     expect(res.json().result).toBe('PASS');
   });
 
+  it('provisions an unknown operator on first submit instead of 500ing on the users FK (DEV-124)', async () => {
+    const newOperatorId = randomUUID();
+    const token = await makeToken('operator', newOperatorId);
+
+    const res = await submit(
+      {
+        equipmentId,
+        templateId,
+        responses: [
+          { itemKey: 'forks-condition', value: true, passed: true },
+          { itemKey: 'horn', value: true, passed: true },
+        ],
+        attested: true,
+      },
+      { token },
+    );
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().operatorId).toBe(newOperatorId);
+
+    const { db, users } = await import('../../db/index.js');
+    const rows = await db.select().from(users).where(eq(users.id, newOperatorId));
+    expect(rows).toHaveLength(1);
+  });
+
+  it('provisioning is idempotent: repeated submits by the same new operator keep one users row (DEV-124)', async () => {
+    // The upsert is onConflictDoNothing, so a second submit by the same operator succeeds and does
+    // not create a duplicate row (nor error on the users.id primary key), whether or not the
+    // in-process cache short-circuits the write.
+    const newOperatorId = randomUUID();
+    const token = await makeToken('operator', newOperatorId);
+    const passResponses = [
+      { itemKey: 'forks-condition', value: true, passed: true },
+      { itemKey: 'horn', value: true, passed: true },
+    ];
+
+    const first = await submit(
+      { equipmentId, templateId, responses: passResponses, attested: true },
+      { token },
+    );
+    const second = await submit(
+      { equipmentId, templateId, responses: passResponses, attested: true },
+      { token },
+    );
+
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(201);
+
+    const { db, users } = await import('../../db/index.js');
+    const rows = await db.select().from(users).where(eq(users.id, newOperatorId));
+    expect(rows).toHaveLength(1);
+  });
+
   it('derives FAIL_WARNING when only a WARNING item fails', async () => {
     const res = await submit({
       equipmentId,
@@ -273,7 +326,7 @@ describe('inspections API', () => {
 
     // Recompute from the actually-persisted rows to prove a later verifier can reproduce the
     // same hash from core_db — the whole mechanism for detecting a post-hoc edit (ADR 0008).
-    const { computeInspectionContentHash } = await import('../../lib/content-hash.js');
+    const { computeInspectionContentHash } = await import('@mat-inspect/shared-crypto');
     const recomputed = computeInspectionContentHash({
       inspectionId: inspRow!.id,
       equipmentId: inspRow!.equipmentId,
@@ -288,6 +341,7 @@ describe('inspections API', () => {
         passed: r.passed,
         notes: r.notes ?? null,
         notesSource: r.notesSource ?? null,
+        photoIds: r.photoIds,
       })),
     });
     expect(recomputed).toBe(payload['contentHash']);

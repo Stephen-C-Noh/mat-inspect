@@ -1,30 +1,14 @@
 {
-  "GHSA-52cp-r559-cp3m": {
-    "expires": "2026-07-29",
-    "reason": "js-yaml 4.3.0 fix is available, but forcing it via override triggers a full npm 11 lockfile rewrite (~1800 lines) that is disproportionate for a bridge change. Dev-only (eslint config parsing). Apply in the DEV-102 batch alongside the cooldown-blocked fixes, in one clean regen."
+  "GHSA-mh99-v99m-4gvg": {
+    "expires": "2026-08-05",
+    "reason": "brace-expansion: DoS via unbounded expansion length. The minimatch@10.2.5 (brace-expansion@^5.0.5) path is fixed: 5.0.8 published 2026-07-23, cleared min-release-age 2026-07-30, applied via override. Two paths remain, both dev/lint-only, no runtime surface: eslint's minimatch (brace-expansion@^1.0.0, needs 1.1.17, published 2026-07-29, clears 2026-08-05) and glob's minimatch (brace-expansion@^2.0.0, needs 2.1.3, published 2026-07-28, clears 2026-08-04). Bump both overrides once their fixes age in."
   },
-  "GHSA-3jxr-9vmj-r5cp": {
-    "expires": "2026-07-29",
-    "reason": "brace-expansion 2.1.2 fix is available, but npm 11's version-scoped override does not apply cleanly (leaves a mix of 2.1.1/2.1.2). Dev/test-only (eslint, testcontainers), no runtime surface. Resolve in the DEV-102 batch with a consistent override."
+  "GHSA-rgw5-rvv9-x895": {
+    "expires": "2026-08-06",
+    "reason": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the GHSA-mh99-v99m-4gvg mitigation. Published 2026-07-30 across all three affected lines (1.1.18, 2.1.4, 5.0.9), so every current override (1.1.16, 2.1.2, 5.0.8) is vulnerable again; all three fixes clear min-release-age 2026-08-06. Dev/lint-only, no runtime surface. Bump all three overrides once the fixes age in."
   },
-  "GHSA-8r6m-32jq-jx6q": {
-    "expires": "2026-07-24",
-    "reason": "fast-xml-parser 5.10.1 fix published 2026-07-16; blocked by .npmrc min-release-age=7 until ~2026-07-23. Transitive via the @azure SDKs. Tracked in DEV-102."
-  },
-  "GHSA-4c8g-83qw-93j6": {
-    "expires": "2026-07-27",
-    "reason": "fast-uri 3.1.3 fix (host confusion via IDN) published 2026-07-19; blocked by min-release-age until ~2026-07-26. Transitive via fastify/ajv. Tracked in DEV-102."
-  },
-  "GHSA-v2hh-gcrm-f6hx": {
-    "expires": "2026-07-27",
-    "reason": "fast-uri 3.1.4 fix (host confusion via backslash authority) published 2026-07-19; blocked by min-release-age until ~2026-07-26. Transitive via fastify/ajv. Tracked in DEV-102."
-  },
-  "GHSA-45rx-2jwx-cxfr": {
-    "expires": "2026-07-29",
-    "reason": "@opentelemetry/propagator-jaeger 2.9.0 fix published 2026-07-21; blocked by min-release-age until ~2026-07-28. Transitive via @azure/monitor-opentelemetry. JaegerPropagator is not used (we run W3C TraceContext). Tracked in DEV-102."
-  },
-  "GHSA-f88m-g3jw-g9cj": {
-    "expires": "2026-07-29",
-    "reason": "sharp 0.35.0 fix (libvips CVEs) is published but next 15.5.19 cannot resolve its 0.35.x binary sub-packages cleanly under min-release-age, so npm keeps 0.34.5. Transitive via next image optimization (dashboard). Apply with the batch in DEV-102 once the 0.35.x binaries age in."
+  "GHSA-7p8r-x3mc-p8w7": {
+    "expires": "2026-08-07",
+    "reason": "fast-uri: host confusion via backslash authority introducer (CVE-2026-18446). Fix is 3.1.5, published 2026-07-31; blocked by min-release-age until 2026-08-07. Ships in the core-api, media, and audit runtime images (ajv dependency), so this is also tolerated in .trivyignore.yaml until the same date; keep both in sync. Apply the override once the fix ages in."
   }
 }

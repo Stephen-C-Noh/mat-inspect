@@ -10,6 +10,7 @@ FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-auth-server/package.json packages/shared-auth-server/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
@@ -27,7 +28,8 @@ COPY packages packages
 COPY services/audit/tsconfig.json services/audit/
 COPY services/audit/src services/audit/src
 COPY services/audit/db services/audit/db
-# tsc -b walks the project references (shared-schemas, shared-crypto) in dependency order.
+# tsc -b walks the project references (shared-types, shared-auth-server, shared-schemas,
+# shared-crypto) in dependency order.
 RUN npx tsc -b services/audit/tsconfig.json
 
 # ---- prod-deps: install only production deps for the runtime image ----
@@ -35,6 +37,7 @@ FROM node:${NODE_VERSION}-alpine AS prod-deps
 WORKDIR /repo
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-auth-server/package.json packages/shared-auth-server/
 COPY packages/shared-schemas/package.json packages/shared-schemas/
 COPY packages/shared-crypto/package.json packages/shared-crypto/
 COPY db/package.json db/
@@ -48,9 +51,20 @@ RUN npm ci --omit=dev --ignore-scripts
 # ---- runtime: minimal image, non-root, prod node_modules + built JS ----
 FROM node:${NODE_VERSION}-alpine AS runtime
 WORKDIR /repo
+# Security hardening (DEV-42). apk upgrade pulls the patched OpenSSL (libssl3/libcrypto3,
+# CVE-2026-45447) from the alpine branch. Removing the bundled npm CLI clears the HIGH/CRITICAL
+# CVEs in npm's own vendored deps (tar, sigstore, brace-expansion, picomatch): the runtime only
+# runs `node`, never npm, so npm is dead weight. Not version-pinned on purpose, so each base-image
+# security bump is picked up instead of frozen at the tag's first build.
+RUN apk --no-cache upgrade \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=prod-deps /repo/package.json ./
+COPY --from=build /repo/packages/shared-types/package.json packages/shared-types/
+COPY --from=build /repo/packages/shared-types/dist packages/shared-types/dist
+COPY --from=build /repo/packages/shared-auth-server/package.json packages/shared-auth-server/
+COPY --from=build /repo/packages/shared-auth-server/dist packages/shared-auth-server/dist
 COPY --from=build /repo/packages/shared-schemas/package.json packages/shared-schemas/
 COPY --from=build /repo/packages/shared-schemas/dist packages/shared-schemas/dist
 COPY --from=build /repo/packages/shared-crypto/package.json packages/shared-crypto/
@@ -61,10 +75,6 @@ COPY --from=build /repo/services/audit/dist services/audit/dist
 # nothing else, so without this the image ships dist/db/migrate.js pointing at a migrations folder
 # that is not there, and a box with only the images cannot create its schema (DEV-97).
 COPY --from=build /repo/services/audit/db/migrations services/audit/dist/db/migrations
-# fastify-type-provider-zod pins a peer range that blocks npm from hoisting it to the root
-# node_modules (same issue core-api hits, DEV-58), so it stays in the workspace-local
-# node_modules. Ship that too.
-COPY --from=prod-deps /repo/services/audit/node_modules services/audit/node_modules
 USER appuser
 WORKDIR /repo/services/audit
 EXPOSE 3000
