@@ -36,33 +36,46 @@ a compliance-impact checklist (audit log structure, equipment state machine, aut
 authorization, PII handling, or none of the above). A change that ticks any of the first four
 boxes is a change that touches this document's section 5.
 
-**Merge strategy.** Squash and merge. One commit per feature lands on `main`; the squash message
-follows Conventional Commits. No merge commits.
+**Merge strategy.** Squash and merge is the team's practice: one commit per feature lands on
+`main`, following Conventional Commits. GitHub's ruleset for `main` does not currently restrict
+this technically; `merge`, `squash`, and `rebase` are all permitted merge methods. Squash-only is
+enforced by convention, not by tooling, today.
 
-## 3. Review requirements
+## 3. Review requirements, as practiced and as actually enforced
 
-- **1 approval minimum** for most changes.
-- **2 approvals** for anything under a path listed in `.github/CODEOWNERS`:
+- **1 approval minimum**, and this part is enforced: the ruleset requires 1 approving review
+  before merge (`required_approving_review_count: 1`).
+- **The team's intent is 2 approvals** for anything under a path listed in `.github/CODEOWNERS`:
   `services/audit/`, `services/core-api/src/middleware/auth.ts`,
   `services/core-api/src/domain/inspection.ts`, `db/migrations/`. These are the audit chain,
   authentication, the inspection state machine, and schema changes: the four places a defect
-  becomes a compliance problem, not just a bug.
-- **The author never merges their own PR.** A reviewer merges, after all required approvals are
-  in and every required status check is green.
+  becomes a compliance problem, not just a bug. **This is not currently enforced by GitHub.**
+  `require_code_owner_review` is off at the ruleset level, so CODEOWNERS only auto-requests the
+  listed reviewers; it does not raise the required approval count past 1. A single approval,
+  from anyone, can currently merge a change to these paths.
+- **The author never merges their own PR**, as team practice. GitHub does not block this
+  technically for a repository admin, who can bypass the ruleset (including the PR requirement
+  itself) at any time (`bypass_actors`, `bypass_mode: always`).
 - Review comments get addressed before merge, or explicitly discussed and resolved in the PR
-  thread. Silence is not resolution.
+  thread. Silence is not resolution. (Practice, not a tooling gate.)
 
-These are not a style preference; they are configured as GitHub branch protection rules on
-`main` (Settings → Branches): PR required before merging, stale approvals dismissed on new
-commits, branch must be up to date before merge, no direct push, no force push, no branch
-deletion, linear history only. A future owner migrating off GitHub, or reconfiguring branch
-protection, should reproduce this list item for item; each one closes a specific way `main` can
-end up with unreviewed or silently-altered code.
+Checked directly against the live ruleset for `main`
+(`gh api repos/<owner>/mat-inspect/rulesets/17306594`, current as of 2026-08-04): pull request
+required before merging, force push blocked, and branch deletion blocked are all enforced.
+Stale-approval dismissal, branch-up-to-date-before-merge, and linear history are **not**
+configured. A future owner migrating off GitHub, or tightening branch protection, should treat
+the bullet list above as the target state, not the current one, and close each gap explicitly
+rather than assuming this document already describes enforced tooling.
 
-## 4. Required CI gates
+## 4. CI gates that run, and what actually blocks merge
 
-Every push and PR to `main` runs two workflows, and every job in both is a required status
-check. Nothing merges with a red check; there is no `--no-verify` equivalent on `main`.
+Every push and PR to `main` runs two workflows. Both run and report pass or fail on every PR;
+**none of their jobs are configured as a required status check** on the live ruleset (no
+`required_status_checks` rule exists there as of 2026-08-04). A red job is visible in the PR
+checks list and should stop a reviewer from approving, but nothing on `main` currently blocks the
+merge button on a red run. Closing this gap (adding a required-status-checks rule naming the jobs
+below, or reproducing the same constraint if the enforcement mechanism moves off GitHub) is an
+open item for a future owner, not yet ticketed.
 
 `.github/workflows/ci.yml`: `lint` (ESLint, Prettier), `type-check` (`tsc`, including the two
 Next.js apps separately from the workspace build), `test-ts` (Vitest), `test-python` (pytest,
@@ -73,7 +86,10 @@ on a PR this only builds, it does not push, so a broken image build fails the PR
 `.github/workflows/security.yml`: `gitleaks`, `npm-audit`, `semgrep`, `trivy` (filesystem and
 Dockerfile config scans), `trivy-image` (per built image), `hadolint`. See
 `docs/VULNERABILITY_MANAGEMENT.md` for what each of these actually checks and how findings are
-triaged; this document only asserts that they gate merge.
+triaged.
+
+None of the above is a reason to skip a red check. It means the discipline currently lives in the
+team choosing not to merge past one, not in tooling refusing to let them.
 
 ## 5. Compliance invariants a change must not break
 
@@ -112,8 +128,10 @@ the legal record.
 2. Branch from an up-to-date `main`: `git checkout main && git pull && git checkout -b dev-<ticket>-<slug>`.
 3. Make the change. If it touches section 5, say so in the PR description up front.
 4. Open a PR titled `DEV-<ticket>: <description>`, filled out from the PR template.
-5. Get the required approvals: 1, or 2 if a CODEOWNERS path is touched.
-6. Wait for every required status check in section 4 to pass. Fix failures; do not bypass them.
+5. Get the team-practice approvals: 1, or 2 if a CODEOWNERS path is touched (only the first is
+   currently GitHub-enforced; see section 3).
+6. Wait for every CI job in section 4 to pass. Fix failures; do not merge past a red one, even
+   though nothing on `main` currently stops you technically (see section 4).
 7. A reviewer (not the author) merges via squash.
 8. Deploy the merged image. `build-and-push` on `main` publishes
    `ghcr.io/<owner>/mat-inspect/<service>:latest` and `:sha-<commit>`. The team demo and mini-PC
@@ -128,13 +146,14 @@ the legal record.
 
 ## 7. Emergency changes
 
-There is no separate emergency or hotfix path that skips review or CI. A production incident is
-handled by reverting the offending change on a new branch, through the same PR process in
-section 6, not by pushing directly to `main` or disabling a gate. Branch protection enforces
-this technically (section 3): no one, including an admin, can push directly to `main` under the
-current GitHub settings. A future owner who needs a genuinely faster incident path should build
-it as a documented, audited exception (for example, a break-glass role with logged usage), not
-as a standing bypass of the gates in section 4.
+There is no separate emergency or hotfix path that skips review or CI, by team practice. A
+production incident is handled by reverting the offending change on a new branch, through the
+same PR process in section 6, not by pushing directly to `main` or disabling a gate. As section 3
+notes, this is currently a practice the team follows, not a technical guarantee: a repository
+admin can bypass the ruleset, including the pull-request requirement, at any time. A future owner
+who needs a genuinely faster incident path should build it as a documented, audited exception (for
+example, a break-glass role with logged usage), not rely on the existing admin-bypass as an
+informal one.
 
 ## 8. Responsibility after handover
 

@@ -184,6 +184,9 @@ Yes / No. If yes, which sections.
 - Address all review comments before merge (or explicitly discuss and resolve)
 - Reviews within **24 hours** of PR being opened during weekdays
 
+These are team process rules. See "Protecting Main" below for which of them GitHub currently
+enforces technically versus which rely on the team following them.
+
 ### Merge Strategy
 
 **Squash and Merge** on GitHub. One commit per feature on `main`. The squash commit message follows Conventional Commits format.
@@ -292,39 +295,45 @@ In short:
 
 ## Protecting Main: Enforced CI Gates
 
-Security on this project is **enforced in tooling**, not left to discipline. The CI pipeline acts as a gate that blocks bad code from reaching `main`.
+Two workflows run on every push and pull request to `main`:
 
-These rules are configured on GitHub under **Settings → Branches → Branch protection rules** for `main`:
+- `.github/workflows/ci.yml`: `lint`, `type-check`, `test-ts`, `test-python`, `build`, `build-and-push`
+- `.github/workflows/security.yml`: `gitleaks`, `npm-audit`, `semgrep`, `trivy`, `trivy-image`, `hadolint`
 
-- [x] Require a pull request before merging
-- [x] Require at least 1 approval (2 for security-sensitive paths via CODEOWNERS)
-- [x] Dismiss stale pull request approvals when new commits are pushed
-- [x] Require branches to be up to date before merging
-- [x] Restrict who can push to matching branches (no direct push)
-- [x] Block force push
-- [x] Block deletions
-- [x] Require linear history (no merge commits; squash or rebase only)
+These jobs run and report pass or fail on every PR. This section previously claimed all of them
+were configured as required status checks on `main`. Checked directly against the live ruleset
+(`gh api repos/<owner>/mat-inspect/rulesets/17306594`, current as of 2026-08-04), that is not the
+case: the ruleset has no `required_status_checks` rule at all. A red job is visible to a reviewer
+and should stop them from approving, but nothing on `main` technically blocks the merge button on
+a red run. Closing this gap (adding a required-status-checks rule, or reproducing the same
+constraint if the enforcement mechanism moves off GitHub) is tracked in
+`docs/CHANGE_MANAGEMENT.md` as an open item, not yet ticketed.
 
-Required status checks (all must pass before merge):
+What the ruleset does enforce today:
 
-- `lint` (ESLint, Prettier, Ruff, Hadolint, Markdownlint, zero warnings)
-- `type-check` (TypeScript strict, mypy strict)
-- `unit-tests`
-- `integration-tests`
-- `trivy` (fails on HIGH or CRITICAL with available patch)
-- `semgrep` (fails on HIGH severity from `p/owasp-top-ten` and `p/security-audit`)
-- `gitleaks` (fails on any secret detection in git history)
-- `npm-audit` (fails on HIGH or CRITICAL with available patch)
-- `build` (Docker images build successfully)
+- [x] Pull request required before merging
+- [x] 1 approving review required
+- [ ] Stale approvals are **not** dismissed on new commits (`dismiss_stale_reviews_on_push: false`)
+- [ ] CODEOWNERS paths do **not** currently require 2 approvals: `require_code_owner_review` is
+      off at the ruleset level. `.github/CODEOWNERS` (below) still auto-requests the listed
+      reviewers on a PR that touches those paths; it just does not raise the required approval
+      count past 1.
+- [x] Force push blocked (`non_fast_forward`)
+- [x] Branch deletion blocked (`deletion`)
+- Merge commit, squash, and rebase are all permitted merge methods (not squash/rebase-only)
+- Repository admins bypass every rule in this ruleset, including the pull-request requirement
+  itself (`bypass_actors` lists the Admin role with `bypass_mode: always`)
 
-CODEOWNERS forces 2 reviewers on:
+CODEOWNERS (`.github/CODEOWNERS`) requests review from, but does not force 2 required approvals
+on, these paths:
 
 - `services/audit/`
 - `services/core-api/src/middleware/auth.ts`
 - `services/core-api/src/domain/inspection.ts`
 - `db/migrations/`
 
-**There is no `--no-verify` escape hatch on `main`.** If CI is failing on your branch, fix the failure. Do not bypass.
+**There is no `--no-verify` escape hatch for a contributor without admin access.** If CI is
+failing on your branch, fix the failure; do not ask an admin to bypass on your behalf.
 
 ---
 
