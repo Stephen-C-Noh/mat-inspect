@@ -112,6 +112,11 @@ export const returnToServiceRoute: FastifyPluginAsync = async (app) => {
           .returning();
 
         // Outbox row only; the poller, hash chain, and content digest are DEV-23.
+        // defectIds is comma-joined, not an array: payloadSummary (auditEventIngestSchema in
+        // packages/shared-schemas) is a flat string/boolean/null record, since it is part of the
+        // hash chain input and must round-trip byte-identically through the jsonb column on
+        // verify (ADR 0008). An array value fails that schema and the Audit Service rejects the
+        // ingest with 400, same failure mode DEV-142 fixed for the missing actor/resource fields.
         await tx.insert(outbox).values({
           eventType: 'EQUIPMENT_STATUS_CHANGED',
           payload: {
@@ -120,7 +125,7 @@ export const returnToServiceRoute: FastifyPluginAsync = async (app) => {
             to: 'AWAITING_INSPECTION',
             reason: 'RETURN_TO_SERVICE',
             approvedBy: req.user.id,
-            defectIds: resolvedIds,
+            defectIds: resolvedIds.join(','),
           },
         });
 

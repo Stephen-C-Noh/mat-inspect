@@ -6,7 +6,7 @@ import pg from 'pg';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
-import type { ChecklistItem } from '@mat-inspect/shared-schemas';
+import { auditEventIngestSchema, type ChecklistItem } from '@mat-inspect/shared-schemas';
 import { setJwksForTest } from '../../middleware/auth.js';
 
 const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
@@ -402,6 +402,23 @@ describe('defect lifecycle API (DEV-20, ADR 0006)', () => {
     const [row2] = await db.select().from(defects).where(eq(defects.id, d2.id));
     expect(row1!.returnToServiceApprovedBy).toBe(SUPERVISOR_ID);
     expect(row2!.returnToServiceApprovedBy).toBe(SUPERVISOR_ID);
+
+    // The outbox payload must stay a valid payloadSummary scalar (DEV-142): an array of defect
+    // ids would fail auditEventIngestSchema's string/boolean/null record and the Audit Service
+    // would reject the ingest with 400, the same stuck-forever failure DEV-142 fixed for the
+    // missing actor/resource fields.
+    const { outbox } = await import('../../db/index.js');
+    const allRows = await db.select().from(outbox);
+    const [rtsEvent] = allRows.filter(
+      (r) =>
+        r.eventType === 'EQUIPMENT_STATUS_CHANGED' &&
+        (r.payload as { equipmentId?: string; reason?: string }).equipmentId === equipment.id &&
+        (r.payload as { reason?: string }).reason === 'RETURN_TO_SERVICE',
+    );
+    const payload = rtsEvent!.payload as { defectIds?: unknown };
+    expect(typeof payload.defectIds).toBe('string');
+    expect(payload.defectIds).toBe([d1.id, d2.id].join(','));
+    expect(() => auditEventIngestSchema.shape.payloadSummary.parse(payload)).not.toThrow();
 
     // No pending-approval defect is left to force a retry; the equipment already left
     // OUT_OF_SERVICE, so a second attempt correctly 409s instead of being needed to "catch" d2.
