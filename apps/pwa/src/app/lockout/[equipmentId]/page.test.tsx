@@ -35,10 +35,12 @@ vi.mock('@azure/msal-react', () => ({
   }),
 }));
 
-let equipmentStatus: 'OUT_OF_SERVICE' | 'RETIRED' = 'OUT_OF_SERVICE';
+let equipmentStatus: 'OUT_OF_SERVICE' | 'RETIRED' | 'READY' = 'OUT_OF_SERVICE';
+let equipmentFetchFails = false;
 
 const fetchMock = vi.fn(async (url: string) => {
   if (url.startsWith('/api/v1/equipment')) {
+    if (equipmentFetchFails) return { ok: false, status: 503, json: async () => ({}) } as Response;
     const equipment = {
       id: EQUIPMENT_ID,
       assetTag: 'FL-001',
@@ -73,6 +75,7 @@ beforeEach(() => {
   fetchMock.mockClear();
   searchParams = new URLSearchParams();
   equipmentStatus = 'OUT_OF_SERVICE';
+  equipmentFetchFails = false;
   vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -136,5 +139,32 @@ describe('lockout screen copy source', () => {
 
     await screen.findByText(/permanently retired/i);
     expect(screen.queryByText('Critical safety compliance violation')).toBeNull();
+  });
+
+  // The copy branch has three states, not two: an unloadable status must not fall through to the
+  // lockout copy, which would put the fabricated defect and the return-to-service instruction back
+  // on the screen for a retired unit whenever the equipment read fails (code review on DEV-143).
+  it('states no reason when the equipment status cannot be loaded', async () => {
+    equipmentFetchFails = true;
+    renderLockout();
+
+    await screen.findByText(/could not be confirmed/i);
+    expect(screen.queryByText('Critical safety compliance violation')).toBeNull();
+    expect(screen.queryByText('Critical Defects Found')).toBeNull();
+    expect(screen.queryByText(/must resolve the defect/i)).toBeNull();
+    expect(screen.queryByText(/permanently retired/i)).toBeNull();
+    // The screen is a lockout tag: an unknown status still reads as do-not-operate.
+    expect(screen.getByText(/do not operate/i)).not.toBeNull();
+  });
+
+  it('does not claim a lockout for equipment that is in neither lockout state', async () => {
+    equipmentStatus = 'READY';
+    searchParams = new URLSearchParams({ defect: 'Forks cracked' });
+    renderLockout();
+
+    // Waits for the row to land, so the assertions below are not just the pending render.
+    await screen.findByText('Forklift 1');
+    expect(screen.queryByText('Forks cracked')).toBeNull();
+    expect(screen.queryByText(/must resolve the defect/i)).toBeNull();
   });
 });

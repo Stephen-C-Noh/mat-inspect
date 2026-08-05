@@ -20,16 +20,28 @@ function LockoutContent() {
       : (equipment?.name ?? 'Equipment Asset');
   const assetTag = equipment?.assetTag ?? (isPending ? '…' : 'N/A');
 
-  // RETIRED equipment (DEV-143) has no failed inspection behind this screen and no
-  // return-to-service cycle, so showing the FAIL_BLOCKING copy (a fabricated "Critical safety
-  // compliance violation" defect, an RTS instruction) would misdescribe why it is unavailable.
-  // Read from the fetched equipment row, not a `?reason=` query param: this screen's own rule
-  // (equipment identity comes from the server, not client-supplied URL params, so a tag cannot be
-  // fabricated) applies here too. A query flag would let anyone spoof either direction: paste
-  // `?reason=retired` onto a merely-OUT_OF_SERVICE unit's URL to hide its real defects, or reach
-  // this screen for a RETIRED unit with no `reason` param (bookmark, shared link, history) and get
-  // the fabricated defect back (code review on DEV-143).
-  const isRetired = equipment?.status === 'RETIRED';
+  // Which reason this screen states (DEV-143). RETIRED equipment has no failed inspection behind
+  // this screen and no return-to-service cycle, so the FAIL_BLOCKING copy (a fabricated "Critical
+  // safety compliance violation" defect, an RTS instruction) would misdescribe why it is
+  // unavailable. Read from the fetched equipment row, not a `?reason=` query param: this screen's
+  // own rule (equipment identity comes from the server, not client-supplied URL params, so a tag
+  // cannot be fabricated) applies here too. A query flag would let anyone spoof either direction:
+  // paste `?reason=retired` onto a merely-OUT_OF_SERVICE unit's URL to hide its real defects, or
+  // reach this screen for a RETIRED unit with no `reason` param (bookmark, shared link, history)
+  // and get the fabricated defect back.
+  //
+  // 'unknown' is the third case, and the reason this is not a boolean: the status can be pending,
+  // or the fetch can fail outright (use-equipment-by-id sets retry: false, so one offline read
+  // settles it), and a two-way split makes the lockout copy the default for both. That put the
+  // fabricated defect and the RTS instruction back on the screen for a retired unit whenever its
+  // status did not load. State no reason at all rather than the wrong one; "Do Not Operate" stands
+  // either way, since that is the safe reading of an unknown status (code review on DEV-143).
+  const variant: 'retired' | 'lockout' | 'unknown' =
+    equipment?.status === 'RETIRED'
+      ? 'retired'
+      : equipment?.status === 'OUT_OF_SERVICE'
+        ? 'lockout'
+        : 'unknown';
 
   // Blocking defects come from the inspection that just failed. There is no endpoint to
   // fetch them after the fact (the submit response carries no defect labels), so the submit
@@ -68,7 +80,11 @@ function LockoutContent() {
         <div className="bg-destructive text-destructive-foreground p-6 text-center space-y-2">
           <div className="text-4xl font-extrabold tracking-tighter uppercase">Do Not Operate</div>
           <p className="text-xs font-bold uppercase tracking-widest opacity-90">
-            {isRetired ? 'Equipment Retired' : 'Digital Lockout Enforced'}
+            {variant === 'retired'
+              ? 'Equipment Retired'
+              : variant === 'lockout'
+                ? 'Digital Lockout Enforced'
+                : 'Status Unavailable'}
           </p>
         </div>
 
@@ -86,7 +102,7 @@ function LockoutContent() {
             </div>
           </div>
 
-          {!isRetired && (
+          {variant === 'lockout' && (
             <>
               {/* Timestamp Container */}
               <div className="bg-muted border border-border p-3 rounded-md flex flex-col gap-0.5">
@@ -120,10 +136,18 @@ function LockoutContent() {
             </>
           )}
 
-          {isRetired && (
+          {variant === 'retired' && (
             <p className="text-sm font-semibold text-foreground">
               This equipment has been permanently retired from service. It has no open defect and no
               return-to-service cycle applies; it cannot be inspected again.
+            </p>
+          )}
+
+          {variant === 'unknown' && (
+            <p className="text-sm font-semibold text-foreground">
+              {isPending
+                ? 'Loading this equipment’s current status…'
+                : 'The reason this equipment is unavailable could not be confirmed.'}
             </p>
           )}
         </div>
@@ -131,9 +155,11 @@ function LockoutContent() {
 
       {/* Footer warning */}
       <p className="text-center text-[11px] font-semibold text-muted-foreground mt-4 max-w-xs px-4">
-        {isRetired
+        {variant === 'retired'
           ? 'If this equipment should still be in service, contact a supervisor to review its status.'
-          : 'This equipment failed a required safety inspection and is locked out. A supervisor must resolve the defect and approve return-to-service before it can be inspected again.'}
+          : variant === 'lockout'
+            ? 'This equipment failed a required safety inspection and is locked out. A supervisor must resolve the defect and approve return-to-service before it can be inspected again.'
+            : 'Contact a supervisor to confirm this equipment’s status before operating it.'}
       </p>
 
       {/* Escape hatch: this screen has no browser-back path (the trap below exists so a fresh
