@@ -57,7 +57,19 @@ export const useSubmitInspection = (): UseMutationResult<Inspection, Error, Subm
             body: JSON.stringify(payload),
           });
 
-          if (!res.ok) throw new HttpAttemptError(res.status);
+          if (!res.ok) {
+            // Best-effort: a body that isn't the expected problem+json (a proxy error page, an
+            // empty 5xx) must not stop the retry/error path from working at all.
+            const title = await res
+              .json()
+              .then((body: unknown) =>
+                typeof body === 'object' && body !== null && 'title' in body
+                  ? String((body as { title: unknown }).title)
+                  : undefined,
+              )
+              .catch(() => undefined);
+            throw new HttpAttemptError(res.status, title);
+          }
 
           return inspectionSchema.parse(await res.json());
         },

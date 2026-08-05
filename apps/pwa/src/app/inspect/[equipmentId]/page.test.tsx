@@ -13,10 +13,11 @@ const USER_ID = '55555555-5555-5555-5555-555555555555';
 
 const push = vi.fn();
 const back = vi.fn();
+const replace = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ equipmentId: EQUIPMENT_ID }),
-  useRouter: () => ({ push, back, replace: vi.fn() }),
+  useRouter: () => ({ push, back, replace }),
   usePathname: () => `/inspect/${EQUIPMENT_ID}`,
 }));
 
@@ -101,6 +102,7 @@ beforeEach(() => {
   window.sessionStorage.clear();
   push.mockClear();
   back.mockClear();
+  replace.mockClear();
   fetchMock.mockClear();
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -203,5 +205,42 @@ describe('checklist screen submit action', () => {
       templateId: TEMPLATE_ID,
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
     });
+  });
+});
+
+// DEV-143: RETIRED equipment never gets a checklist (no repair-and-return-to-service cycle
+// applies to it, and core-api rejects every submit). OUT_OF_SERVICE is different: an operator can
+// legitimately reopen the checklist and find another blocking problem during the same lockout
+// (DEV-101 lockout-cycle test on the backend), so it gets a warning banner instead of a redirect.
+describe('checklist screen lockout gate', () => {
+  const stubEquipmentFetch = (status: string): void => {
+    const stubbed = { ...equipment, status };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.startsWith('/api/v1/equipment')) return jsonOk([stubbed]);
+        if (url.startsWith('/api/v1/checklists/active')) return jsonOk(template);
+        throw new Error(`unexpected request: ${url}`);
+      }),
+    );
+  };
+
+  it('redirects to the lockout screen instead of rendering the checklist for RETIRED equipment', async () => {
+    stubEquipmentFetch('RETIRED');
+
+    renderChecklist();
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/lockout/${EQUIPMENT_ID}`));
+    expect(screen.queryByRole('button', { name: /submit inspection/i })).toBeNull();
+  });
+
+  it('shows a warning banner but still renders the checklist for OUT_OF_SERVICE equipment', async () => {
+    stubEquipmentFetch('OUT_OF_SERVICE');
+
+    renderChecklist();
+
+    await screen.findByRole('alert');
+    expect(replace).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: /pass/i })).not.toBeNull();
   });
 });
