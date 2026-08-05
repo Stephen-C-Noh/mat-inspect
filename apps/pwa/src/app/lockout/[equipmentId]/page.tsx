@@ -21,10 +21,15 @@ function LockoutContent() {
   const assetTag = equipment?.assetTag ?? (isPending ? '…' : 'N/A');
 
   // RETIRED equipment (DEV-143) has no failed inspection behind this screen and no
-  // return-to-service cycle: it never carries `defect`/`lockedAt` params, and showing the
-  // FAIL_BLOCKING copy (a fabricated "Critical safety compliance violation" defect, an RTS
-  // instruction) would misdescribe why the equipment is unavailable.
-  const isRetired = searchParams.get('reason') === 'retired';
+  // return-to-service cycle, so showing the FAIL_BLOCKING copy (a fabricated "Critical safety
+  // compliance violation" defect, an RTS instruction) would misdescribe why it is unavailable.
+  // Read from the fetched equipment row, not a `?reason=` query param: this screen's own rule
+  // (equipment identity comes from the server, not client-supplied URL params, so a tag cannot be
+  // fabricated) applies here too. A query flag would let anyone spoof either direction: paste
+  // `?reason=retired` onto a merely-OUT_OF_SERVICE unit's URL to hide its real defects, or reach
+  // this screen for a RETIRED unit with no `reason` param (bookmark, shared link, history) and get
+  // the fabricated defect back (code review on DEV-143).
+  const isRetired = equipment?.status === 'RETIRED';
 
   // Blocking defects come from the inspection that just failed. There is no endpoint to
   // fetch them after the fact (the submit response carries no defect labels), so the submit

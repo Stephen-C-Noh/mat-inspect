@@ -51,4 +51,17 @@ describe('submitErrorMessage', () => {
     expect(message).toMatch(/supervisor/i);
     expect(message).not.toMatch(/locked out|retired/i);
   });
+
+  // The title comes from a parsed response body; an intermediary's error page on a bad day could
+  // hand back any JSON as the "problem" document. A plain-object lookup keyed on that value would
+  // return an inherited Object.prototype member instead of undefined for a title like
+  // "constructor", and the caller would try to render that as the message (code review on
+  // DEV-143). Must fall back to the generic string, not throw or return a non-string.
+  it('does not resolve a prototype-chain property for an adversarial title', () => {
+    const cause = new HttpAttemptError(409, 'constructor');
+    const message = submitErrorMessage(new RetryExhaustedError('not-retryable', 1, cause));
+
+    expect(typeof message).toBe('string');
+    expect(message).toMatch(/supervisor/i);
+  });
 });

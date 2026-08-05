@@ -44,9 +44,9 @@ function ChecklistView(): ReactElement {
   const isRetired = equipment?.status === 'RETIRED';
   const isOutOfService = equipment?.status === 'OUT_OF_SERVICE';
   useEffect(() => {
-    // reason=retired tells the lockout screen not to show fabricated defects or
-    // return-to-service copy: RETIRED has neither (code review on DEV-143).
-    if (isRetired) router.replace(`/lockout/${params.equipmentId}?reason=retired`);
+    // No `?reason=` param: the lockout screen reads RETIRED from the fetched equipment row
+    // itself, not from a client-suppliable query string (code review on DEV-143).
+    if (isRetired) router.replace(`/lockout/${params.equipmentId}`);
   }, [isRetired, router, params.equipmentId]);
 
   const {
@@ -141,7 +141,7 @@ function ChecklistView(): ReactElement {
   if (!equipment)
     return <div className="p-8 text-center text-destructive">Equipment not found.</div>;
 
-  if (isRetired) return <div className="p-8 text-center">Equipment is locked out...</div>;
+  if (isRetired) return <div className="p-8 text-center">Equipment is retired...</div>;
 
   if (checklistLoading) return <div className="p-8 text-center">Loading checklist...</div>;
   if (checklistError)

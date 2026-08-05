@@ -35,16 +35,25 @@ vi.mock('@azure/msal-react', () => ({
   }),
 }));
 
-const equipment = {
-  id: EQUIPMENT_ID,
-  assetTag: 'FL-001',
-  name: 'Forklift 1',
-  type: 'FORKLIFT',
-  status: 'OUT_OF_SERVICE',
-};
+let equipmentStatus: 'OUT_OF_SERVICE' | 'RETIRED' = 'OUT_OF_SERVICE';
 
 const fetchMock = vi.fn(async (url: string) => {
   if (url.startsWith('/api/v1/equipment')) {
+    const equipment = {
+      id: EQUIPMENT_ID,
+      assetTag: 'FL-001',
+      name: 'Forklift 1',
+      type: 'FORKLIFT',
+      make: null,
+      model: null,
+      serialNumber: null,
+      location: null,
+      status: equipmentStatus,
+      currentStatusSince: '2026-07-27T12:00:00.000Z',
+      manufacturerSpecsUrl: null,
+      createdAt: '2026-07-27T12:00:00.000Z',
+      updatedAt: '2026-07-27T12:00:00.000Z',
+    };
     return { ok: true, status: 200, json: async () => equipment } as Response;
   }
   throw new Error(`unexpected request: ${url}`);
@@ -63,6 +72,7 @@ beforeEach(() => {
   push.mockClear();
   fetchMock.mockClear();
   searchParams = new URLSearchParams();
+  equipmentStatus = 'OUT_OF_SERVICE';
   vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -80,8 +90,13 @@ describe('lockout screen escape hatch', () => {
   });
 });
 
-describe('lockout screen reason-specific copy', () => {
-  it('shows the failed-inspection defects and return-to-service copy by default', async () => {
+// DEV-143 code review: whether this screen shows FAIL_BLOCKING copy or RETIRED copy must come
+// from the fetched equipment row (the server), not from a `?reason=` query param anyone could
+// paste onto the URL — this screen's own stated rule for equipmentName/assetTag above, now
+// applied to which copy renders at all.
+describe('lockout screen copy source', () => {
+  it('shows the failed-inspection defects and return-to-service copy for OUT_OF_SERVICE equipment', async () => {
+    equipmentStatus = 'OUT_OF_SERVICE';
     searchParams = new URLSearchParams({
       defect: 'Forks cracked',
       lockedAt: '2026-08-04T12:00:00Z',
@@ -92,8 +107,8 @@ describe('lockout screen reason-specific copy', () => {
     expect(screen.getByText(/return-to-service/i)).not.toBeNull();
   });
 
-  it('does not fabricate a defect or return-to-service instruction for retired equipment', async () => {
-    searchParams = new URLSearchParams({ reason: 'retired' });
+  it('does not fabricate a defect or return-to-service instruction for RETIRED equipment', async () => {
+    equipmentStatus = 'RETIRED';
     renderLockout();
 
     await screen.findByText(/permanently retired/i);
@@ -103,5 +118,23 @@ describe('lockout screen reason-specific copy', () => {
     // footer's actionable "a supervisor must resolve the defect and approve return-to-service"
     // instruction, which is only true for a lockout, not a retirement.
     expect(screen.queryByText(/must resolve the defect/i)).toBeNull();
+  });
+
+  it('ignores a spoofed ?reason=retired on merely-OUT_OF_SERVICE equipment and still shows its real defect', async () => {
+    equipmentStatus = 'OUT_OF_SERVICE';
+    searchParams = new URLSearchParams({ reason: 'retired', defect: 'Forks cracked' });
+    renderLockout();
+
+    expect(await screen.findByText('Forks cracked')).not.toBeNull();
+    expect(screen.queryByText(/permanently retired/i)).toBeNull();
+  });
+
+  it('shows the retired copy for RETIRED equipment reached with no ?reason= param at all', async () => {
+    equipmentStatus = 'RETIRED';
+    searchParams = new URLSearchParams();
+    renderLockout();
+
+    await screen.findByText(/permanently retired/i);
+    expect(screen.queryByText('Critical safety compliance violation')).toBeNull();
   });
 });
