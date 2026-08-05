@@ -1,12 +1,13 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEquipmentById } from '@/hooks/use-equipment-by-id';
 
 function LockoutContent() {
   const { equipmentId } = useParams<{ equipmentId: string }>();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Equipment identity comes from the server, not from URL params. This is the source of
   // truth and stops anyone from fabricating a lockout tag for arbitrary name/tag values.
@@ -18,6 +19,12 @@ function LockoutContent() {
       ? 'Equipment (identity unavailable)'
       : (equipment?.name ?? 'Equipment Asset');
   const assetTag = equipment?.assetTag ?? (isPending ? '…' : 'N/A');
+
+  // RETIRED equipment (DEV-143) has no failed inspection behind this screen and no
+  // return-to-service cycle: it never carries `defect`/`lockedAt` params, and showing the
+  // FAIL_BLOCKING copy (a fabricated "Critical safety compliance violation" defect, an RTS
+  // instruction) would misdescribe why the equipment is unavailable.
+  const isRetired = searchParams.get('reason') === 'retired';
 
   // Blocking defects come from the inspection that just failed. There is no endpoint to
   // fetch them after the fact (the submit response carries no defect labels), so the submit
@@ -56,7 +63,7 @@ function LockoutContent() {
         <div className="bg-destructive text-destructive-foreground p-6 text-center space-y-2">
           <div className="text-4xl font-extrabold tracking-tighter uppercase">Do Not Operate</div>
           <p className="text-xs font-bold uppercase tracking-widest opacity-90">
-            Digital Lockout Enforced
+            {isRetired ? 'Equipment Retired' : 'Digital Lockout Enforced'}
           </p>
         </div>
 
@@ -74,43 +81,68 @@ function LockoutContent() {
             </div>
           </div>
 
-          {/* Timestamp Container */}
-          <div className="bg-muted border border-border p-3 rounded-md flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Lockout Timestamp
-            </span>
-            <span className="text-sm font-semibold text-foreground">{lockedAtLabel}</span>
-          </div>
+          {!isRetired && (
+            <>
+              {/* Timestamp Container */}
+              <div className="bg-muted border border-border p-3 rounded-md flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Lockout Timestamp
+                </span>
+                <span className="text-sm font-semibold text-foreground">{lockedAtLabel}</span>
+              </div>
 
-          {/* Blocking Defects Display */}
-          <div className="space-y-2">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-destructive">
-              Critical Defects Found
-            </h2>
+              {/* Blocking Defects Display */}
+              <div className="space-y-2">
+                <h2 className="text-xs font-extrabold uppercase tracking-widest text-destructive">
+                  Critical Defects Found
+                </h2>
 
-            <ul className="space-y-2" role="list">
-              {blockingDefects.map((defect, index) => (
-                <li
-                  key={index}
-                  // used text-foreground to pass WCAG 2.1 AA accessibility guidelines
-                  className="bg-destructive/10 border-l-4 border-destructive rounded-r-md p-3 text-foreground text-sm font-bold"
-                >
-                  <span className="text-destructive mr-1" aria-hidden="true">
-                    ⚠️
-                  </span>{' '}
-                  {defect}
-                </li>
-              ))}
-            </ul>
-          </div>
+                <ul className="space-y-2" role="list">
+                  {blockingDefects.map((defect, index) => (
+                    <li
+                      key={index}
+                      // used text-foreground to pass WCAG 2.1 AA accessibility guidelines
+                      className="bg-destructive/10 border-l-4 border-destructive rounded-r-md p-3 text-foreground text-sm font-bold"
+                    >
+                      <span className="text-destructive mr-1" aria-hidden="true">
+                        ⚠️
+                      </span>{' '}
+                      {defect}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {isRetired && (
+            <p className="text-sm font-semibold text-foreground">
+              This equipment has been permanently retired from service. It has no open defect and no
+              return-to-service cycle applies; it cannot be inspected again.
+            </p>
+          )}
         </div>
       </div>
 
       {/* Footer warning */}
       <p className="text-center text-[11px] font-semibold text-muted-foreground mt-4 max-w-xs px-4">
-        This equipment failed a required safety inspection and is locked out. A supervisor must
-        resolve the defect and approve return-to-service before it can be inspected again.
+        {isRetired
+          ? 'If this equipment should still be in service, contact a supervisor to review its status.'
+          : 'This equipment failed a required safety inspection and is locked out. A supervisor must resolve the defect and approve return-to-service before it can be inspected again.'}
       </p>
+
+      {/* Escape hatch: this screen has no browser-back path (the trap below exists so a fresh
+          FAIL_BLOCKING submit cannot be backed into and resubmitted), and it is now also reached
+          by browsing directly to already-locked-out or retired equipment, not only right after a
+          failing submit. Without a forward path an operator who lands here has no way off the
+          screen short of force-closing the installed PWA (code review on DEV-143). */}
+      <button
+        type="button"
+        onClick={() => router.push('/')}
+        className="mt-6 rounded-lg border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground shadow-card"
+      >
+        Back to Equipment List
+      </button>
     </main>
   );
 }

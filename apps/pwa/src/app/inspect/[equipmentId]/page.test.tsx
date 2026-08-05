@@ -230,7 +230,9 @@ describe('checklist screen lockout gate', () => {
 
     renderChecklist();
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/lockout/${EQUIPMENT_ID}`));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(`/lockout/${EQUIPMENT_ID}?reason=retired`),
+    );
     expect(screen.queryByRole('button', { name: /submit inspection/i })).toBeNull();
   });
 

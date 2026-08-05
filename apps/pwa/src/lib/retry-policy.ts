@@ -85,10 +85,16 @@ export const defaultRetryRuntime: RetryRuntime = {
 
 // Raised by a caller that got an HTTP response, so the policy can tell a 503 (worth retrying)
 // from a 409 (never worth retrying) instead of treating every rejection as a transport failure.
+// `title` is the server's RFC 7807 problem code (app.ts's error handler sets it to the httpError
+// `code`), carried through so a caller can give the operator a reason instead of a generic
+// rejection message (code review on DEV-143), not just a retry/no-retry decision.
 export class HttpAttemptError extends Error {
   readonly kind = 'http';
 
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly title?: string,
+  ) {
     super(`request failed with status ${status}`);
     this.name = 'HttpAttemptError';
   }

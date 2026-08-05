@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RetryExhaustedError } from './retry-policy';
+import { HttpAttemptError, RetryExhaustedError } from './retry-policy';
 import { submitErrorMessage } from './submit-error-message';
 
 describe('submitErrorMessage', () => {
@@ -23,5 +23,32 @@ describe('submitErrorMessage', () => {
 
   it('falls back to a plain message for an unclassified failure', () => {
     expect(submitErrorMessage(new Error('boom'))).toMatch(/could not submit/i);
+  });
+
+  // DEV-143 code review: a 409 EQUIPMENT_OUT_OF_SERVICE or EQUIPMENT_RETIRED must not be flattened
+  // into the same generic "report to your supervisor" copy as every other rejection, since the
+  // operator already saw the lockout warning banner before submitting and deserves to know their
+  // specific submission was the problem, not something unexplained.
+  it('explains an EQUIPMENT_OUT_OF_SERVICE rejection specifically', () => {
+    const cause = new HttpAttemptError(409, 'EQUIPMENT_OUT_OF_SERVICE');
+    const message = submitErrorMessage(new RetryExhaustedError('not-retryable', 1, cause));
+
+    expect(message).toMatch(/locked out/i);
+    expect(message).toMatch(/still saved/i);
+  });
+
+  it('explains an EQUIPMENT_RETIRED rejection specifically', () => {
+    const cause = new HttpAttemptError(409, 'EQUIPMENT_RETIRED');
+    const message = submitErrorMessage(new RetryExhaustedError('not-retryable', 1, cause));
+
+    expect(message).toMatch(/retired/i);
+  });
+
+  it('falls back to the generic rejection message for an unrecognized title', () => {
+    const cause = new HttpAttemptError(409, 'IDEMPOTENCY_MISMATCH');
+    const message = submitErrorMessage(new RetryExhaustedError('not-retryable', 1, cause));
+
+    expect(message).toMatch(/supervisor/i);
+    expect(message).not.toMatch(/locked out|retired/i);
   });
 });

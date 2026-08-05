@@ -44,7 +44,9 @@ function ChecklistView(): ReactElement {
   const isRetired = equipment?.status === 'RETIRED';
   const isOutOfService = equipment?.status === 'OUT_OF_SERVICE';
   useEffect(() => {
-    if (isRetired) router.replace(`/lockout/${params.equipmentId}`);
+    // reason=retired tells the lockout screen not to show fabricated defects or
+    // return-to-service copy: RETIRED has neither (code review on DEV-143).
+    if (isRetired) router.replace(`/lockout/${params.equipmentId}?reason=retired`);
   }, [isRetired, router, params.equipmentId]);
 
   const {

@@ -180,6 +180,20 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
       // another Defect in the same lockout cycle (see the block below), which is how an operator
       // documents a second problem found while the unit is already torn down for repair. Return-
       // to-service is the only path back to AWAITING_INSPECTION either way.
+      //
+      // equipmentRow is read unlocked, above, before this check and before the transaction below.
+      // A PASS submitted in the narrow window between that read and a concurrent FAIL_BLOCKING
+      // submit's commit can still slip through with a stale AWAITING_INSPECTION status; this is
+      // not the invariant this gate closes for correctness, only for the common case, since
+      // computeReadiness still excludes the equipment once its status is actually OUT_OF_SERVICE
+      // regardless of that PASS row. Not worth a SELECT ... FOR UPDATE on every submit to close.
+      //
+      // Rejecting here (rather than accepting and just not restoring READY, the pre-DEV-143
+      // behavior) does mean an operator mid-walkaround when someone else's submission locks the
+      // same equipment loses that attempt's record entirely, not just its effect on readiness.
+      // Accepted deliberately (code review on DEV-143, 2026-08-04): each site runs 2 to 4
+      // operators against a small, fixed equipment pool, so two people independently inspecting
+      // the same unit at the same time is not a realistic scenario worth designing around.
       if (equipmentRow.status === 'OUT_OF_SERVICE' && result !== 'FAIL_BLOCKING') {
         throw httpError(
           409,
