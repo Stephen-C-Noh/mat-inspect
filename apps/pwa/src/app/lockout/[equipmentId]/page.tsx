@@ -36,12 +36,26 @@ function LockoutContent() {
   // fabricated defect and the RTS instruction back on the screen for a retired unit whenever its
   // status did not load. State no reason at all rather than the wrong one; "Do Not Operate" stands
   // either way, since that is the safe reading of an unknown status (code review on DEV-143).
+  //
+  // A loaded status that is neither lockout state (READY or AWAITING_INSPECTION, for example a
+  // supervisor completed return-to-service between the failing submit and this screen loading, or
+  // this URL is a stale bookmark) is not 'unknown' either: it is a confirmed answer that this is
+  // not a lockout tag, and showing "Do Not Operate" for equipment the server says is available
+  // would be actively wrong, not just uninformative (code review on DEV-143). Handled as a
+  // redirect below rather than a fourth copy variant, since there is nothing this screen should
+  // ever tell the operator about equipment that is not locked out.
+  const isAvailable = equipment?.status === 'READY' || equipment?.status === 'AWAITING_INSPECTION';
+
   const variant: 'retired' | 'lockout' | 'unknown' =
     equipment?.status === 'RETIRED'
       ? 'retired'
       : equipment?.status === 'OUT_OF_SERVICE'
         ? 'lockout'
         : 'unknown';
+
+  useEffect(() => {
+    if (isAvailable) router.replace('/');
+  }, [isAvailable, router]);
 
   // Blocking defects come from the inspection that just failed. There is no endpoint to
   // fetch them after the fact (the submit response carries no defect labels), so the submit
@@ -60,7 +74,12 @@ function LockoutContent() {
     lockedAt && !Number.isNaN(lockedAt.getTime()) ? lockedAt.toLocaleString() : 'Unknown';
 
   // --- HARD UI NAVIGATION LOCKOUT TRAP ---
+  // Must not engage while redirecting equipment that turned out to be available away (isAvailable
+  // above): trapping the operator on a screen this component is about to navigate off of anyway
+  // serves nothing (code review on DEV-143).
   useEffect(() => {
+    if (isAvailable) return;
+
     // Overrides popstate to forcefully re-push current page state
     window.history.pushState(null, '', window.location.href);
 
@@ -70,7 +89,11 @@ function LockoutContent() {
 
     window.addEventListener('popstate', lockViewport);
     return () => window.removeEventListener('popstate', lockViewport);
-  }, []);
+  }, [isAvailable]);
+
+  // Redirecting away (the effect above); render nothing rather than flash the lockout card for
+  // equipment the server just confirmed is not locked out.
+  if (isAvailable) return null;
 
   return (
     <main className="min-h-screen bg-muted p-4 flex flex-col justify-center items-center">
