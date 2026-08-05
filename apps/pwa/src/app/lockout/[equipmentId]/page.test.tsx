@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
@@ -9,11 +9,12 @@ import LockoutPage from './page';
 const EQUIPMENT_ID = '11111111-1111-1111-1111-111111111111';
 
 const push = vi.fn();
+const replace = vi.fn();
 let searchParams = new URLSearchParams();
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ equipmentId: EQUIPMENT_ID }),
-  useRouter: () => ({ push, replace: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push, replace, back: vi.fn() }),
   useSearchParams: () => searchParams,
 }));
 
@@ -35,7 +36,8 @@ vi.mock('@azure/msal-react', () => ({
   }),
 }));
 
-let equipmentStatus: 'OUT_OF_SERVICE' | 'RETIRED' | 'READY' = 'OUT_OF_SERVICE';
+let equipmentStatus: 'OUT_OF_SERVICE' | 'RETIRED' | 'READY' | 'AWAITING_INSPECTION' =
+  'OUT_OF_SERVICE';
 let equipmentFetchFails = false;
 
 const fetchMock = vi.fn(async (url: string) => {
@@ -72,6 +74,7 @@ const renderLockout = (): ReturnType<typeof render> => {
 beforeEach(() => {
   cleanup();
   push.mockClear();
+  replace.mockClear();
   fetchMock.mockClear();
   searchParams = new URLSearchParams();
   equipmentStatus = 'OUT_OF_SERVICE';
@@ -157,14 +160,21 @@ describe('lockout screen copy source', () => {
     expect(screen.getByText(/do not operate/i)).not.toBeNull();
   });
 
-  it('does not claim a lockout for equipment that is in neither lockout state', async () => {
-    equipmentStatus = 'READY';
-    searchParams = new URLSearchParams({ defect: 'Forks cracked' });
-    renderLockout();
+  // Copilot review on PR #132: a loaded status that is neither lockout state (a supervisor
+  // completed return-to-service between the failing submit and this screen loading, or this URL
+  // is a stale bookmark) was falling into the same 'unknown' bucket as a pending/failed read and
+  // showing "Do Not Operate" for equipment the server says is available. Redirects away instead,
+  // and must not engage the popstate trap while doing so.
+  it.each(['READY', 'AWAITING_INSPECTION'] as const)(
+    'redirects away instead of showing a lockout tag for %s equipment',
+    async (status) => {
+      equipmentStatus = status;
+      searchParams = new URLSearchParams({ defect: 'Forks cracked' });
+      renderLockout();
 
-    // Waits for the row to land, so the assertions below are not just the pending render.
-    await screen.findByText('Forklift 1');
-    expect(screen.queryByText('Forks cracked')).toBeNull();
-    expect(screen.queryByText(/must resolve the defect/i)).toBeNull();
-  });
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
+      expect(screen.queryByText('Do Not Operate')).toBeNull();
+      expect(screen.queryByText('Forks cracked')).toBeNull();
+    },
+  );
 });
