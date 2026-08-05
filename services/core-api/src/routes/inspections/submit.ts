@@ -126,6 +126,16 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
         throw httpError(404, 'EQUIPMENT_NOT_FOUND', `Equipment ${body.equipmentId} not found`);
       }
 
+      // RETIRED is terminal: there is no repair-and-return-to-service cycle for it (ADR 0006),
+      // so no submission against it is ever meaningful.
+      if (equipmentRow.status === 'RETIRED') {
+        throw httpError(
+          409,
+          'EQUIPMENT_RETIRED',
+          `Equipment ${body.equipmentId} is retired and cannot accept a new inspection`,
+        );
+      }
+
       const [template] = await db
         .select()
         .from(checklistTemplates)
@@ -161,6 +171,22 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
       }
 
       const result = deriveInspectionResult(template.items, body.responses);
+
+      // OUT_OF_SERVICE is a sticky, supervisor-controlled state (ADR 0006): a PASS or
+      // FAIL_WARNING result would not restore READY (computeReadiness excludes OUT_OF_SERVICE
+      // rows from the passing-today check entirely) and would not open a Defect either, so
+      // accepting it would only write a confusing record into the immutable audit trail for
+      // equipment that stays locked out regardless. A FAIL_BLOCKING result is different: it opens
+      // another Defect in the same lockout cycle (see the block below), which is how an operator
+      // documents a second problem found while the unit is already torn down for repair. Return-
+      // to-service is the only path back to AWAITING_INSPECTION either way.
+      if (equipmentRow.status === 'OUT_OF_SERVICE' && result !== 'FAIL_BLOCKING') {
+        throw httpError(
+          409,
+          'EQUIPMENT_OUT_OF_SERVICE',
+          `Equipment ${body.equipmentId} is OUT_OF_SERVICE; only a submission that opens a new blocking defect is accepted until return-to-service`,
+        );
+      }
 
       let responseBody: ReturnType<typeof serializeInspection>;
       // Captured from inside the transaction so the post-commit Teams alert can deep-link to the

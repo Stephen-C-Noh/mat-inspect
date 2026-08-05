@@ -33,6 +33,20 @@ function ChecklistView(): ReactElement {
     [equipmentList, params.equipmentId],
   );
 
+  // RETIRED equipment never gets a checklist: it is permanently decommissioned, there is no
+  // repair-and-return-to-service cycle for it, and core-api rejects every submit against it
+  // (DEV-143). OUT_OF_SERVICE is different: an operator can legitimately reopen the checklist on
+  // already-locked-out equipment and find another BLOCKING problem while it is torn down for
+  // repair (submit.ts opens a second Defect in the same cycle; see the DEV-101 lockout-cycle
+  // test). So OUT_OF_SERVICE only gets a warning banner below, not a redirect; core-api still
+  // rejects a PASS or WARNING-only result against it with 409, surfaced by the normal submit
+  // error path.
+  const isRetired = equipment?.status === 'RETIRED';
+  const isOutOfService = equipment?.status === 'OUT_OF_SERVICE';
+  useEffect(() => {
+    if (isRetired) router.replace(`/lockout/${params.equipmentId}`);
+  }, [isRetired, router, params.equipmentId]);
+
   const {
     data: template,
     isLoading: checklistLoading,
@@ -125,6 +139,8 @@ function ChecklistView(): ReactElement {
   if (!equipment)
     return <div className="p-8 text-center text-destructive">Equipment not found.</div>;
 
+  if (isRetired) return <div className="p-8 text-center">Equipment is locked out...</div>;
+
   if (checklistLoading) return <div className="p-8 text-center">Loading checklist...</div>;
   if (checklistError)
     return (
@@ -176,6 +192,16 @@ function ChecklistView(): ReactElement {
       </header>
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 p-4">
+        {isOutOfService && (
+          <div
+            role="alert"
+            className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm font-semibold text-destructive"
+          >
+            This equipment is already locked out (OUT_OF_SERVICE). Only a submission that finds
+            another blocking problem is accepted here; a pass or warning-only result will be
+            rejected until a supervisor completes return-to-service.
+          </div>
+        )}
         <div>
           <div className="flex items-start justify-between gap-2">
             <h1 className="text-2xl font-extrabold text-foreground">{equipment.name} Inspection</h1>

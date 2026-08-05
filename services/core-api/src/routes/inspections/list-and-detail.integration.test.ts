@@ -139,8 +139,13 @@ describe('GET /inspections and GET /inspections/:id', () => {
         equipmentId: opts.equipmentId ?? equipmentId,
         templateId,
         responses: [
-          { itemKey: 'horn', value: true, passed: true },
-          { itemKey: 'forks-condition', value: opts.passed, passed: opts.passed },
+          // `passed` fails the WARNING item (horn), not the BLOCKING one (forks-condition): this
+          // file tests listing/detail/RBAC, not the defect lifecycle, and a BLOCKING failure would
+          // flip equipment.status to OUT_OF_SERVICE (ADR 0006) and make every later `passed: true`
+          // submit against the shared `equipmentId` 409 under the DEV-143 lockout gate. The
+          // BLOCKING/OUT_OF_SERVICE path is covered by defects.integration.test.ts instead.
+          { itemKey: 'horn', value: opts.passed, passed: opts.passed },
+          { itemKey: 'forks-condition', value: true, passed: true },
         ],
         attested: true,
       },
@@ -215,9 +220,13 @@ describe('GET /inspections and GET /inspections/:id', () => {
       payload: {
         equipmentId,
         templateId,
+        // Fails the WARNING item (horn), not the BLOCKING one, for the same reason as the shared
+        // `submit` helper above: a BLOCKING failure here would flip equipment.status to
+        // OUT_OF_SERVICE and 409 every later `passed: true` submit against the shared equipmentId
+        // (DEV-143). The photo round-trip being asserted does not depend on failSeverity.
         responses: [
-          { itemKey: 'horn', value: true, passed: true },
-          { itemKey: 'forks-condition', value: false, passed: false, photoIds: [photoA, photoB] },
+          { itemKey: 'horn', value: false, passed: false, photoIds: [photoA, photoB] },
+          { itemKey: 'forks-condition', value: true, passed: true },
         ],
         attested: true,
       },
@@ -238,8 +247,8 @@ describe('GET /inspections and GET /inspections/:id', () => {
     );
     // Preserved in submit order on the item that carried them; empty array (not absent) on the
     // item that carried none.
-    expect(byKey['forks-condition']).toEqual([photoA, photoB]);
-    expect(byKey['horn']).toEqual([]);
+    expect(byKey['horn']).toEqual([photoA, photoB]);
+    expect(byKey['forks-condition']).toEqual([]);
   });
 
   it('rejects a response carrying more than 10 photo references', async () => {

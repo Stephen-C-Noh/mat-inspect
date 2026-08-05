@@ -54,6 +54,10 @@ describe('inspections API', () => {
   let templateId: string;
   let inactiveTemplateId: string;
   let truckTemplateId: string;
+  let oosEquipmentId: string;
+  let retiredEquipmentId: string;
+  let blockingEquipmentId: string;
+  let blockingEquipmentId2: string;
 
   beforeAll(async () => {
     delete process.env['ENTRA_TENANT_ID'];
@@ -124,6 +128,52 @@ describe('inspections API', () => {
       })
       .returning();
     truckTemplateId = truckTemplateRow!.id;
+
+    // Locked-out equipment (DEV-143), to assert a new inspection cannot be submitted against it
+    // until return-to-service, regardless of what the submitted responses would derive to.
+    const [oosEquipmentRow] = await migrationDb
+      .insert(equipment)
+      .values({
+        assetTag: 'FORK-INSP-OOS',
+        name: 'Forklift OOS',
+        type: 'FORKLIFT',
+        status: 'OUT_OF_SERVICE',
+      })
+      .returning();
+    oosEquipmentId = oosEquipmentRow!.id;
+
+    // Retired equipment (DEV-143): terminal, no repair-and-return-to-service cycle applies, so
+    // every submit against it is rejected regardless of result.
+    const [retiredEquipmentRow] = await migrationDb
+      .insert(equipment)
+      .values({
+        assetTag: 'FORK-INSP-RETIRED',
+        name: 'Forklift Retired',
+        type: 'FORKLIFT',
+        status: 'RETIRED',
+      })
+      .returning();
+    retiredEquipmentId = retiredEquipmentRow!.id;
+
+    // A separate equipment row for the FAIL_BLOCKING tests: submitting a BLOCKING failure sets
+    // equipment.status to OUT_OF_SERVICE (ADR 0006), and every other test in this file reuses the
+    // shared `equipmentId` expecting it to still accept a submit (DEV-143 changed that from a
+    // no-op status write to a hard 409 gate). Isolating the blocking-failure tests here keeps the
+    // shared fixture in its original AWAITING_INSPECTION state for the rest of the suite.
+    const [blockingEquipmentRow] = await migrationDb
+      .insert(equipment)
+      .values({ assetTag: 'FORK-INSP-BLOCKING', name: 'Forklift Blocking', type: 'FORKLIFT' })
+      .returning();
+    blockingEquipmentId = blockingEquipmentRow!.id;
+
+    // A second one: the FAIL_BLOCKING test above already sets blockingEquipmentId to
+    // OUT_OF_SERVICE, so the operatorId/result-derivation test below needs its own equipment to
+    // reach the derivation logic instead of being stopped by the DEV-143 gate first.
+    const [blockingEquipmentRow2] = await migrationDb
+      .insert(equipment)
+      .values({ assetTag: 'FORK-INSP-BLOCKING-2', name: 'Forklift Blocking 2', type: 'FORKLIFT' })
+      .returning();
+    blockingEquipmentId2 = blockingEquipmentRow2!.id;
 
     await migrationPool.end();
 
@@ -259,7 +309,7 @@ describe('inspections API', () => {
 
   it('derives FAIL_BLOCKING when a BLOCKING item fails, overriding a passing WARNING item', async () => {
     const res = await submit({
-      equipmentId,
+      equipmentId: blockingEquipmentId,
       templateId,
       responses: [
         { itemKey: 'forks-condition', value: false, passed: false },
@@ -273,7 +323,7 @@ describe('inspections API', () => {
 
   it('ignores a client-supplied operatorId and result, deriving both server-side', async () => {
     const res = await submit({
-      equipmentId,
+      equipmentId: blockingEquipmentId2,
       templateId,
       operatorId: MANAGER_ID,
       result: 'PASS',
@@ -509,5 +559,61 @@ describe('inspections API', () => {
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().title).toBe('INSPECTION_TEMPLATE_INACTIVE');
+  });
+
+  it('rejects a fully-passing submit against OUT_OF_SERVICE equipment with 409 (DEV-143)', async () => {
+    const res = await submit({
+      equipmentId: oosEquipmentId,
+      templateId,
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().title).toBe('EQUIPMENT_OUT_OF_SERVICE');
+  });
+
+  it('rejects a FAIL_WARNING-only submit against OUT_OF_SERVICE equipment with 409 (DEV-143)', async () => {
+    const res = await submit({
+      equipmentId: oosEquipmentId,
+      templateId,
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: false, passed: false },
+      ],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().title).toBe('EQUIPMENT_OUT_OF_SERVICE');
+  });
+
+  it('accepts a FAIL_BLOCKING submit against OUT_OF_SERVICE equipment, opening another defect in the same lockout cycle (DEV-143)', async () => {
+    const res = await submit({
+      equipmentId: oosEquipmentId,
+      templateId,
+      responses: [
+        { itemKey: 'forks-condition', value: false, passed: false },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().result).toBe('FAIL_BLOCKING');
+  });
+
+  it('rejects any submit against RETIRED equipment with 409, regardless of result (DEV-143)', async () => {
+    const res = await submit({
+      equipmentId: retiredEquipmentId,
+      templateId,
+      responses: [
+        { itemKey: 'forks-condition', value: true, passed: true },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
+      attested: true,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().title).toBe('EQUIPMENT_RETIRED');
   });
 });
