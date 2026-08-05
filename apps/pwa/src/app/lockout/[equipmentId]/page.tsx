@@ -74,11 +74,14 @@ function LockoutContent() {
     lockedAt && !Number.isNaN(lockedAt.getTime()) ? lockedAt.toLocaleString() : 'Unknown';
 
   // --- HARD UI NAVIGATION LOCKOUT TRAP ---
-  // Must not engage while redirecting equipment that turned out to be available away (isAvailable
-  // above): trapping the operator on a screen this component is about to navigate off of anyway
-  // serves nothing (code review on DEV-143).
+  // Must not engage until the equipment read has resolved and confirmed the unit is not
+  // available (Copilot review on PR #133): engaging it during the pending render, then
+  // redirecting once the status turns out to be READY/AWAITING_INSPECTION, leaves the pushed
+  // history entry behind. Back would land on this route again, bounce straight through the
+  // isAvailable redirect, and read as a flash back onto the very screen the trap exists to
+  // keep the operator off of.
   useEffect(() => {
-    if (isAvailable) return;
+    if (isPending || isAvailable) return;
 
     // Overrides popstate to forcefully re-push current page state
     window.history.pushState(null, '', window.location.href);
@@ -89,7 +92,7 @@ function LockoutContent() {
 
     window.addEventListener('popstate', lockViewport);
     return () => window.removeEventListener('popstate', lockViewport);
-  }, [isAvailable]);
+  }, [isPending, isAvailable]);
 
   // Redirecting away (the effect above); render nothing rather than flash the lockout card for
   // equipment the server just confirmed is not locked out.

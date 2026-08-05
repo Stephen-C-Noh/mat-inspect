@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
@@ -172,7 +172,7 @@ describe('lockout screen copy source', () => {
       searchParams = new URLSearchParams({ defect: 'Forks cracked' });
       renderLockout();
 
-      await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
       expect(screen.queryByText('Do Not Operate')).toBeNull();
       expect(screen.queryByText('Forks cracked')).toBeNull();
     },
