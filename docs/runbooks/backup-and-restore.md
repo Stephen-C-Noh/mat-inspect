@@ -137,18 +137,39 @@ dumps only is up to 24 hours.
 
 1. On a clean host: `git pull` the repository, place the `.env` file, and copy the latest dumps into
    place from the off-host backup.
-2. Start only the database: `docker compose up -d postgres`. Wait for it to report healthy. On first
+2. Fetch the AI Service model weights: `./scripts/fetch-ai-models.sh`. These are not in the database
+   and not in Git (DEV-95; ~1.5 GB, license-bound, bind-mounted read-only from `./models`). A host
+   rebuilt from the database backup alone comes up with every service healthy except transcription,
+   which fails closed with a 503 until this step runs. Found during the DEV-45 drill (2026-08-04):
+   the AI Service reported healthy throughout because its healthcheck does not probe model load, so
+   this gap only surfaces when an operator records a voice note, not in `docker-health-check.sh`.
+3. Start only the database: `docker compose up -d postgres`. Wait for it to report healthy. On first
    start `infra/docker/postgres-init.sh` creates `core_db`, `audit_db`, and the roles.
-3. Restore each dump into its database:
+4. Restore each dump into its database:
    ```
    docker compose exec -T postgres pg_restore --no-owner --clean --if-exists \
      -U "$POSTGRES_USER" -d core_db /path/to/core_db_<timestamp>.dump
    ```
    Restore `audit_db` the same way. `audit_db` rows are append-only; the immutability triggers allow
    the COPY load a restore uses.
-4. Start the rest of the stack: `docker compose up -d`.
-5. Run the smoke checks: `./scripts/docker-health-check.sh` and `./scripts/smoke-gateway.sh`.
-6. Record the time taken and any issue found. The DR runbook is a capstone deliverable.
+5. Start the rest of the stack: `docker compose up -d`.
+6. Run the smoke checks: `./scripts/docker-health-check.sh` and `./scripts/smoke-gateway.sh`, then have
+   an operator log in, read the equipment list, and submit one test inspection. The first two scripts
+   check reachability and the auth surface; neither logs in, so a login-level regression (for example
+   a redirect URI or role-claim break) is invisible to them.
+7. Record the time taken and any issue found. The DR runbook is a capstone deliverable.
+
+### 3.3 Drill log
+
+| Date       | Ticket | Environment                                                                                                      | RTO (restore + smoke)                                                | Issues found                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------- | ------ | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-04 | DEV-45 | Dev staging (M5 mini-PC), isolated compose project alongside the live stack, restoring the Aug 4 02:00 UTC dumps | ~1.5 min DB restore; all 9 services healthy within ~2 min of `up -d` | (1) AI model weights are not covered by the pg_dump backup or Git and must be fetched separately (`scripts/fetch-ai-models.sh`); added as step 2 above. (2) No gate stops an operator from opening and submitting a fresh inspection against equipment that is already `OUT_OF_SERVICE`; tracked separately as DEV-143. (3) The live stack's `caddy` container reported unhealthy at 12 days uptime; the drill's freshly started `caddy` was healthy, so this looks like a long-uptime issue on the live container, not a restore defect. Worth a look independent of this ticket. |
+
+The measured RTO above is optimistic relative to a true from-scratch rebuild: this drill ran on a
+host with the Docker images already cached (no image pull) and against dev staging's small synthetic
+dataset (10 equipment, 8 inspections, 12 audit events). A cold host or a larger dataset will both add
+time; the 1 to 2 hour RTO in ARCHITECTURE.md 12.6 already accounts for that and is not contradicted by
+this result.
 
 ---
 
