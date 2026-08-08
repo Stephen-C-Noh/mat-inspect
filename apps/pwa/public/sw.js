@@ -20,5 +20,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Chrome internally issues requests with cache: 'only-if-cached' paired with mode other than
+  // 'same-origin' (prefetch and similar); re-issuing that combination via fetch() inside a
+  // service worker throws, per spec, even though the browser's own network stack handles it
+  // fine outside one. Falling through here (not calling respondWith) leaves the browser's
+  // default handling in place, same as if this file did not exist (DEV-144 review).
+  if (event.request.cache === 'only-if-cached' && event.request.mode !== 'same-origin') return;
   event.respondWith(fetch(event.request));
 });

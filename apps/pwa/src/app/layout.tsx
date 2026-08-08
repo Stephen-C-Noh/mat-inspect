@@ -13,8 +13,20 @@ export const metadata: Metadata = {
   description: 'Operator PWA equipment list',
   manifest: '/manifest.webmanifest',
   icons: {
-    icon: '/icons/icon-192.png',
+    // A dedicated small icon, not icon-192.png: that one is sized for the Android install
+    // prompt and its transparent background reads low-contrast in a dark browser tab strip at
+    // favicon size, and fetching 16KB to draw 16px of it on every page load is wasteful
+    // (DEV-144 review). favicon-32.png has an opaque background like apple-touch-icon.
+    icon: '/favicon-32.png',
     apple: '/apple-touch-icon.png',
+  },
+  // iOS Safari does not read the manifest's `display: standalone` on every version; without
+  // this, Add to Home Screen can still show Safari chrome and label the icon with the document
+  // title instead of a short name (DEV-144 review).
+  appleWebApp: {
+    capable: true,
+    title: 'MAT-Inspect',
+    statusBarStyle: 'default',
   },
 };
 
