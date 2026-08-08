@@ -40,6 +40,7 @@ BUILD_IMAGES="${BUILD_IMAGES:-true}"       # set false if images are already in 
 require() { if [ -z "${!1:-}" ]; then echo "ERROR: required env var $1 is not set" >&2; exit 1; fi; }
 for v in ENTRA_TENANT_ID ENTRA_CLIENT_ID APPLICATIONINSIGHTS_CONNECTION_STRING \
          PG_ADMIN_PASSWORD AUDIT_MIGRATOR_DB_PASSWORD AUDIT_WRITER_DB_PASSWORD \
+         CORE_API_MIGRATOR_DB_PASSWORD CORE_API_WRITER_DB_PASSWORD \
          AUDIT_INGEST_TOKEN CORE_API_INTERNAL_TOKEN REPORT_SIGNING_PRIVATE_KEY; do
   require "$v"
 done
@@ -96,7 +97,7 @@ az postgres flexible-server firewall-rule create -g "$RG" --server-name "$PG" \
   --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 -o none
 PG_FQDN="${PG}.postgres.database.azure.com"
 
-echo ">> Databases and least-privilege audit roles (mirrors infra/docker/postgres-init.sh)"
+echo ">> Databases and least-privilege audit + core_api roles (mirrors infra/docker/postgres-init.sh, DEV-146)"
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
   --querytext "CREATE DATABASE core_db;" -o none || true
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
@@ -105,6 +106,10 @@ az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_P
   --querytext "CREATE ROLE audit_migrator LOGIN PASSWORD '${AUDIT_MIGRATOR_DB_PASSWORD}';" -o none || true
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
   --querytext "CREATE ROLE audit_writer LOGIN PASSWORD '${AUDIT_WRITER_DB_PASSWORD}';" -o none || true
+az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
+  --querytext "CREATE ROLE core_api_migrator LOGIN PASSWORD '${CORE_API_MIGRATOR_DB_PASSWORD}';" -o none || true
+az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
+  --querytext "CREATE ROLE core_api_writer LOGIN PASSWORD '${CORE_API_WRITER_DB_PASSWORD}';" -o none || true
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d audit_db \
   --querytext "ALTER SCHEMA public OWNER TO audit_migrator; \
     GRANT CREATE ON DATABASE audit_db TO audit_migrator; \
@@ -112,9 +117,19 @@ az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_P
     ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public GRANT SELECT, INSERT ON TABLES TO audit_writer; \
     ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO audit_writer;" \
   -o none
+# core_api_writer gets UPDATE too (equipment status, defect lifecycle, outbox.processed_at), unlike
+# audit_writer's INSERT+SELECT-only grant; core-api never deletes a row, so no DELETE grant either.
+az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d core_db \
+  --querytext "ALTER SCHEMA public OWNER TO core_api_migrator; \
+    GRANT CREATE ON DATABASE core_db TO core_api_migrator; \
+    GRANT CONNECT ON DATABASE core_db TO core_api_writer; \
+    ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE ON TABLES TO core_api_writer; \
+    ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO core_api_writer;" \
+  -o none
 
 # Derived connection strings (never printed). All carry sslmode=require (Azure PG mandates TLS).
-CORE_API_DB_URL="postgres://${PG_ADMIN_USER}:${PG_ADMIN_PASSWORD}@${PG_FQDN}:5432/core_db?sslmode=require"
+CORE_API_DB_URL="postgres://core_api_writer:${CORE_API_WRITER_DB_PASSWORD}@${PG_FQDN}:5432/core_db?sslmode=require"
+CORE_MIGRATOR_DB_URL="postgres://core_api_migrator:${CORE_API_MIGRATOR_DB_PASSWORD}@${PG_FQDN}:5432/core_db?sslmode=require"
 AUDIT_API_DB_URL="postgres://audit_writer:${AUDIT_WRITER_DB_PASSWORD}@${PG_FQDN}:5432/audit_db?sslmode=require"
 AUDIT_MIGRATOR_DB_URL="postgres://audit_migrator:${AUDIT_MIGRATOR_DB_PASSWORD}@${PG_FQDN}:5432/audit_db?sslmode=require"
 
@@ -272,8 +287,9 @@ Front Door default endpoints (usable immediately for testing):
 Next steps (runbook Part B):
   1. Upload AI model weights to the '${AI_SHARE}' Azure Files share and confirm the ai app mounts
      them at /models (az containerapp update --yaml, see the runbook).
-  2. Run migrations: core-api against core_db, audit against audit_db as audit_migrator
-     (AUDIT_MIGRATOR_DB_URL). Then seed synthetic data (db/seed.ts) into core_db.
+  2. Run migrations: core-api against core_db as core_api_migrator (CORE_MIGRATOR_DB_URL), audit
+     against audit_db as audit_migrator (AUDIT_MIGRATOR_DB_URL). Then seed synthetic data
+     (db/seed.ts) into core_db.
   3. Add custom domains on the two Front Door endpoints (az afd custom-domain create), add the DNS
      records, and validate.
   4. Add the front-end origins (custom domains, or the default endpoints above) as SPA redirect URIs

@@ -5,10 +5,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      # Read by postgres-init.sh to create the audit_migrator / audit_writer roles (DEV-23,
-      # ARCHITECTURE.md 8.4 rule 8). Only used at first volume init.
+      # Read by postgres-init.sh to create the audit_migrator / audit_writer / core_api_migrator /
+      # core_api_writer roles (DEV-23, DEV-146, ARCHITECTURE.md 8.4 rule 8). Only used at first
+      # volume init.
       AUDIT_MIGRATOR_DB_PASSWORD: ${AUDIT_MIGRATOR_DB_PASSWORD}
       AUDIT_WRITER_DB_PASSWORD: ${AUDIT_WRITER_DB_PASSWORD}
+      CORE_API_MIGRATOR_DB_PASSWORD: ${CORE_API_MIGRATOR_DB_PASSWORD}
+      CORE_API_WRITER_DB_PASSWORD: ${CORE_API_WRITER_DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/docker/postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
@@ -144,6 +147,10 @@ services:
     environment:
       PORT: '3000'
       OTEL_SERVICE_NAME: core-api
+      # Runtime connection: core_api_writer (SELECT/INSERT/UPDATE only, no DELETE, not the owner
+      # of the immutability triggers on inspections/inspection_responses/outbox; DEV-146). Set
+      # CORE_API_DB_URL to a core_api_writer connection string, not the Postgres admin role.
+      # Migrations run separately via CORE_MIGRATOR_DB_URL (see db/migrate.ts), never this one.
       DATABASE_URL: ${CORE_API_DB_URL}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}

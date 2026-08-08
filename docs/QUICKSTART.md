@@ -48,7 +48,7 @@ root first):
 
 ```bash
 cd services/core-api
-npm run db:migrate
+npm run db:migrate     # core_db, via CORE_MIGRATOR_DB_URL
 npm run db:seed        # 10 equipment + 4 checklist templates into core_db
 cd ../audit
 npm run db:migrate     # audit_db, via AUDIT_MIGRATOR_DB_URL
@@ -203,3 +203,39 @@ rather start clean instead of patching an existing volume, that means
 dropping the `postgres_data` volume (`docker compose down -v`), which also
 deletes every other table in it (`core_db` included); do not do this without
 checking who else is using the volume first.
+
+### `CORE_MIGRATOR_DB_URL must be set` or core-api migrate fails with a role/permission error
+
+Same failure mode as above, for `core_db`'s `core_api_migrator` / `core_api_writer` roles
+(DEV-146). Check whether they exist:
+
+```bash
+docker exec mat-inspect-postgres-1 sh -c \
+  'psql -U "$POSTGRES_USER" -d core_db -c "select rolname from pg_roles where rolname like '"'"'core_api_%'"'"';"'
+```
+
+If that returns 0 rows, recreate the roles and grants by hand the same way as the audit roles
+above (again, letting the container substitute its own env vars):
+
+```bash
+docker exec mat-inspect-postgres-1 sh -c '
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<-SQL
+  CREATE ROLE core_api_migrator LOGIN PASSWORD '"'"'$CORE_API_MIGRATOR_DB_PASSWORD'"'"';
+  CREATE ROLE core_api_writer LOGIN PASSWORD '"'"'$CORE_API_WRITER_DB_PASSWORD'"'"';
+SQL
+'
+
+docker exec mat-inspect-postgres-1 sh -c '
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname core_db <<-SQL
+  ALTER SCHEMA public OWNER TO core_api_migrator;
+  GRANT CREATE ON DATABASE core_db TO core_api_migrator;
+  GRANT CONNECT ON DATABASE core_db TO core_api_writer;
+  ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE ON TABLES TO core_api_writer;
+  ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO core_api_writer;
+SQL
+'
+```
+
+Then `npm run db:migrate` in `services/core-api` should succeed.
