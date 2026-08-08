@@ -396,7 +396,7 @@ The audit log is the legal record. Naive hash-chain implementations have five co
 
 6. **Defense-in-depth CHECK constraint.** A Postgres function `verify_audit_hash(event_row, prev_hash)` recomputes the hash from canonical JSON and the supplied `prev_hash`; a CHECK constraint on the table calls this function. Even if application code has a bug, the database rejects malformed entries. **Implementation note (DEV-23):** A faithful RFC 8785 reimplementation in PL/pgSQL is deferred. A PL/pgSQL canonicalizer that diverges from the Node-side `canonicalize` library would silently reject every valid insert or provide false assurance; the risk exceeds the benefit for capstone scope. Startup chain verification (rule 7 below) achieves the same "detect app bug" goal in Node, where the real canonicalizer runs. This constraint is a stated gap, not a hidden one (see ADR 0007 for the precedent of documenting residual risks explicitly).
 
-7. **Chain verification.** On startup, Audit Service verifies the last 1000 events. A nightly job verifies the full chain. Any break triggers a CRITICAL alert to Admin and freezes new writes until manual review.
+7. **Chain verification.** On startup, Audit Service verifies the full chain (a bounded "last 1000 events" check was the original design, but the implementation does a full genesis-to-tail walk instead: at capstone scale this takes milliseconds, and no separate scheduler exists in this codebase for a distinct nightly job, so the nightly job below runs the same full walk). Any break triggers a CRITICAL alert to Admin and freezes new writes until manual review. The manual review procedure is `docs/runbooks/audit-chain-break-recovery.md` (DEV-145): how to read the break from logs, triage its cause, restore `audit_db`, and reset the `core_db.outbox` delivery state so no queued event is silently lost.
 
 8. **No schema changes touch the chain.** Migrations on `audit_events` use a separate Postgres role (`audit_migrator`) and require an out-of-band approval. The migration role has DDL privileges only, not INSERT. Operational writes use the `audit_writer` role which has only INSERT.
 
@@ -681,7 +681,7 @@ Caddy:
 ### 12.5 Backup Strategy
 
 - Postgres (dev-staging): `pg_dump` nightly + WAL archiving every 5 minutes to off-host storage. RPO ~5 minutes.
-- Postgres (prod): Azure Database for PostgreSQL automated backups with 7-day retention and geo-redundancy. RPO ~5 minutes; managed by Azure.
+- Postgres (prod): Azure Database for PostgreSQL automated backups with 7-day retention and geo-redundancy. RPO ~5 minutes; managed by Azure. Geo-redundant backup requires the General Purpose tier or higher; a SAIT production deployment should provision at that tier. The team's own Azure demo (ADR 0024) runs Burstable (`Standard_B1ms`) for cost, so its automated backups are locally redundant only, not geo-redundant, for the demo's lifetime (see `docs/runbooks/audit-chain-break-recovery.md` section 7.1).
 - Azure Blob Storage (prod): geo-redundant storage (GRS) replication is on by default; point-in-time restore available. No manual mirror job required.
 - Azurite (dev-staging): not backed up; dev data only.
 - Configuration: All in Git.
