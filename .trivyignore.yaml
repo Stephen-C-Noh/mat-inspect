@@ -21,12 +21,6 @@
 #
 # Tracked in DEV-102.
 vulnerabilities:
-  # fast-uri (ajv dependency) in the core-api, media, and audit images. Fix is 3.1.5, published
-  # 2026-07-31; blocked by min-release-age until 2026-08-07 (see scripts/audit-allowlist.json
-  # GHSA-7p8r-x3mc-p8w7, expires 2026-08-07 there; one day later here per the note above).
-  - id: CVE-2026-18446
-    expired_at: 2026-08-08
-    statement: 'fast-uri 3.1.5 fix (host confusion via backslash authority introducer). Cooldown-blocked; mirrors scripts/audit-allowlist.json GHSA-7p8r-x3mc-p8w7.'
   # starlette CVEs in the AI image (fastapi 0.111.0 pulls starlette 0.37.2). Clearing them needs
   # starlette >= 1.3.1, a fastapi 0.111 -> ~0.140 major jump that also re-ports the FOIP multipart
   # disk-spool guard (max_file_size -> spool_max_size, plus the new 1 MB max_part_size cap). Tracked

@@ -1,14 +1,1 @@
-{
-  "GHSA-mh99-v99m-4gvg": {
-    "expires": "2026-08-05",
-    "reason": "brace-expansion: DoS via unbounded expansion length. The minimatch@10.2.5 (brace-expansion@^5.0.5) path is fixed: 5.0.8 published 2026-07-23, cleared min-release-age 2026-07-30, applied via override. Two paths remain, both dev/lint-only, no runtime surface: eslint's minimatch (brace-expansion@^1.0.0, needs 1.1.17, published 2026-07-29, clears 2026-08-05) and glob's minimatch (brace-expansion@^2.0.0, needs 2.1.3, published 2026-07-28, clears 2026-08-04). Bump both overrides once their fixes age in."
-  },
-  "GHSA-rgw5-rvv9-x895": {
-    "expires": "2026-08-06",
-    "reason": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the GHSA-mh99-v99m-4gvg mitigation. Published 2026-07-30 across all three affected lines (1.1.18, 2.1.4, 5.0.9), so every current override (1.1.16, 2.1.2, 5.0.8) is vulnerable again; all three fixes clear min-release-age 2026-08-06. Dev/lint-only, no runtime surface. Bump all three overrides once the fixes age in."
-  },
-  "GHSA-7p8r-x3mc-p8w7": {
-    "expires": "2026-08-07",
-    "reason": "fast-uri: host confusion via backslash authority introducer (CVE-2026-18446). Fix is 3.1.5, published 2026-07-31; blocked by min-release-age until 2026-08-07. Ships in the core-api, media, and audit runtime images (ajv dependency), so this is also tolerated in .trivyignore.yaml until the same date; keep both in sync. Apply the override once the fix ages in."
-  }
-}
+{}
