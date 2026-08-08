@@ -99,12 +99,14 @@ assumption) and escalate before touching the database.
 
 ---
 
-## 4. Restore `audit_db`
+## 4. Restore `audit_db` (dev staging)
+
+This section is dev staging only (mini-PC, Docker Compose, self-hosted Postgres). The live Azure
+demo (ADR 0024) is a **currently running, different environment** with a different restore
+mechanism; see section 9. Do not follow the `docker compose` commands below against the Azure demo.
 
 This follows the same restore mechanics as `docs/runbooks/backup-and-restore.md` section 3.2,
-scoped to `audit_db` only. Do this on dev staging exactly as written; the same steps apply to a
-future production Azure-hosted `audit_db`, substituting the managed restore mechanism (ADR 0005) for
-`pg_restore`.
+scoped to `audit_db` only.
 
 1. Stop the Audit Service so nothing tries to boot against a half-restored database:
    ```
@@ -220,7 +222,82 @@ WHERE processed_at IS NOT NULL
 
 ---
 
-## 7. Record the incident
+## 7. Azure demo environment (live now, not a future state)
+
+DEV-121 (ADR 0024) put the full stack on Azure Container Apps behind Azure Front Door, with
+Azure Database for PostgreSQL Flexible Server as the data tier, on the team's own tenant
+(`lowell2753`, tenant `fa517e85`). It has been live since 2026-07-25 and is scheduled for
+teardown on 2026-08-21, per `scripts/azure/teardown.sh`. Until teardown, a chain break there is
+a real, actionable scenario, not a hypothetical for a SAIT deployment that does not exist yet
+(sections 1 to 6 above cover dev staging on Docker Compose; do not run those commands here).
+
+### 7.1 A real gap: the demo's Postgres tier is not geo-redundant
+
+`scripts/azure/provision.sh` creates the server with `--tier Burstable --sku-name
+Standard_B1ms`. Azure Database for PostgreSQL Flexible Server only offers geo-redundant backup
+on General Purpose or Memory Optimized tiers; Burstable does not support it. ARCHITECTURE.md
+12.5 states "Postgres (prod): Azure Database for PostgreSQL automated backups with 7-day
+retention and geo-redundancy" — that line describes the intended production posture on a
+General Purpose+ tier, not the Burstable demo server actually running today. The demo has
+locally-redundant automated backups with 7-day retention only. If the region has an outage
+during the demo window, there is no geo-redundant copy to fall back to. This is a real,
+uncorrected gap in ARCHITECTURE.md 12.5 as of this writing; flag it if the demo's blast radius
+matters for the sponsor pilot (DEV-90) or presentation (DEV-92).
+
+### 7.2 How the mechanics differ from dev staging
+
+There is no `db-backup` compose service and no `docker compose` on the ACA demo. The equivalents:
+
+| Dev staging (sections 1-6) | Azure demo |
+| --- | --- |
+| `docker compose logs audit` | `az containerapp logs show -n audit -g MAT-Inspect --follow`, or the `mat-inspect-logs` Log Analytics workspace |
+| `docker compose stop/start audit` | `az containerapp revision restart -n audit -g MAT-Inspect --revision <name>` (or scale to 0/1 via `az containerapp update --min-replicas 0` then back) |
+| `pg_restore` from a local dump | `az postgres flexible-server restore` — **this creates a brand-new server**, it does not restore in place. There is no equivalent of "restore over the live database." |
+| `psql` on the `postgres` container | `psql` (or `az postgres flexible-server execute`, needs the `rdbms-connect` extension — gcc/libpq-dev/python3-dev first, then add the extension without `sudo`, see the DEV-121 provisioning notes) against `mat-inspect-pg-220503.postgres.database.azure.com`, from a host allowed through the server firewall |
+| running a query from a shell on the host | `az containerapp exec` works non-interactively if wrapped in a pty: `script -qec "az containerapp exec -n core-api -g MAT-Inspect --command '...'" /dev/null` (confirmed working for migrations during DEV-121 redeploys) |
+
+### 7.3 Restore procedure (Azure)
+
+1. Confirm which server to restore and to what point in time:
+   ```
+   az postgres flexible-server show --name mat-inspect-pg-220503 -g MAT-Inspect
+   az postgres flexible-server list-backups --name mat-inspect-pg-220503 -g MAT-Inspect
+   ```
+2. Point-in-time restore creates a **new** server (cannot target the same name as the source):
+   ```
+   az postgres flexible-server restore \
+     --name mat-inspect-pg-220503-restored \
+     --source-server mat-inspect-pg-220503 \
+     --restore-time "<UTC timestamp before the break>"
+   ```
+3. The restored server only contains `audit_db` (and `core_db`) at the restore point, on a
+   **different hostname**. Either:
+   - Re-point the `audit` container app's `DATABASE_URL` secret to the restored server
+     (`az containerapp secret set` + `az containerapp update --set-env-vars`), and decommission
+     the old server once confirmed good, or
+   - `pg_dump` just `audit_db` off the restored server and `pg_restore` it into the original
+     server's `audit_db` (keeps the hostname/secret unchanged, costs an extra dump/restore hop).
+     Preferred when only `audit_db` needs recovery and `core_db` on the original server is fine.
+4. Follow section 5's `processed_at` reset logic unchanged: find `max(occurred_at)` from
+   whichever `audit_db` ends up live, then reset `core_db.outbox` rows created after that point
+   (minus the same safety margin). The query is identical; only the connection string to reach
+   `core_db` changes (Azure Postgres, `sslmode=require`).
+5. Bring `audit` back (new revision picks up the secret change automatically) and verify with
+   `az containerapp logs show -n audit -g MAT-Inspect --tail 50`, watching for the same `audit
+   chain verified on startup` line as section 6 step 2.
+
+### 7.4 Do not conflate this with the DEV-90 pilot
+
+DEV-90 (the scripted sponsor pilot) explicitly runs on **dev staging**, not the Azure demo — its
+own acceptance criteria say so. A chain break during the Azure demo window matters for DEV-92
+(capstone presentation, if it runs against the Azure demo) and for the demo's own credibility
+between 2026-07-25 and the 2026-08-21 teardown, but it does not block the DEV-90 pilot itself.
+Check which environment is actually in front of the sponsor before choosing between section 4-6
+and this section.
+
+---
+
+## 8. Record the incident
 
 Log what happened the same way the DR drill does (`docs/runbooks/backup-and-restore.md` section
 3.3): date, which dump was restored, the triage cause from section 3, how many outbox rows were
@@ -233,7 +310,7 @@ draining to zero.
 
 ---
 
-## 8. Out of scope
+## 9. Out of scope
 
 A quarantine mode — refuse new writes but keep serving exports of the cryptographically verified
 prefix up to `brokenAtSeq`, labelled as ending at that sequence, instead of the whole service going
