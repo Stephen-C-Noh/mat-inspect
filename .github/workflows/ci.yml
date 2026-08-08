@@ -122,18 +122,28 @@ jobs:
     strategy:
       matrix:
         include:
+          # GIT_SHA (DEV-99): baked in as an ENV so /health can report the commit this image was
+          # built from. Every matrix entry gets it (added here, not just to the two Next apps).
           - name: core-api
             context: .
             dockerfile: services/core-api/Dockerfile
+            build_args: |
+              GIT_SHA=${{ github.sha }}
           - name: media
             context: .
             dockerfile: services/media/Dockerfile
+            build_args: |
+              GIT_SHA=${{ github.sha }}
           - name: audit
             context: .
             dockerfile: services/audit/Dockerfile
+            build_args: |
+              GIT_SHA=${{ github.sha }}
           - name: ai
             context: services/ai
             dockerfile: services/ai/Dockerfile
+            build_args: |
+              GIT_SHA=${{ github.sha }}
           # NEXT_PUBLIC_* are inlined into the client bundle at build time (DEV-110). Without
           # these, the published image ships an empty client_id and Entra login fails with
           # AADSTS900144. Tenant id and client id are public identifiers, so plain repo Variables,
@@ -185,8 +195,12 @@ jobs:
           file: ${{ matrix.dockerfile }}
           target: runtime
           push: ${{ github.event_name == 'push' }}
-          # Empty for every image except pwa and dashboard (see the matrix comment).
+          # Empty for pwa and dashboard's tenant/client id args (see the matrix comment).
           build-args: ${{ matrix.build_args }}
+          # DEV-99: the standard OCI label, so `docker image inspect` answers "which commit built
+          # this" without needing the sha- tag (which nothing else consumes) as the only record.
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
           tags: |
             ghcr.io/${{ env.OWNER }}/mat-inspect/${{ matrix.name }}:latest
             ghcr.io/${{ env.OWNER }}/mat-inspect/${{ matrix.name }}:sha-${{ github.sha }}

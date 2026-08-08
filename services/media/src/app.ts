@@ -83,7 +83,13 @@ export const buildApp = async (): Promise<ReturnType<typeof Fastify>> => {
     });
   });
 
-  app.get('/health', async () => ({ status: 'ok', service: 'media' }));
+  // revision: the commit this image was built from (DEV-99), so a deployed stack can be asked
+  // from outside whether it is on the commit it is supposed to be on, not just whether it is alive.
+  app.get('/health', async () => ({
+    status: 'ok',
+    service: 'media',
+    revision: process.env['GIT_SHA'] ?? 'unknown',
+  }));
 
   await app.register(uploadPhotoRoute, { prefix: '/api/v1/media' });
   await app.register(getPhotoRoute, { prefix: '/api/v1/media' });
