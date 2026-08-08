@@ -321,8 +321,8 @@ DASH_EP=$(az afd endpoint show -g "$RG" --profile-name "$FD" --endpoint-name mat
 # first pwa image build above. Rebuild pwa now that DASH_EP is known, and redeploy it. This second
 # build uses a distinct tag rather than reusing "$TAG": `az containerapp update --image` with an
 # unchanged image reference string can skip creating a new revision even though the ACR content
-# changed (the same gotcha noted in scripts/azure/redeploy-notes.md), so a plain rebuild-in-place
-# under "$TAG" would silently leave the first, dashboard-URL-less image running.
+# changed underneath that tag, so a plain rebuild-in-place under "$TAG" would silently leave the
+# first, dashboard-URL-less image running.
 if [ "$BUILD_IMAGES" = "true" ]; then
   echo ">> Rebuilding pwa with the dashboard's Front Door endpoint baked in"
   PWA_TAG="${TAG}-dashboard-url"
