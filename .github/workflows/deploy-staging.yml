@@ -43,6 +43,12 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY }}
           envs: GHCR_TOKEN,GHCR_OWNER,DEPLOY_SHA
           script: |
+            set -e
+            # Without this, appleboy/ssh-action reports the step's outcome from the last command
+            # only: docker-health-check.sh failing mid-script (DEV-99's commit-mismatch assertion,
+            # or the pre-existing not-all-healthy check) printed its error and kept going straight
+            # into smoke-gateway.sh, which then passed and made the whole deploy look green.
+            # Confirmed happening in run 31271090854 before this fix.
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_OWNER" --password-stdin
             cd ~/projects/mat-inspect
             git pull
