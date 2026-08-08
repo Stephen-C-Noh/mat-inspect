@@ -11,8 +11,15 @@ import { fileURLToPath } from 'url';
 // Passes the connection string directly to drizzle() rather than constructing a pg.Pool, which
 // avoids a @types/pg version conflict between drizzle-orm's own nested @types/pg and the
 // workspace root's @types/pg when building inside Docker.
-const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
-const rawUrl = process.env['AUDIT_MIGRATOR_DB_URL']?.replace('@postgres:', `@${localHost}:`);
+// DB_HOST_LOCAL: set to localhost (Docker Desktop) or <project>-postgres-1.orb.local (OrbStack)
+// when running from the host machine, where the "postgres" hostname used inside the container
+// network does not resolve. Must stay unset for in-container runs (compose does not set it):
+// "@postgres:" is already the correct, resolvable host there, and defaulting this rewrite to
+// localhost breaks the in-container migrate path with a misleading ECONNREFUSED (DEV-149).
+const localHost = process.env['DB_HOST_LOCAL'];
+const rawUrl = localHost
+  ? process.env['AUDIT_MIGRATOR_DB_URL']?.replace('@postgres:', `@${localHost}:`)
+  : process.env['AUDIT_MIGRATOR_DB_URL'];
 
 if (!rawUrl) {
   process.stderr.write('AUDIT_MIGRATOR_DB_URL must be set\n');

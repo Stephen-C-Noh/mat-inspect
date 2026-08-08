@@ -240,16 +240,24 @@ SQL
 docker exec mat-inspect-postgres-1 sh -c '
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname core_db <<-SQL
   ALTER SCHEMA public OWNER TO core_api_migrator;
+  -- The drizzle schema holds __drizzle_migrations, the journal table migrate.ts reads and writes
+  -- on every run. Skipping it here leaves that table owned by the admin role: core_api_migrator
+  -- can still CREATE SCHEMA IF NOT EXISTS "drizzle" (it holds CREATE on the database) but cannot
+  -- record the migration it just applied, which surfaces as a misleading permission error deep
+  -- inside drizzle-orm rather than at this handover step (DEV-149). Only matters on a database
+  -- that already has migration history, e.g. a restore or an upgrade; a fresh provision creates
+  -- and owns the schema itself.
+  ALTER SCHEMA drizzle OWNER TO core_api_migrator;
   -- Hands every table and sequence core_db already has (created by the old admin-role
   -- migrate.ts runs) to core_api_migrator.
   DO \$\$
   DECLARE r RECORD;
   BEGIN
-    FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = '"'"'public'"'"' LOOP
-      EXECUTE format('"'"'ALTER TABLE public.%I OWNER TO core_api_migrator'"'"', r.tablename);
+    FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('"'"'public'"'"', '"'"'drizzle'"'"') LOOP
+      EXECUTE format('"'"'ALTER TABLE %I.%I OWNER TO core_api_migrator'"'"', r.schemaname, r.tablename);
     END LOOP;
-    FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = '"'"'public'"'"' LOOP
-      EXECUTE format('"'"'ALTER SEQUENCE public.%I OWNER TO core_api_migrator'"'"', r.sequencename);
+    FOR r IN SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname IN ('"'"'public'"'"', '"'"'drizzle'"'"') LOOP
+      EXECUTE format('"'"'ALTER SEQUENCE %I.%I OWNER TO core_api_migrator'"'"', r.schemaname, r.sequencename);
     END LOOP;
   END \$\$;
   GRANT CREATE ON DATABASE core_db TO core_api_migrator;

@@ -130,16 +130,28 @@ az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_P
 # Docker image's bootstrap superuser with "cannot reassign ownership of objects ... required by
 # the database system" (confirmed locally); the ALTER ... OWNER TO loop has no such restriction
 # and needs only what ALTER SCHEMA public OWNER TO already relies on just below.
+# drizzle holds __drizzle_migrations, the journal table migrate.ts reads and writes on every run.
+# A rerun of this script against a database that already has migration history (drizzle schema
+# already exists, owned by $PG_ADMIN_USER) needs it handed over too, or core_api_migrator can
+# CREATE SCHEMA IF NOT EXISTS "drizzle" but not record the migration it just applied (DEV-149). A
+# fresh provision has no drizzle schema yet, so this is a no-op there: the migrator creates and
+# owns it itself.
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d core_db \
   --querytext "ALTER SCHEMA public OWNER TO core_api_migrator; \
     DO \$\$ \
+    BEGIN \
+      IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'drizzle') THEN \
+        EXECUTE 'ALTER SCHEMA drizzle OWNER TO core_api_migrator'; \
+      END IF; \
+    END \$\$; \
+    DO \$\$ \
     DECLARE r RECORD; \
     BEGIN \
-      FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP \
-        EXECUTE format('ALTER TABLE public.%I OWNER TO core_api_migrator', r.tablename); \
+      FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('public', 'drizzle') LOOP \
+        EXECUTE format('ALTER TABLE %I.%I OWNER TO core_api_migrator', r.schemaname, r.tablename); \
       END LOOP; \
-      FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = 'public' LOOP \
-        EXECUTE format('ALTER SEQUENCE public.%I OWNER TO core_api_migrator', r.sequencename); \
+      FOR r IN SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname IN ('public', 'drizzle') LOOP \
+        EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO core_api_migrator', r.schemaname, r.sequencename); \
       END LOOP; \
     END \$\$; \
     GRANT CREATE ON DATABASE core_db TO core_api_migrator; \
