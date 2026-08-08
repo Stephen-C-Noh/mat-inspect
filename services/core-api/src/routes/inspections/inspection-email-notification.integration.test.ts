@@ -59,6 +59,7 @@ describe('failed-inspection email wiring (DEV-81)', () => {
   let app: Awaited<ReturnType<(typeof import('../../app.js'))['buildApp']>>;
   let operatorToken: string;
   let equipmentId: string;
+  let blockingEquipmentId: string;
   let templateId: string;
 
   beforeAll(async () => {
@@ -97,6 +98,16 @@ describe('failed-inspection email wiring (DEV-81)', () => {
       .returning();
     equipmentId = equipmentRow!.id;
 
+    // A separate equipment row for the FAIL_BLOCKING test: submitting a BLOCKING failure sets
+    // equipment.status to OUT_OF_SERVICE (ADR 0006), and the PASS/FAIL_WARNING tests below reuse
+    // the shared `equipmentId` expecting it to still accept a submit (DEV-143 rejects a PASS or
+    // FAIL_WARNING-only submit against OUT_OF_SERVICE equipment with 409).
+    const [blockingEquipmentRow] = await migrationDb
+      .insert(equipment)
+      .values({ assetTag: 'FORK-EMAIL-BLOCKING', name: 'Forklift Blocking', type: 'FORKLIFT' })
+      .returning();
+    blockingEquipmentId = blockingEquipmentRow!.id;
+
     const [templateRow] = await migrationDb
       .insert(checklistTemplates)
       .values({
@@ -127,7 +138,7 @@ describe('failed-inspection email wiring (DEV-81)', () => {
     delete process.env['SUPERVISOR_ALERT_EMAILS'];
   });
 
-  const submit = (responses: Array<Record<string, unknown>>) =>
+  const submit = (responses: Array<Record<string, unknown>>, targetEquipmentId = equipmentId) =>
     app.inject({
       method: 'POST',
       url: '/api/v1/inspections',
@@ -135,7 +146,7 @@ describe('failed-inspection email wiring (DEV-81)', () => {
         authorization: `Bearer ${operatorToken}`,
         'idempotency-key': randomUUID(),
       },
-      payload: { equipmentId, templateId, responses, attested: true },
+      payload: { equipmentId: targetEquipmentId, templateId, responses, attested: true },
     });
 
   const passingResponses = [
@@ -145,10 +156,13 @@ describe('failed-inspection email wiring (DEV-81)', () => {
 
   it('sends the supervisor email on FAIL_BLOCKING with recipients, asset tag, operator, and defect', async () => {
     sendMailMock.mockClear();
-    const res = await submit([
-      { itemKey: 'forks-condition', value: false, passed: false },
-      { itemKey: 'horn', value: true, passed: true },
-    ]);
+    const res = await submit(
+      [
+        { itemKey: 'forks-condition', value: false, passed: false },
+        { itemKey: 'horn', value: true, passed: true },
+      ],
+      blockingEquipmentId,
+    );
     expect(res.statusCode).toBe(201);
     expect(res.json().result).toBe('FAIL_BLOCKING');
 
@@ -160,7 +174,7 @@ describe('failed-inspection email wiring (DEV-81)', () => {
       text: string;
     };
     expect(message.to).toEqual(SUPERVISOR_EMAILS);
-    expect(message.subject).toContain('FORK-EMAIL-1');
+    expect(message.subject).toContain('FORK-EMAIL-BLOCKING');
     expect(message.subject).not.toContain('Operator User'); // no PII in the subject (FRS AC-8.1.3)
     expect(message.text).toContain('Operator User'); // display name resolved from the users table
     expect(message.text).toContain('Forks free of cracks, bends, and excessive wear');

@@ -126,6 +126,16 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
         throw httpError(404, 'EQUIPMENT_NOT_FOUND', `Equipment ${body.equipmentId} not found`);
       }
 
+      // RETIRED is terminal: there is no repair-and-return-to-service cycle for it (ADR 0006),
+      // so no submission against it is ever meaningful.
+      if (equipmentRow.status === 'RETIRED') {
+        throw httpError(
+          409,
+          'EQUIPMENT_RETIRED',
+          `Equipment ${body.equipmentId} is retired and cannot accept a new inspection`,
+        );
+      }
+
       const [template] = await db
         .select()
         .from(checklistTemplates)
@@ -161,6 +171,36 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
       }
 
       const result = deriveInspectionResult(template.items, body.responses);
+
+      // OUT_OF_SERVICE is a sticky, supervisor-controlled state (ADR 0006): a PASS or
+      // FAIL_WARNING result would not restore READY (computeReadiness excludes OUT_OF_SERVICE
+      // rows from the passing-today check entirely) and would not open a Defect either, so
+      // accepting it would only write a confusing record into the immutable audit trail for
+      // equipment that stays locked out regardless. A FAIL_BLOCKING result is different: it opens
+      // another Defect in the same lockout cycle (see the block below), which is how an operator
+      // documents a second problem found while the unit is already torn down for repair. Return-
+      // to-service is the only path back to AWAITING_INSPECTION either way.
+      //
+      // equipmentRow is read unlocked, above, before this check and before the transaction below.
+      // A PASS submitted in the narrow window between that read and a concurrent FAIL_BLOCKING
+      // submit's commit can still slip through with a stale AWAITING_INSPECTION status; this is
+      // not the invariant this gate closes for correctness, only for the common case, since
+      // computeReadiness still excludes the equipment once its status is actually OUT_OF_SERVICE
+      // regardless of that PASS row. Not worth a SELECT ... FOR UPDATE on every submit to close.
+      //
+      // Rejecting here (rather than accepting and just not restoring READY, the pre-DEV-143
+      // behavior) does mean an operator mid-walkaround when someone else's submission locks the
+      // same equipment loses that attempt's record entirely, not just its effect on readiness.
+      // Accepted deliberately (code review on DEV-143, 2026-08-04): each site runs 2 to 4
+      // operators against a small, fixed equipment pool, so two people independently inspecting
+      // the same unit at the same time is not a realistic scenario worth designing around.
+      if (equipmentRow.status === 'OUT_OF_SERVICE' && result !== 'FAIL_BLOCKING') {
+        throw httpError(
+          409,
+          'EQUIPMENT_OUT_OF_SERVICE',
+          `Equipment ${body.equipmentId} is OUT_OF_SERVICE; only a submission that opens a new blocking defect is accepted until return-to-service`,
+        );
+      }
 
       let responseBody: ReturnType<typeof serializeInspection>;
       // Captured from inside the transaction so the post-commit Teams alert can deep-link to the
