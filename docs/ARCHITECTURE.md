@@ -681,7 +681,7 @@ Caddy:
 ### 12.5 Backup Strategy
 
 - Postgres (dev-staging): `pg_dump` nightly + WAL archiving every 5 minutes to off-host storage. RPO ~5 minutes.
-- Postgres (prod): Azure Database for PostgreSQL automated backups with 7-day retention and geo-redundancy. RPO ~5 minutes; managed by Azure.
+- Postgres (prod): Azure Database for PostgreSQL automated backups with 7-day retention and geo-redundancy. RPO ~5 minutes; managed by Azure. Geo-redundant backup requires the General Purpose tier or higher; a SAIT production deployment should provision at that tier. The team's own Azure demo (ADR 0024) runs Burstable (`Standard_B1ms`) for cost, so its automated backups are locally redundant only, not geo-redundant, for the demo's lifetime (see `docs/runbooks/audit-chain-break-recovery.md` section 7.1).
 - Azure Blob Storage (prod): geo-redundant storage (GRS) replication is on by default; point-in-time restore available. No manual mirror job required.
 - Azurite (dev-staging): not backed up; dev data only.
 - Configuration: All in Git.
