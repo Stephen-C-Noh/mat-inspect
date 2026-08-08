@@ -139,12 +139,22 @@ jobs:
           # AADSTS900144. Tenant id and client id are public identifiers, so plain repo Variables,
           # not Secrets. Only the two Next apps declare these ARGs; the other images have no
           # build_args and so get none.
+          #
+          # NEXT_PUBLIC_DASHBOARD_URL (DEV-148) only covers dev staging: the GHCR pwa image this
+          # job publishes is what deploy-staging.yml deploys there (docker compose pull, never
+          # build), so this is the only place that actually reaches it. The Azure demo pwa image
+          # is a separate build (scripts/azure/provision.sh, its own build_arg) because it needs
+          # the demo's own dashboard origin, which does not exist until that script has created
+          # the dashboard container app and its Front Door endpoint. A single repo Variable here
+          # cannot serve both origins, unlike ENTRA_TENANT_ID/ENTRA_CLIENT_ID which are the same
+          # value everywhere.
           - name: pwa
             context: .
             dockerfile: apps/pwa/Dockerfile
             build_args: |
               NEXT_PUBLIC_AZURE_TENANT_ID=${{ vars.ENTRA_TENANT_ID }}
               NEXT_PUBLIC_AZURE_CLIENT_ID=${{ vars.ENTRA_CLIENT_ID }}
+              NEXT_PUBLIC_DASHBOARD_URL=${{ vars.DASHBOARD_URL }}
           - name: dashboard
             context: .
             dockerfile: apps/dashboard/Dockerfile
