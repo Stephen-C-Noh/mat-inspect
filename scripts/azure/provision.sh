@@ -316,6 +316,23 @@ make_routes mat-inspect-dashboard og-dash
 PWA_EP=$(az afd endpoint show -g "$RG" --profile-name "$FD" --endpoint-name mat-inspect-pwa --query hostName -o tsv)
 DASH_EP=$(az afd endpoint show -g "$RG" --profile-name "$FD" --endpoint-name mat-inspect-dashboard --query hostName -o tsv)
 
+# NEXT_PUBLIC_DASHBOARD_URL (DEV-148) is inlined at build time (Next.js), but the dashboard app and
+# its Front Door endpoint (DASH_EP) do not exist until this point in the script, well after the
+# first pwa image build above. Rebuild pwa now that DASH_EP is known, and redeploy it. This second
+# build uses a distinct tag rather than reusing "$TAG": `az containerapp update --image` with an
+# unchanged image reference string can skip creating a new revision even though the ACR content
+# changed underneath that tag, so a plain rebuild-in-place under "$TAG" would silently leave the
+# first, dashboard-URL-less image running.
+if [ "$BUILD_IMAGES" = "true" ]; then
+  echo ">> Rebuilding pwa with the dashboard's Front Door endpoint baked in"
+  PWA_TAG="${TAG}-dashboard-url"
+  az acr build -r "$ACR" -t "${IMG_PREFIX}/pwa:${PWA_TAG}" -f apps/pwa/Dockerfile --target runtime \
+    --build-arg NEXT_PUBLIC_AZURE_TENANT_ID="$ENTRA_TENANT_ID" \
+    --build-arg NEXT_PUBLIC_AZURE_CLIENT_ID="$ENTRA_CLIENT_ID" \
+    --build-arg NEXT_PUBLIC_DASHBOARD_URL="https://${DASH_EP}" . -o none
+  az containerapp update -g "$RG" -n pwa --image "${ACR_SERVER}/${IMG_PREFIX}/pwa:${PWA_TAG}" -o none
+fi
+
 cat <<EOF
 
 Provisioning complete (resources added to existing RG: $RG).
