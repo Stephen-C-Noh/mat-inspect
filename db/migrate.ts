@@ -4,17 +4,23 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// DB_HOST_LOCAL: use localhost (Docker Desktop) or <project>-postgres-1.orb.local (OrbStack).
-const localHost = process.env['DB_HOST_LOCAL'] ?? 'localhost';
+// DB_HOST_LOCAL: set to localhost (Docker Desktop) or <project>-postgres-1.orb.local (OrbStack)
+// when running from the host machine, where the "postgres" hostname used inside the container
+// network does not resolve. Must stay unset for in-container runs (compose does not set it):
+// "@postgres:" is already the correct, resolvable host there, and defaulting this rewrite to
+// localhost breaks the in-container migrate path with a misleading ECONNREFUSED (DEV-149).
+const localHost = process.env['DB_HOST_LOCAL'];
+const rewriteHost = (url: string | undefined) =>
+  localHost && url ? url.replace('@postgres:', `@${localHost}:`) : url;
 // CORE_MIGRATOR_DB_URL runs as core_api_migrator (DDL only), a role separate from the
 // core_api_writer connection the running service uses (DEV-146, mirrors
 // services/audit/db/migrate.ts's AUDIT_MIGRATOR_DB_URL / audit_migrator split). DATABASE_URL and
 // CORE_API_DB_URL remain as fallbacks for testcontainers-based integration tests and any other
 // setup that only has a single admin connection string, not a scoped migrator role.
 const rawUrl =
-  process.env['CORE_MIGRATOR_DB_URL']?.replace('@postgres:', `@${localHost}:`) ??
+  rewriteHost(process.env['CORE_MIGRATOR_DB_URL']) ??
   process.env['DATABASE_URL'] ??
-  process.env['CORE_API_DB_URL']?.replace('@postgres:', `@${localHost}:`);
+  rewriteHost(process.env['CORE_API_DB_URL']);
 
 if (!rawUrl) {
   process.stderr.write('CORE_MIGRATOR_DB_URL, DATABASE_URL, or CORE_API_DB_URL must be set\n');

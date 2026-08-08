@@ -53,6 +53,9 @@ On the mini-PC (`stephen-noh@stephen-noh-M5-PLUS`, checkout `~/projects/mat-insp
    deploy's `git pull` is a no-op and the compose file and scripts silently stay stale. Then
    `git pull --ff-only`. Never `reset --hard`.
 2. If not deploying through CI: `docker compose pull` (or `build`), then `docker compose up -d`.
+   `docker compose up -d` does not rebuild images itself; if the checkout has service-code changes
+   not yet in a pulled image, run `docker compose build` first or the stack starts stale code with
+   no error (DEV-149).
 3. Migrations and seed do not run on deploy. Run them from the deployed images (DEV-97 made the
    published images able to do this) or from the checkout: `npm run db:migrate` and
    `npm run db:seed` in `services/core-api`. Schema was current and seed data present on

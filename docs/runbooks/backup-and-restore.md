@@ -162,24 +162,33 @@ dumps only is up to 24 hours.
 OWNED BY` looks like the tool for this but fails against `$POSTGRES_USER` here (it is the
    image's initdb bootstrap superuser; Postgres refuses to `REASSIGN OWNED BY` that specific
    role), so use the same `ALTER ... OWNER TO` loop as the existing-volume bootstrap below:
+
    ```
    docker compose exec -T postgres psql -U "$POSTGRES_USER" -d core_db <<-SQL
+     ALTER SCHEMA drizzle OWNER TO core_api_migrator;
      DO \$\$
      DECLARE r RECORD;
      BEGIN
-       FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
-         EXECUTE format('ALTER TABLE public.%I OWNER TO core_api_migrator', r.tablename);
+       FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('public', 'drizzle') LOOP
+         EXECUTE format('ALTER TABLE %I.%I OWNER TO core_api_migrator', r.schemaname, r.tablename);
        END LOOP;
-       FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = 'public' LOOP
-         EXECUTE format('ALTER SEQUENCE public.%I OWNER TO core_api_migrator', r.sequencename);
+       FOR r IN SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname IN ('public', 'drizzle') LOOP
+         EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO core_api_migrator', r.schemaname, r.sequencename);
        END LOOP;
      END \$\$;
      GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO core_api_writer;
      GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO core_api_writer;
    SQL
    ```
+
+   The `drizzle` schema holds `__drizzle_migrations`, the journal table migrate.ts reads and writes
+   on every run; skipping it here leaves that table owned by the admin role and a later migration
+   fails to record itself even though it applied (DEV-149). `core_api_writer` does not need access
+   to `drizzle`, only the migrator does.
+
    Same recipe as the existing-volume bootstrap in `docs/QUICKSTART.md`'s
    `CORE_MIGRATOR_DB_URL must be set` section; see that section if this fails partway.
+
 6. Start the rest of the stack: `docker compose up -d`.
 7. Run the smoke checks: `./scripts/docker-health-check.sh` and `./scripts/smoke-gateway.sh`, then have
    an operator log in, read the equipment list, and submit one test inspection. The first two scripts
