@@ -150,8 +150,12 @@ services:
       # Runtime connection: core_api_writer (SELECT/INSERT/UPDATE only, no DELETE, not the owner
       # of the immutability triggers on inspections/inspection_responses/outbox; DEV-146). Set
       # CORE_API_DB_URL to a core_api_writer connection string, not the Postgres admin role.
-      # Migrations run separately via CORE_MIGRATOR_DB_URL (see db/migrate.ts), never this one.
       DATABASE_URL: ${CORE_API_DB_URL}
+      # Migrations run as core_api_migrator, never DATABASE_URL above. Set here (not just in the
+      # host .env) so `docker compose exec core-api node ../../db/dist/migrate.js` picks it up —
+      # that is the documented way to migrate core_db on dev staging, and it runs inside this
+      # container's own environment, not the host's.
+      CORE_MIGRATOR_DB_URL: ${CORE_MIGRATOR_DB_URL}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}

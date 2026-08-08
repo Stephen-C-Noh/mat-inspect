@@ -18,6 +18,20 @@ writes the inspection, its responses, and an outbox row in one `core_db` transac
 is asynchronous. With the Audit Service unreachable, `services/core-api/src/outbox/poller.ts` retries
 delivery every tick indefinitely (no retry cap, no dead-letter queue) and just logs a warning.
 
+A row that will never deliver (a permanently malformed payload, the DEV-142 class of bug) has no
+delete escape hatch as of DEV-146: `outbox`'s immutability trigger rejects DELETE unconditionally,
+even for a superuser connection (`db/migrations/0011_outbox_immutability_trigger.sql`). To stop the
+poller from retrying such a row forever, set `processed_at` by hand instead of deleting it — the
+trigger allows that column through, and the poller only ever re-selects rows where `processed_at IS
+NULL`:
+
+```sql
+UPDATE outbox SET processed_at = now() WHERE id = '<poison row id>';
+```
+
+This silences the row without erasing evidence that it existed; record the row's `id` and why it was
+silenced in the incident log (section 8) the same way a restore's outbox reset is recorded.
+
 Still working during the outage: inspection submit, equipment lockout, defect creation, supervisor
 notifications, computed readiness.
 
@@ -329,9 +343,10 @@ proven, so the premise is not taken on faith during a real recovery.
   proves this directly). This closes the exact mechanism DEV-145's drill used deliberately to
   corrupt the chain: disabling a trigger from the same connection that writes through it.
 - `outbox` now has an immutability trigger (`db/migrations/0011_outbox_immutability_trigger.sql`).
-  `processed_at` can be updated (the poller needs this); `id`, `event_type`, and `payload` cannot be
-  changed after insert, and DELETE/TRUNCATE are rejected outright, at the row level and the role
-  level both.
+  `processed_at` can be updated (the poller needs this); `id`, `event_type`, `payload`, and
+  `created_at` cannot be changed after insert, and DELETE/TRUNCATE are rejected outright, at the
+  row level and the role level both. There is no delete-based escape hatch for a permanently bad
+  row; see section 1's `processed_at` workaround.
 - Migrations on `core_db` run as `core_api_migrator` (`CORE_MIGRATOR_DB_URL`), a role separate from
   the one the running service uses, the same separation rule ARCHITECTURE.md 8.4 rule 8 already
   applied to `audit_db`.

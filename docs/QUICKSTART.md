@@ -214,8 +214,20 @@ docker exec mat-inspect-postgres-1 sh -c \
   'psql -U "$POSTGRES_USER" -d core_db -c "select rolname from pg_roles where rolname like '"'"'core_api_%'"'"';"'
 ```
 
-If that returns 0 rows, recreate the roles and grants by hand the same way as the audit roles
-above (again, letting the container substitute its own env vars):
+If that returns 0 rows, recreate the roles and grants by hand (again, letting the container
+substitute its own env vars). **This is not the same recipe as the audit roles above.** `audit_db`
+and its roles were created together from day one, so there was never a point where `audit_db` had
+tables owned by anything other than `audit_migrator`. `core_db` is the opposite: on any checkout
+that predates DEV-146, its tables already exist and are owned by `$POSTGRES_USER` (the admin role).
+`ALTER DEFAULT PRIVILEGES` only ever applies to objects created _after_ the grant runs, so on an
+existing `core_db` it silently grants nothing on the tables that are already there, and
+`core_api_migrator` cannot run migration 0011 either (it does not own the tables it would need to
+add a trigger to). Both problems need existing objects handed over explicitly, not just the
+default-privilege statement. `REASSIGN OWNED BY` looks like the obvious tool for this but fails
+here: in the official Postgres image `$POSTGRES_USER` is the initdb bootstrap superuser, and
+Postgres refuses to `REASSIGN OWNED BY` that specific role ("cannot reassign ownership of objects
+... required by the database system"). Use a loop of `ALTER TABLE/SEQUENCE ... OWNER TO` instead,
+confirmed working against a populated `core_db`:
 
 ```bash
 docker exec mat-inspect-postgres-1 sh -c '
@@ -228,8 +240,24 @@ SQL
 docker exec mat-inspect-postgres-1 sh -c '
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname core_db <<-SQL
   ALTER SCHEMA public OWNER TO core_api_migrator;
+  -- Hands every table and sequence core_db already has (created by the old admin-role
+  -- migrate.ts runs) to core_api_migrator.
+  DO \$\$
+  DECLARE r RECORD;
+  BEGIN
+    FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = '"'"'public'"'"' LOOP
+      EXECUTE format('"'"'ALTER TABLE public.%I OWNER TO core_api_migrator'"'"', r.tablename);
+    END LOOP;
+    FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = '"'"'public'"'"' LOOP
+      EXECUTE format('"'"'ALTER SEQUENCE public.%I OWNER TO core_api_migrator'"'"', r.sequencename);
+    END LOOP;
+  END \$\$;
   GRANT CREATE ON DATABASE core_db TO core_api_migrator;
   GRANT CONNECT ON DATABASE core_db TO core_api_writer;
+  -- Existing objects: the ownership change above does not touch the writer'"'"'s grants.
+  GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO core_api_writer;
+  GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO core_api_writer;
+  -- Future objects: what any later `npm run db:migrate` creates.
   ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE ON TABLES TO core_api_writer;
   ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public
@@ -238,4 +266,5 @@ SQL
 '
 ```
 
-Then `npm run db:migrate` in `services/core-api` should succeed.
+Then `npm run db:migrate` in `services/core-api` should succeed, and will pick up migration 0011
+(the outbox trigger) against the tables that already existed.

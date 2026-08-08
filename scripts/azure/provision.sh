@@ -119,10 +119,33 @@ az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_P
   -o none
 # core_api_writer gets UPDATE too (equipment status, defect lifecycle, outbox.processed_at), unlike
 # audit_writer's INSERT+SELECT-only grant; core-api never deletes a row, so no DELETE grant either.
+#
+# Unlike audit_db (created together with audit_migrator/audit_writer from day one), core_db may
+# already have tables owned by $PG_ADMIN_USER from a pre-DEV-146 run of this script, or from any
+# earlier migration run against the admin-role CORE_API_DB_URL. The ALTER TABLE/SEQUENCE loop below
+# + GRANT ... ON ALL TABLES cover that existing data; ALTER DEFAULT PRIVILEGES alone only ever
+# applies to objects created after it runs, so it would silently grant nothing on tables that
+# already exist (this is what -o none swallowing a prior partial run would otherwise hide).
+# REASSIGN OWNED BY looks like the obvious tool here but fails against the official Postgres
+# Docker image's bootstrap superuser with "cannot reassign ownership of objects ... required by
+# the database system" (confirmed locally); the ALTER ... OWNER TO loop has no such restriction
+# and needs only what ALTER SCHEMA public OWNER TO already relies on just below.
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d core_db \
   --querytext "ALTER SCHEMA public OWNER TO core_api_migrator; \
+    DO \$\$ \
+    DECLARE r RECORD; \
+    BEGIN \
+      FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP \
+        EXECUTE format('ALTER TABLE public.%I OWNER TO core_api_migrator', r.tablename); \
+      END LOOP; \
+      FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = 'public' LOOP \
+        EXECUTE format('ALTER SEQUENCE public.%I OWNER TO core_api_migrator', r.sequencename); \
+      END LOOP; \
+    END \$\$; \
     GRANT CREATE ON DATABASE core_db TO core_api_migrator; \
     GRANT CONNECT ON DATABASE core_db TO core_api_writer; \
+    GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO core_api_writer; \
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO core_api_writer; \
     ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE ON TABLES TO core_api_writer; \
     ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO core_api_writer;" \
   -o none
@@ -196,9 +219,14 @@ echo ">> core-api"
 # ACA rejects a secret with an empty value. The notification channels are optional (ADR 0013): add
 # their secrets and secretref env-vars only when set, so a blank TEAMS_WEBHOOK_URL / SMTP_PASS leaves
 # the channel silent instead of failing app creation.
-CORE_SECRETS=("coredb=$CORE_API_DB_URL" "ingest=$AUDIT_INGEST_TOKEN" \
+CORE_SECRETS=("coredb=$CORE_API_DB_URL" "coremigrator=$CORE_MIGRATOR_DB_URL" "ingest=$AUDIT_INGEST_TOKEN" \
   "appinsights=$APPLICATIONINSIGHTS_CONNECTION_STRING" "internaltoken=$CORE_API_INTERNAL_TOKEN")
-CORE_ENV=("DATABASE_URL=secretref:coredb" \
+# CORE_MIGRATOR_DB_URL is set here (not just derived above) so `az containerapp exec -n core-api
+# ... node ../../db/dist/migrate.js` (the documented way to migrate core_db on the Azure demo,
+# runbook Part B step 2 below) can find it inside the running container's own environment. It is
+# never read by the server itself (only db/migrate.ts reads it); DATABASE_URL above (core_api_writer)
+# is what the running app uses.
+CORE_ENV=("DATABASE_URL=secretref:coredb" "CORE_MIGRATOR_DB_URL=secretref:coremigrator" \
   "ENTRA_TENANT_ID=$ENTRA_TENANT_ID" "ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID" \
   "APPLICATIONINSIGHTS_CONNECTION_STRING=secretref:appinsights" \
   "AUDIT_INGEST_TOKEN=secretref:ingest" "CORE_API_INTERNAL_TOKEN=secretref:internaltoken" \

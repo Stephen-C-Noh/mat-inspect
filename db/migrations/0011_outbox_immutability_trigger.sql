@@ -4,13 +4,19 @@
 -- by Postgres. Mirrors db/migrations/0004_inspection_immutability_triggers.sql and
 -- services/audit/db/migrations/0001_audit_events_hash_format_and_immutability.sql, except outbox
 -- has one legitimate mutation (the poller's processed_at write in
--- services/core-api/src/outbox/poller.ts) so the UPDATE trigger allows that column through and
--- rejects everything else, instead of rejecting UPDATE outright.
+-- services/core-api/src/outbox/poller.ts) so the UPDATE trigger allows only that column through
+-- and rejects any other column change, instead of rejecting UPDATE outright.
+-- created_at is guarded too, not just id/event_type/payload: it is the field the recovery
+-- runbook's outbox reset query filters on (docs/runbooks/audit-chain-break-recovery.md section
+-- 5), and core_api_writer holds a table-wide UPDATE grant, so without this the trigger's
+-- processed_at exception would let a compromised core-api process forge created_at and dodge
+-- that reset window.
 CREATE FUNCTION reject_outbox_mutation() RETURNS trigger AS $$
 BEGIN
   IF NEW.id IS DISTINCT FROM OLD.id
      OR NEW.event_type IS DISTINCT FROM OLD.event_type
-     OR NEW.payload IS DISTINCT FROM OLD.payload THEN
+     OR NEW.payload IS DISTINCT FROM OLD.payload
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'outbox rows are immutable except processed_at';
   END IF;
   RETURN NEW;

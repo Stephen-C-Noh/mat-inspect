@@ -31,6 +31,16 @@ try {
   process.stdout.write('Migrations applied\n');
 } catch (err) {
   process.stderr.write(`Migration failed: ${String(err)}\n`);
+  // A permission-denied error here almost always means this ran with core_api_writer's
+  // connection (DATABASE_URL/CORE_API_DB_URL fallback) instead of core_api_migrator's. Say so
+  // instead of leaving a raw Postgres error as the only clue (ADR 0015's fail-fast-with-a-named-
+  // var philosophy).
+  if (!process.env['CORE_MIGRATOR_DB_URL'] && /permission denied/i.test(String(err))) {
+    process.stderr.write(
+      'Hint: CORE_MIGRATOR_DB_URL is not set, so this ran as core_api_writer, which cannot ' +
+        'run DDL. Set CORE_MIGRATOR_DB_URL to a core_api_migrator connection string.\n',
+    );
+  }
   process.exitCode = 1;
 } finally {
   // Always close the pool so the process can exit cleanly, even on failure.

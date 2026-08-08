@@ -228,6 +228,14 @@ CORE_API_DB_URL=postgresql://core_api_writer:changeme@postgres:5432/core_db
 CORE_MIGRATOR_DB_URL=postgresql://core_api_migrator:changeme@postgres:5432/core_db
 AUDIT_API_DB_URL=postgresql://audit_writer:changeme@postgres:5432/audit_db
 AUDIT_MIGRATOR_DB_URL=postgresql://audit_migrator:changeme@postgres:5432/audit_db
+
+# Read by infra/docker/postgres-init.sh to create the four roles above (first volume init only).
+# Must be non-empty: postgres-init.sh now fails fast on a blank one instead of silently creating
+# a passwordless-looking role (DEV-146).
+CORE_API_MIGRATOR_DB_PASSWORD=changeme
+CORE_API_WRITER_DB_PASSWORD=changeme
+AUDIT_MIGRATOR_DB_PASSWORD=changeme
+AUDIT_WRITER_DB_PASSWORD=changeme
 ```
 
 - [ ] Verify: `docker compose up` succeeds; all containers show healthy after ~60 seconds

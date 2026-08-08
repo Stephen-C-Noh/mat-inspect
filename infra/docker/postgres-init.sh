@@ -24,6 +24,19 @@ set -euo pipefail
 #                         etc.), so it is not a copy of audit_writer's grant set, just the same
 #                         separate-role pattern.
 
+# Fail fast on a missing password rather than silently create a passwordless-looking login role.
+# `set -u` above does not catch this: docker compose maps an unset .env var to an empty string
+# (KEY: ${VAR} with no default), so the variable is always "set" from this script's point of view,
+# just empty. An empty PASSWORD '' is syntactically valid to Postgres and creates a role no one
+# intended, on a database that then looks fully migrated and healthy.
+for _role_pw_var in AUDIT_MIGRATOR_DB_PASSWORD AUDIT_WRITER_DB_PASSWORD \
+                     CORE_API_MIGRATOR_DB_PASSWORD CORE_API_WRITER_DB_PASSWORD; do
+  if [ -z "${!_role_pw_var:-}" ]; then
+    echo "postgres-init.sh: $_role_pw_var is empty; set it in .env before starting postgres" >&2
+    exit 1
+  fi
+done
+
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<-SQL
   CREATE DATABASE core_db;
   CREATE DATABASE audit_db;

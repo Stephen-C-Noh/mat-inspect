@@ -160,6 +160,18 @@ describe('core_db role privileges', () => {
       ).rejects.toThrow(/immutable/i);
     });
 
+    // created_at is what the recovery runbook's outbox reset query filters on (section 5); if it
+    // were forgeable, core_api_writer's table-wide UPDATE grant would let a compromised process
+    // dodge that reset window even though it cannot touch payload directly.
+    it('rejects a created_at change even though the role has UPDATE', async () => {
+      const res = await insertOutboxRow();
+      await expect(
+        writerPool.query(`UPDATE outbox SET created_at = now() - interval '1 day' WHERE id = $1`, [
+          res.rows[0].id,
+        ]),
+      ).rejects.toThrow(/immutable/i);
+    });
+
     it('core_api_writer cannot DELETE from outbox (role grant)', async () => {
       const res = await insertOutboxRow();
       await expect(
