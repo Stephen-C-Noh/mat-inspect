@@ -67,7 +67,17 @@ if [ -n "$EXPECTED_SHA" ]; then
   revision_mismatch=false
   for svc in "${!REVISION_PORTS[@]}"; do
     port="${REVISION_PORTS[$svc]}"
-    body=$(docker compose exec -T "$svc" wget -qO- "http://127.0.0.1:${port}/health" 2>/dev/null || true)
+    if [ "$svc" = "ai" ]; then
+      # python:3.12-slim has no wget (see services/ai/Dockerfile's own HEALTHCHECK, which uses
+      # python for the same reason). wget worked silently here in testing: docker compose exec
+      # returned nonzero for "command not found", the `|| true` below swallowed it, and the
+      # empty body just looked like a service with no revision to report (DEV-99 follow-up).
+      body=$(docker compose exec -T "$svc" python -c \
+        "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:${port}/health').read().decode())" \
+        2>/dev/null || true)
+    else
+      body=$(docker compose exec -T "$svc" wget -qO- "http://127.0.0.1:${port}/health" 2>/dev/null || true)
+    fi
     # grep -o exits 1 on no match (empty body, or a pre-DEV-99 image with no "revision" key), which
     # under pipefail would otherwise kill this script outright instead of reporting the mismatch.
     revision=$(printf '%s' "$body" | grep -o '"revision":"[^"]*"' | cut -d'"' -f4 || true)
