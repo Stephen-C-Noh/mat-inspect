@@ -60,6 +60,16 @@ The mechanism is specified in FRS Section 9.1 and ARCHITECTURE Section 10.1:
 In-progress inspections live in `sessionStorage` for the duration of the browser
 session. A hard device failure ends the session and the in-progress inspection is lost.
 
+## Amendment (2026-08-08, DEV-144)
+
+Point 6 above and "The offline foundation does not exist" under Reasons said the PWA has no
+service worker. DEV-144 added one, for installability only: Chrome gates the home-screen
+install prompt on a service worker with a fetch handler. It does not change this ADR's
+decision. `apps/pwa/public/sw.js` passes every request straight to the network, uncached; it
+has no Cache Storage read or write path. A device with no connectivity still gets the "no
+connection" error in point 6, not a cached checklist. Do not add caching to that file without
+first amending this decision, not just the file's own comment.
+
 ## Reasons
 
 ### The client bought the descope with a WiFi commitment
