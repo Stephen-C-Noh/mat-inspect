@@ -57,12 +57,6 @@ WORKDIR /repo
 RUN apk --no-cache upgrade \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-# GIT_SHA (DEV-99): the commit this image was built from, reported in /health so a deployed
-# stack can be asked from outside whether every service is on the same commit and whether that
-# commit is the head of main. ci.yml passes it as a build arg; docker-compose.yml's local build
-# falls back to "local" when unset. Unknown by default so a hand build never lies about its origin.
-ARG GIT_SHA=unknown
-ENV GIT_SHA=$GIT_SHA
 COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=prod-deps /repo/package.json ./
 COPY --from=build /repo/packages/shared-types/package.json packages/shared-types/
@@ -77,6 +71,14 @@ COPY --from=build /repo/services/media/dist services/media/dist
 # fastify-type-provider-zod, @azure/storage-blob) hoists to the root node_modules copied above,
 # so there is no workspace-local node_modules to ship. If a future dependency conflict forces a
 # nested copy, add: COPY --from=prod-deps /repo/services/media/node_modules services/media/node_modules
+# GIT_SHA (DEV-99): the commit this image was built from, reported in /health so a deployed
+# stack can be asked from outside whether every service is on the same commit and whether that
+# commit is the head of main. ci.yml passes it as a build arg; docker-compose.yml's local build
+# falls back to "local" when unset. Unknown by default so a hand build never lies about its origin.
+# Placed after the COPY layers, not before: this value changes on every commit, and putting it
+# earlier would bust BuildKit's cache for every COPY that follows it on every single build.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 USER appuser
 WORKDIR /repo/services/media
 EXPOSE 3000

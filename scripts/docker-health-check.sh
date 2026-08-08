@@ -68,7 +68,9 @@ if [ -n "$EXPECTED_SHA" ]; then
   for svc in "${!REVISION_PORTS[@]}"; do
     port="${REVISION_PORTS[$svc]}"
     body=$(docker compose exec -T "$svc" wget -qO- "http://127.0.0.1:${port}/health" 2>/dev/null || true)
-    revision=$(printf '%s' "$body" | grep -o '"revision":"[^"]*"' | cut -d'"' -f4)
+    # grep -o exits 1 on no match (empty body, or a pre-DEV-99 image with no "revision" key), which
+    # under pipefail would otherwise kill this script outright instead of reporting the mismatch.
+    revision=$(printf '%s' "$body" | grep -o '"revision":"[^"]*"' | cut -d'"' -f4 || true)
     if [ "$revision" = "$EXPECTED_SHA" ]; then
       printf '%-20s %s\n' "$svc" "$revision"
     else

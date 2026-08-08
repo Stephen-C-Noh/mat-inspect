@@ -30,17 +30,19 @@ RUN groupadd -r appgroup && useradd -r -g appgroup --home-dir /app appuser && ch
 COPY --from=build /app/packages ./packages
 COPY main.py advisory.py advisory_model.py transcription.py transcription_model.py ./
 ENV PYTHONPATH=/app/packages
-# GIT_SHA (DEV-99): the commit this image was built from, reported in /health so a deployed
-# stack can be asked from outside whether every service is on the same commit and whether that
-# commit is the head of main. ci.yml passes it as a build arg; docker-compose.yml's local build
-# falls back to "local" when unset. Unknown by default so a hand build never lies about its origin.
-ARG GIT_SHA=unknown
-ENV GIT_SHA=$GIT_SHA
 # Model weights are not baked into the image (about 1.5 GB, license-bound). They are fetched once
 # onto the host and bind-mounted at /models; Compose points ADVISORY_MODEL_PATH and
 # AI_TRANSCRIPTION_MODEL into that mount. See docs/runbooks/ai-model-weights.md for the reasoning
 # and the provisioning step. If the weights are absent the service still boots: the advisory path
 # is UNAVAILABLE and /transcribe returns 503, and submit is unaffected (ADR 0017, ADR 0018).
+# GIT_SHA (DEV-99): the commit this image was built from, reported in /health so a deployed
+# stack can be asked from outside whether every service is on the same commit and whether that
+# commit is the head of main. ci.yml passes it as a build arg; docker-compose.yml's local build
+# falls back to "local" when unset. Unknown by default so a hand build never lies about its origin.
+# Placed after the COPY layers, not before: this value changes on every commit, and putting it
+# earlier would bust BuildKit's cache for every COPY that follows it on every single build.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 USER appuser
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
