@@ -226,7 +226,13 @@ def get_inference_timeout(request: Request) -> float:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "ai"}
+    # revision: the commit this image was built from (DEV-99), so a deployed stack can be asked
+    # from outside whether it is on the commit it is supposed to be on, not just whether it is alive.
+    return {
+        "status": "ok",
+        "service": "ai",
+        "revision": os.environ.get("GIT_SHA", "unknown"),
+    }
 
 
 class AdvisoryRequest(BaseModel):

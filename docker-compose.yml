@@ -144,6 +144,10 @@ services:
       context: .
       dockerfile: services/core-api/Dockerfile
       target: runtime
+      args:
+        # DEV-99: reported back in /health. "local" (not "unknown", the Dockerfile's own default)
+        # so a locally built image is visibly distinguishable from one that forgot to set this.
+        GIT_SHA: ${GIT_SHA:-local}
     environment:
       PORT: '3000'
       OTEL_SERVICE_NAME: core-api
@@ -196,6 +200,8 @@ services:
       context: .
       dockerfile: services/media/Dockerfile
       target: runtime
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
     environment:
       PORT: '3000'
       OTEL_SERVICE_NAME: media
@@ -266,6 +272,8 @@ services:
       context: .
       dockerfile: services/audit/Dockerfile
       target: runtime
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
     environment:
       PORT: '3000'
       OTEL_SERVICE_NAME: audit
@@ -312,6 +320,8 @@ services:
     build:
       context: ./services/ai
       target: runtime
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
     environment:
       PORT: '8000'
       OTEL_SERVICE_NAME: ai
