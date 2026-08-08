@@ -220,8 +220,22 @@ ENTRA_CLIENT_ID=REPLACE_ME
 # Azurite (Azure Storage emulator) in dev; the well-known dev shortcut connection string
 AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
 
-CORE_API_DB_URL=postgresql://mat:changeme@postgres:5432/core_db
-AUDIT_API_DB_URL=postgresql://mat:changeme@postgres:5432/audit_db
+# CORE_API_DB_URL is core-api's runtime connection: the core_api_writer role (SELECT/INSERT/
+# UPDATE, no DELETE, not the owner of the immutability triggers; DEV-146), not the admin role.
+# Migrations run separately as core_api_migrator via CORE_MIGRATOR_DB_URL. Same split as audit_db
+# below (audit_writer for AUDIT_API_DB_URL, audit_migrator for AUDIT_MIGRATOR_DB_URL).
+CORE_API_DB_URL=postgresql://core_api_writer:changeme@postgres:5432/core_db
+CORE_MIGRATOR_DB_URL=postgresql://core_api_migrator:changeme@postgres:5432/core_db
+AUDIT_API_DB_URL=postgresql://audit_writer:changeme@postgres:5432/audit_db
+AUDIT_MIGRATOR_DB_URL=postgresql://audit_migrator:changeme@postgres:5432/audit_db
+
+# Read by infra/docker/postgres-init.sh to create the four roles above (first volume init only).
+# Must be non-empty: postgres-init.sh now fails fast on a blank one instead of silently creating
+# a passwordless-looking role (DEV-146).
+CORE_API_MIGRATOR_DB_PASSWORD=changeme
+CORE_API_WRITER_DB_PASSWORD=changeme
+AUDIT_MIGRATOR_DB_PASSWORD=changeme
+AUDIT_WRITER_DB_PASSWORD=changeme
 ```
 
 - [ ] Verify: `docker compose up` succeeds; all containers show healthy after ~60 seconds

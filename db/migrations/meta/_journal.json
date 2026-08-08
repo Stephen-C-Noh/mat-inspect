@@ -78,6 +78,13 @@
       "when": 1785144505778,
       "tag": "0010_fantastic_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786164037399,
+      "tag": "0011_outbox_immutability_trigger",
+      "breakpoints": true
     }
   ]
 }
