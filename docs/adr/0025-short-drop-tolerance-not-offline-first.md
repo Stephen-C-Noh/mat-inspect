@@ -109,14 +109,15 @@ storage. Offline-first is not "add IndexedDB" on top of the current app; it is t
 shell, the cache strategy, the queue, and the blob handling for photos, built from
 nothing. The 3-to-5-day estimate in ARCHITECTURE Section 10.1 reflects that.
 
-### `sessionStorage` over `localStorage` on shared devices
+### `sessionStorage` over `localStorage` on the operator's device
 
-Lab devices are shared between operators. A draft holds defect notes, which may be
-voice-transcribed, and evidence photos. `sessionStorage` bounds that content to the
-browser session, so it does not carry to the next operator. `localStorage` would survive
-a device power-off and satisfy the old FRS 13.2 promise, but it would leave one
-operator's PII on a shared phone indefinitely and would need explicit expiry and
-operator-boundary handling (FOIP). The cross-session resume case is deferred to v2 along
+Devices are individually assigned per operator, not shared between operators.
+`sessionStorage` still bounds a draft's defect notes and evidence photos to the browser
+session rather than leaving them on the device indefinitely: a lost or stolen phone, or
+one later reassigned or sold, does not carry the last inspection's PII with it.
+`localStorage` would survive a device power-off and satisfy the old FRS 13.2 promise, but
+it would need explicit expiry and PII-retention handling (FOIP) to avoid that exposure.
+The cross-session resume case is deferred to v2 along
 with the rest of offline-first.
 
 ## Consequences
@@ -153,8 +154,8 @@ and the client already committed to the lab coverage that makes it unnecessary.
 
 **`localStorage` with a 24-hour expiry, matching the old FRS 13.2.** Rejected. It solves
 only the device-failure case, not offline submission, so it does not deliver what a
-reader of the old text expects, and it puts operator PII on a shared device with no
-clear owner.
+reader of the old text expects, and a 24-hour window still leaves operator PII on the
+device past the inspection it belongs to, with no expiry logic built to enforce it.
 
 **No client persistence at all, the state before DEV-125.** Rejected. It fails FRS
 Section 9.1 outright and silently discards completed inspections, which is what DEV-125

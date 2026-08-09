@@ -671,7 +671,7 @@ If PWA crashes or phone dies during an inspection:
 
 - Partial state (answers, inline notes, documented defects) is preserved in `sessionStorage` for the browser session. Returning to the checklist after a page load, a reload, or an interactive token renewal restores the in-progress inspection.
 - A hard device failure ends the browser session, so the in-progress inspection is lost and the operator re-answers. This is a deliberate limit of the short-drop connectivity model (ADR 0025), not a defect. Cross-session resume needs durable client storage and belongs to the v2 offline-first escalation.
-- `sessionStorage` also bounds the exposure of defect notes and evidence photos on a shared lab device: the draft does not outlive the session, so it does not carry to the next operator (FOIP).
+- `sessionStorage` also bounds the exposure of defect notes and evidence photos on the operator's device: the draft does not outlive the session, so a lost, stolen, or reassigned device does not carry it (FOIP).
 
 ### 13.3 Calendar Day Boundary
 

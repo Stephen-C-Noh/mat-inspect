@@ -19,12 +19,22 @@ describe('createMsalConfig', () => {
     expect(config.auth.postLogoutRedirectUri).toBe('');
   });
 
-  it('keeps the token cache in localStorage and backs up redirect state to a cookie', () => {
-    // Both apps are installed PWAs whose Android process can be killed between launches
-    // (DEV-151); sessionStorage would force a relogin on nearly every relaunch.
+  it('keeps the token cache in localStorage and backs up redirect state to a Secure cookie', () => {
+    // The PWA is installed to the home screen (DEV-144) and Android can kill its process
+    // between launches; sessionStorage would force a relogin on nearly every relaunch.
+    // secureCookies must be explicit: MSAL defaults it to false, which would send the
+    // redirect-state cookie over a plain-HTTP hop (ADR 0027).
     const config = createMsalConfig({ clientId: CLIENT_ID, tenantId: TENANT_ID });
     expect(config.cache?.cacheLocation).toBe('localStorage');
     expect(config.cache?.storeAuthStateInCookie).toBe(true);
+    expect(config.cache?.secureCookies).toBe(true);
+  });
+
+  it('skips the extra hop back to the login-launching page', () => {
+    // Both apps register their origin, not /login, as the redirect URI, so there is no
+    // reason to also carry the pre-redirect URL in the auth-response cookie (ADR 0027).
+    const config = createMsalConfig({ clientId: CLIENT_ID, tenantId: TENANT_ID });
+    expect(config.auth.navigateToLoginRequestUrl).toBe(false);
   });
 });
 

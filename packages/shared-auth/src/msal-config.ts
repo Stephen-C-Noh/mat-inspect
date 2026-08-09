@@ -17,22 +17,34 @@ export type LoginRequest = {
 // Both apps register the page origin itself as the redirect URI, with no trailing slash,
 // or Entra rejects the return. Reading window here means the config must be built in the
 // browser; on the server the origin is empty and MSAL is never instantiated.
+//
+// navigateToLoginRequestUrl: false. Both apps redirect to the origin, not to /login, so
+// there is no separate "page that launched login" to hop back to; skipping the hop keeps
+// the redirect-state cookie below from also having to carry the pre-redirect URL (ADR 0027).
 export const createMsalConfig = ({ clientId, tenantId }: EntraConfig): Configuration => ({
   auth: {
     clientId,
     authority: `https://login.microsoftonline.com/${tenantId}`,
     redirectUri: typeof window !== 'undefined' ? window.location.origin : '',
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : '',
+    navigateToLoginRequestUrl: false,
   },
-  // localStorage: both apps are installed PWAs (DEV-144) whose Android process can be
-  // killed between launches; sessionStorage would force a relogin on almost every
-  // relaunch. storeAuthStateInCookie: true backs up the redirect-in-progress state to a
-  // cookie, since MSAL always keeps that temporary state in sessionStorage/memory
-  // regardless of cacheLocation, and an installed PWA's out-of-scope navigation to
-  // login.microsoftonline.com may not return to the same browsing context. See DEV-151.
+  // cacheLocation: localStorage. Devices are individually assigned per operator, not
+  // shared (ADR 0007, ADR 0025), and the PWA is installed to the home screen (DEV-144),
+  // where Android can kill the process between launches; sessionStorage would force a
+  // relogin on nearly every relaunch. See ADR 0027.
+  //
+  // storeAuthStateInCookie backs up the redirect-in-progress state (PKCE verifier, state,
+  // nonce) to a cookie, since MSAL always keeps that temporary state in sessionStorage or
+  // memory regardless of cacheLocation, and an installed PWA's out-of-scope navigation to
+  // login.microsoftonline.com may not return to the same browsing context (DEV-151).
+  // secureCookies defaults to false in MSAL; without it that cookie would go out
+  // unencrypted on any plain-HTTP hop (Caddy's own 80->443 redirect is one). No token or
+  // JWT is ever stored in the cookie, only the redirect handshake state.
   cache: {
     cacheLocation: 'localStorage',
     storeAuthStateInCookie: true,
+    secureCookies: true,
   },
 });
 
