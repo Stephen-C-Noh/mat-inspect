@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
+import { getActiveAccount, getLogoutHint } from '@mat-inspect/shared-auth';
 import { HelpCircle, LogOut, Settings, User } from 'lucide-react';
 
 export const AccountMenu = (): ReactElement | null => {
   const { instance, accounts } = useMsal();
-  const activeAccount = accounts[0];
+  const activeAccount = getActiveAccount(instance, accounts);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -33,14 +34,14 @@ export const AccountMenu = (): ReactElement | null => {
 
   if (!activeAccount) return null;
 
-  // Targets the active account and its login_hint, so Entra skips the "which account do you
-  // want to sign out of?" picker when the browser holds more than one Microsoft session
-  // (same reasoning as SwitchAccountButton, used on /unauthorized for the denied-account case).
+  // Clears the whole local MSAL cache, not just this account: DEV-151's ADR 0027 bootstrap
+  // guard would have forced that anyway on the next load if any other account were left
+  // cached with no active designation, so there is no reason to leave one behind on purpose.
+  // logoutHint still targets the active account's Entra session, so Entra skips the "which
+  // account do you want to sign out of?" picker when the browser holds more than one
+  // Microsoft session (same reasoning as SwitchAccountButton, used on /unauthorized).
   const handleSignOut = (): void => {
-    const claims = activeAccount.idTokenClaims as Record<string, unknown> | undefined;
-    const logoutHint =
-      typeof claims?.['login_hint'] === 'string' ? claims['login_hint'] : undefined;
-    void instance.logoutRedirect({ account: activeAccount, logoutHint });
+    void instance.logoutRedirect({ logoutHint: getLogoutHint(activeAccount) });
   };
 
   return (

@@ -1,5 +1,6 @@
 import type { AccountInfo, IPublicClientApplication } from '@azure/msal-browser';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
+import { getActiveAccount } from './active-account';
 import type { TokenRequest } from './msal-config';
 
 // Acquires an API access token silently. If the session expired or consent is missing, MSAL
@@ -18,7 +19,8 @@ export const acquireApiToken = async (
     return await acquireApiTokenSilent(instance, accounts, tokenRequest);
   } catch (err) {
     if (err instanceof InteractionRequiredAuthError) {
-      await instance.acquireTokenRedirect({ ...tokenRequest, account: accounts[0] });
+      const account = getActiveAccount(instance, accounts) ?? undefined;
+      await instance.acquireTokenRedirect({ ...tokenRequest, account });
     }
     throw err;
   }
@@ -34,6 +36,7 @@ export const acquireApiTokenSilent = async (
   accounts: AccountInfo[],
   tokenRequest: TokenRequest,
 ): Promise<string> => {
-  const response = await instance.acquireTokenSilent({ ...tokenRequest, account: accounts[0] });
+  const account = getActiveAccount(instance, accounts) ?? undefined;
+  const response = await instance.acquireTokenSilent({ ...tokenRequest, account });
   return response.accessToken;
 };

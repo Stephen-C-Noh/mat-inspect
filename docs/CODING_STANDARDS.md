@@ -617,8 +617,8 @@ throw new Error('something broke'); // use httpError
 // No skipping Zod validation
 const body = req.body as SubmitInspectionInput; // unsafe cast; use Zod parse
 
-// No localStorage tokens
-localStorage.setItem('token', jwt); // use memory + httpOnly cookies via MSAL
+// No hand-rolled token storage
+localStorage.setItem('token', jwt); // let MSAL manage its own cache (ADR 0027), never call storage APIs directly for a token
 
 // No business logic in handlers
 async function handler(req, reply) {

@@ -6,7 +6,7 @@ import { useMsal } from '@azure/msal-react';
 import Image from 'next/image';
 import { LayoutDashboard, Menu, ScrollText, Settings, TriangleAlert, Truck } from 'lucide-react';
 import { useState, type ComponentType, type ReactElement } from 'react';
-import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import { getActiveAccount, getRolesFromAccount } from '@mat-inspect/shared-auth';
 import type { UserRole } from '@mat-inspect/shared-types';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { AccountMenu } from '@/components/ui/account-menu';
@@ -44,8 +44,8 @@ const NAV_LINKS: ReadonlyArray<{
 ];
 
 export const TopBar = function (): ReactElement | null {
-  const { accounts } = useMsal();
-  const activeAccount = accounts[0];
+  const { instance, accounts } = useMsal();
+  const activeAccount = getActiveAccount(instance, accounts);
   const [navOpen, setNavOpen] = useState(false);
   const pathname = usePathname();
 

@@ -362,8 +362,9 @@ For the 13-week capstone (final deliverable August 15, 2026):
 
 - Multi-campus support (Aero Centre, Pt. Trotter). MVP is Main Campus, 10 machines.
 - Native iOS and Android apps. The PWA is the only client.
-- Per-operator cryptographic signatures. Key provisioning on shared lab tablets is
-  out of scope; attestation plus the audit chain is the accepted model (ADR 0007).
+- Per-operator cryptographic signatures. Key provisioning on individually assigned
+  operator devices is out of scope; attestation plus the audit chain is the accepted
+  model (ADR 0007).
 - A message broker. The outbox poller covers delivery (ADR 0008).
 - Closed-loop alert delivery (Teams acknowledgement, SMS escalation). Alerts are
   best-effort over email and Teams, with the dashboard queue as the durable source

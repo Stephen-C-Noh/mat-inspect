@@ -2,14 +2,14 @@
 
 import type { ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
-import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import { getActiveAccount, getRolesFromAccount } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
 import { FailureQueue } from '@/components/dashboard/failure-queue';
 import { OPERATIONAL_ROLES } from '@/lib/auth';
 
 function DashboardContent(): ReactElement {
-  const { accounts } = useMsal();
-  const account = accounts[0] ?? null;
+  const { instance, accounts } = useMsal();
+  const account = getActiveAccount(instance, accounts);
   const roles = getRolesFromAccount(account);
 
   return (

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { hasAllowedRole } from '@mat-inspect/shared-auth';
+import { getActiveAccount, hasAllowedRole } from '@mat-inspect/shared-auth';
 import { ALLOWED_ROLES } from '@/lib/auth';
 
 export const AuthGuard = ({
@@ -14,10 +14,10 @@ export const AuthGuard = ({
 }): React.ReactElement | null => {
   const pathname = usePathname();
   const isAuthenticated = useIsAuthenticated();
-  const { accounts, inProgress } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
   const router = useRouter();
 
-  const activeAccount = accounts[0] ?? null;
+  const activeAccount = getActiveAccount(instance, accounts);
   const roleAllowed = hasAllowedRole(activeAccount, ALLOWED_ROLES);
   // MSAL restores the cached session and resolves any redirect response asynchronously.
   // Until inProgress settles to None, isAuthenticated reads false even for a signed-in
