@@ -51,9 +51,6 @@ cache: {
   storeAuthStateInCookie: true,
   secureCookies: true,
 },
-system: {
-  navigateToLoginRequestUrl: false,
-},
 ```
 
 `cacheLocation: 'localStorage'` survives an Android process kill between launches. This
@@ -84,11 +81,18 @@ is not about this cookie and is now genuinely exercised by `cacheLocation: 'loca
 holding the real token cache; that test case is updated in the same change to expect
 tokens in `localStorage` rather than asserting their absence.
 
-`navigateToLoginRequestUrl: false` is a companion hardening step, not required to fix
-either concern above. Both apps register their origin, not `/login`, as the redirect
-URI, so returning to the origin directly (skipping MSAL's default hop back to the page
-that launched the login) removes one place the auth-response cookie has to survive and
-keeps it from also having to carry the pre-redirect URL.
+`navigateToLoginRequestUrl` is left at its MSAL default (`true`). A version of this
+decision briefly set it `false`, reasoning that both apps register their origin, not
+`/login`, as the redirect URI, so there seemed to be no separate "page that launched
+login" to hop back to. That reasoning missed a real case: the dashboard's `AuthGuard`
+sends an unauthenticated deep link (for example `/defects?id=<uuid>`) to
+`/login?redirect=<path>` (DEV-128), and `LoginContent` only reads that `redirect` query
+param because MSAL's default post-login hop returns the browser to the URL that called
+`loginRedirect`, which was `/login?redirect=...`, not the origin. Setting the flag `false`
+skipped that hop, so `handleRedirectPromise` resolved on the origin instead, the query
+param was never read, and every sign-in landed on the role's default page regardless of
+what the operator originally asked for. Caught in review before this branch shipped; see
+Alternatives.
 
 ## Consequences
 
@@ -118,6 +122,22 @@ consumer should use instead of reading `accounts[0]` directly). Every such read 
 apps (`apps/pwa/src/**`, `apps/dashboard/src/**`) and in `access-token.ts`'s token
 acquisition calls now goes through it.
 
+The bootstrap only auto-promotes an account when exactly one is cached. `account-menu.tsx`
+and `switch-account-button.tsx` sign out of one account by id (so Entra can skip its
+account picker when the browser holds more than one Microsoft session); that removes only
+that account from MSAL's cache and can leave others behind with no active designation. Two
+or more cached accounts and no active designation is exactly the ambiguous case a stale
+`accounts[0]` read would have gotten wrong, so the bootstrap does not guess: it calls
+`instance.clearCache()` and forces a real sign-in instead. `useIsAuthenticated()` (from
+`@azure/msal-react`) only checks whether `accounts.length > 0`, not the active
+designation, so leaving the choice merely unset would not have forced a re-login on its
+own; the cache has to actually be cleared.
+
+`wireActiveAccount` returns a cleanup function that removes its `addEventCallback`
+registration. Both apps' `MsalProviderWrapper` call it from the `useEffect` cleanup, so
+React StrictMode's dev-only double-invoke (mount, unmount, mount) does not register the
+callback twice.
+
 The `loginRedirect` round-trip fix (concern 1) is still unverified on a real Android
 device with the PWA actually installed. `storeAuthStateInCookie` is the documented,
 low-downside response to the failure mode described, and is not conditioned on that
@@ -136,6 +156,10 @@ per-app branch in a function both apps share is complexity with no corresponding
 requirement. Revisit if the dashboard's threat model turns out to need
 `sessionStorage` specifically (for example, if it starts running on a shared manager
 workstation).
+
+**`navigateToLoginRequestUrl: false`.** Tried and reverted; see Decision. It shrinks the
+redirect-state cookie slightly (no pre-redirect URL to carry) but breaks the dashboard's
+DEV-128 deep-link restore, which is a bigger loss than the cookie-size saving is worth.
 
 **Wait for real Android device verification before deciding anything.** Rejected as the
 blocking path for the whole ticket: `storeAuthStateInCookie` and `secureCookies` are

@@ -30,11 +30,12 @@ describe('createMsalConfig', () => {
     expect(config.cache?.secureCookies).toBe(true);
   });
 
-  it('skips the extra hop back to the login-launching page', () => {
-    // Both apps register their origin, not /login, as the redirect URI, so there is no
-    // reason to also carry the pre-redirect URL in the auth-response cookie (ADR 0027).
+  it('leaves navigateToLoginRequestUrl at the MSAL default', () => {
+    // The dashboard's AuthGuard sends unauthenticated deep links to /login?redirect=<path>
+    // (DEV-128) and depends on MSAL's default post-login hop back to that URL. Setting this
+    // false (an earlier version of this config did) silently drops that redirect (ADR 0027).
     const config = createMsalConfig({ clientId: CLIENT_ID, tenantId: TENANT_ID });
-    expect(config.auth.navigateToLoginRequestUrl).toBe(false);
+    expect(config.auth.navigateToLoginRequestUrl).toBeUndefined();
   });
 });
 

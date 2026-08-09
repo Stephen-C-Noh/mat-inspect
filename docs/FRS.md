@@ -34,7 +34,7 @@
 - AC-1.1.1: Successful login takes under 3 seconds end to end
 - AC-1.1.2: After 5 failed attempts, account locks for 30 minutes
 - AC-1.1.3: MFA is enforced for Supervisor, Manager, Admin
-- AC-1.1.4: Tokens are stored in memory and httpOnly cookies; never localStorage
+- AC-1.1.4: The MSAL token cache lives in `localStorage`, the only persistence an SPA has for surviving an installed PWA's Android process kill between launches (ADR 0027); the redirect-in-progress handshake state (never a token) is backed up to a Secure cookie for the same reason
 
 ### 1.2 User Account Creation (Admin)
 

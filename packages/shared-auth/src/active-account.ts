@@ -9,6 +9,13 @@ import { EventType } from '@azure/msal-browser';
 //
 // instance.getActiveAccount is optional on IPublicClientApplication only for test doubles
 // that stub a narrower interface; a real MSAL instance always has it.
+//
+// Not a reactive read: msal-react only re-renders on a change to inProgress or to the
+// accounts array, neither of which changes when only the active designation does. Every
+// caller today only reaches this after loginRedirect/logoutRedirect, both full navigations
+// that remount the app, so it is current in practice. It would go stale if a caller started
+// switching accounts via ssoSilent, acquireTokenPopup, or a direct setActiveAccount call
+// without a navigation, since nothing would force affected components to re-render.
 export const getActiveAccount = (
   instance: IPublicClientApplication,
   accounts: AccountInfo[],
@@ -18,18 +25,32 @@ export const getActiveAccount = (
   null;
 
 // Keeps MSAL's active-account designation current. Call once per PublicClientApplication
-// instance, before rendering with it (see each app's MsalProviderWrapper).
+// instance, before rendering with it (see each app's MsalProviderWrapper), and call the
+// returned cleanup on unmount so a remount (React StrictMode's dev double-invoke, or a
+// second MsalProviderWrapper instance) does not accumulate duplicate event callbacks.
 //
 // Bootstraps from the cache on first load, since a session restored from a previous page
 // load fires no LOGIN_SUCCESS event to hang the designation off of, then tracks every
 // sign-in and token acquisition after that.
-export const wireActiveAccount = (instance: IPublicClientApplication): void => {
+//
+// The bootstrap only promotes an account when exactly one is cached. Two or more cached
+// accounts with no active designation is what a targeted sign-out leaves behind (account-menu
+// and switch-account-button log out one account by id; any others stay cached), and guessing
+// which of several real identities to continue as is exactly the Part 6 misattribution risk
+// this module exists to close. msal-react's useIsAuthenticated only checks accounts.length,
+// not the active designation, so leaving the choice merely unset would not force a re-login;
+// clearing the cache does.
+export const wireActiveAccount = (instance: IPublicClientApplication): (() => void) => {
   if (!instance.getActiveAccount()) {
-    const [firstCached] = instance.getAllAccounts();
-    if (firstCached) instance.setActiveAccount(firstCached);
+    const cached = instance.getAllAccounts();
+    if (cached.length === 1) {
+      instance.setActiveAccount(cached[0]);
+    } else if (cached.length > 1) {
+      void instance.clearCache();
+    }
   }
 
-  instance.addEventCallback((event) => {
+  const callbackId = instance.addEventCallback((event) => {
     const isSuccess =
       event.eventType === EventType.LOGIN_SUCCESS ||
       event.eventType === EventType.ACQUIRE_TOKEN_SUCCESS;
@@ -42,4 +63,8 @@ export const wireActiveAccount = (instance: IPublicClientApplication): void => {
         : null;
     if (account) instance.setActiveAccount(account);
   });
+
+  return () => {
+    if (callbackId) instance.removeEventCallback(callbackId);
+  };
 };

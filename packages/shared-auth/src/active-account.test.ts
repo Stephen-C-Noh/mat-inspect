@@ -12,6 +12,8 @@ const makeInstance = (overrides: Partial<IPublicClientApplication>): IPublicClie
     getAllAccounts: vi.fn().mockReturnValue([]),
     setActiveAccount: vi.fn(),
     addEventCallback: vi.fn(),
+    removeEventCallback: vi.fn(),
+    clearCache: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }) as unknown as IPublicClientApplication;
 
@@ -38,7 +40,7 @@ describe('getActiveAccount', () => {
 });
 
 describe('wireActiveAccount', () => {
-  it('bootstraps the active account from the cache when none is set', () => {
+  it('bootstraps the active account from the cache when exactly one is cached', () => {
     const setActiveAccount = vi.fn();
     const instance = makeInstance({
       getActiveAccount: vi.fn().mockReturnValue(null),
@@ -62,6 +64,42 @@ describe('wireActiveAccount', () => {
     wireActiveAccount(instance);
 
     expect(setActiveAccount).not.toHaveBeenCalled();
+  });
+
+  it('does not guess between two or more cached accounts with no active designation', () => {
+    // A targeted sign-out (account-menu, switch-account-button) removes one cached account
+    // and can leave others behind. Auto-promoting one would be exactly the identity
+    // misattribution CLAUDE.md Part 6 rules out, so this clears everything and forces a
+    // real re-login instead.
+    const setActiveAccount = vi.fn();
+    const clearCache = vi.fn().mockResolvedValue(undefined);
+    const instance = makeInstance({
+      getActiveAccount: vi.fn().mockReturnValue(null),
+      getAllAccounts: vi.fn().mockReturnValue([accountA, accountB]),
+      setActiveAccount,
+      clearCache,
+    });
+
+    wireActiveAccount(instance);
+
+    expect(setActiveAccount).not.toHaveBeenCalled();
+    expect(clearCache).toHaveBeenCalled();
+  });
+
+  it('does nothing on bootstrap when no account is cached', () => {
+    const setActiveAccount = vi.fn();
+    const clearCache = vi.fn();
+    const instance = makeInstance({
+      getActiveAccount: vi.fn().mockReturnValue(null),
+      getAllAccounts: vi.fn().mockReturnValue([]),
+      setActiveAccount,
+      clearCache,
+    });
+
+    wireActiveAccount(instance);
+
+    expect(setActiveAccount).not.toHaveBeenCalled();
+    expect(clearCache).not.toHaveBeenCalled();
   });
 
   it('sets the active account on LOGIN_SUCCESS', () => {
@@ -120,5 +158,33 @@ describe('wireActiveAccount', () => {
     callback?.({ eventType: EventType.LOGIN_SUCCESS, payload: {} } as EventMessage);
 
     expect(setActiveAccount).not.toHaveBeenCalled();
+  });
+
+  it('removes its event callback when the returned cleanup runs', () => {
+    // Guards against React StrictMode's dev double-invoke (mount, unmount, mount)
+    // registering this callback twice.
+    const removeEventCallback = vi.fn();
+    const instance = makeInstance({
+      addEventCallback: vi.fn().mockReturnValue('callback-id'),
+      removeEventCallback,
+    });
+
+    const cleanup = wireActiveAccount(instance);
+    cleanup();
+
+    expect(removeEventCallback).toHaveBeenCalledWith('callback-id');
+  });
+
+  it('does nothing on cleanup when addEventCallback returned no id', () => {
+    const removeEventCallback = vi.fn();
+    const instance = makeInstance({
+      addEventCallback: vi.fn().mockReturnValue(null),
+      removeEventCallback,
+    });
+
+    const cleanup = wireActiveAccount(instance);
+    cleanup();
+
+    expect(removeEventCallback).not.toHaveBeenCalled();
   });
 });

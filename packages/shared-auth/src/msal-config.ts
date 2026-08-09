@@ -18,16 +18,18 @@ export type LoginRequest = {
 // or Entra rejects the return. Reading window here means the config must be built in the
 // browser; on the server the origin is empty and MSAL is never instantiated.
 //
-// navigateToLoginRequestUrl: false. Both apps redirect to the origin, not to /login, so
-// there is no separate "page that launched login" to hop back to; skipping the hop keeps
-// the redirect-state cookie below from also having to carry the pre-redirect URL (ADR 0027).
+// navigateToLoginRequestUrl is left at its MSAL default (true). An earlier version of this
+// config set it to false on the reasoning that both apps redirect to the origin, so there is
+// no "page that launched login" to hop back to; that missed that the dashboard's AuthGuard
+// sends an unauthenticated deep link to /login?redirect=<path> (DEV-128) and depends on this
+// default hop to land back there after sign-in. Setting it false silently dropped that
+// redirect and returned every login to the origin instead. See ADR 0027.
 export const createMsalConfig = ({ clientId, tenantId }: EntraConfig): Configuration => ({
   auth: {
     clientId,
     authority: `https://login.microsoftonline.com/${tenantId}`,
     redirectUri: typeof window !== 'undefined' ? window.location.origin : '',
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : '',
-    navigateToLoginRequestUrl: false,
   },
   // cacheLocation: localStorage. Devices are individually assigned per operator, not
   // shared (ADR 0007, ADR 0025), and the PWA is installed to the home screen (DEV-144),

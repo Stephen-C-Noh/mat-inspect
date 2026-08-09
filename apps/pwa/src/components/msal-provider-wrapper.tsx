@@ -16,10 +16,21 @@ export const MsalProviderWrapper = ({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    let unwireActiveAccount: (() => void) | undefined;
+
     msalInstance.initialize().then(() => {
-      wireActiveAccount(msalInstance);
+      if (cancelled) return;
+      unwireActiveAccount = wireActiveAccount(msalInstance);
       setReady(true);
     });
+
+    // Guards against React StrictMode's dev double-invoke (mount, unmount, mount)
+    // registering the active-account event callback twice.
+    return () => {
+      cancelled = true;
+      unwireActiveAccount?.();
+    };
   }, []);
 
   if (!ready) {
