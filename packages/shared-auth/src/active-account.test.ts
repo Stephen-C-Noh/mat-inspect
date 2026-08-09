@@ -40,7 +40,7 @@ describe('getActiveAccount', () => {
 });
 
 describe('wireActiveAccount', () => {
-  it('bootstraps the active account from the cache when exactly one is cached', () => {
+  it('bootstraps the active account from the cache when exactly one is cached', async () => {
     const setActiveAccount = vi.fn();
     const instance = makeInstance({
       getActiveAccount: vi.fn().mockReturnValue(null),
@@ -48,12 +48,12 @@ describe('wireActiveAccount', () => {
       setActiveAccount,
     });
 
-    wireActiveAccount(instance);
+    await wireActiveAccount(instance);
 
     expect(setActiveAccount).toHaveBeenCalledWith(accountA);
   });
 
-  it('does not overwrite an already-designated active account on bootstrap', () => {
+  it('does not overwrite an already-designated active account on bootstrap', async () => {
     const setActiveAccount = vi.fn();
     const instance = makeInstance({
       getActiveAccount: vi.fn().mockReturnValue(accountB),
@@ -61,12 +61,12 @@ describe('wireActiveAccount', () => {
       setActiveAccount,
     });
 
-    wireActiveAccount(instance);
+    await wireActiveAccount(instance);
 
     expect(setActiveAccount).not.toHaveBeenCalled();
   });
 
-  it('does not guess between two or more cached accounts with no active designation', () => {
+  it('does not guess between two or more cached accounts with no active designation', async () => {
     // A targeted sign-out (account-menu, switch-account-button) removes one cached account
     // and can leave others behind. Auto-promoting one would be exactly the identity
     // misattribution CLAUDE.md Part 6 rules out, so this clears everything and forces a
@@ -80,13 +80,39 @@ describe('wireActiveAccount', () => {
       clearCache,
     });
 
-    wireActiveAccount(instance);
+    await wireActiveAccount(instance);
 
     expect(setActiveAccount).not.toHaveBeenCalled();
     expect(clearCache).toHaveBeenCalled();
   });
 
-  it('does nothing on bootstrap when no account is cached', () => {
+  it('awaits clearCache before resolving, so a caller cannot render on stale accounts', async () => {
+    // MsalProvider reads getAllAccounts() synchronously on its first render. If
+    // wireActiveAccount resolved before clearCache finished, a caller doing
+    // `await wireActiveAccount(instance); setReady(true)` could still mount MsalProvider
+    // against the pre-clear account list.
+    let clearCacheResolved = false;
+    const clearCache = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            clearCacheResolved = true;
+            resolve();
+          }, 0),
+        ),
+    );
+    const instance = makeInstance({
+      getActiveAccount: vi.fn().mockReturnValue(null),
+      getAllAccounts: vi.fn().mockReturnValue([accountA, accountB]),
+      clearCache,
+    });
+
+    await wireActiveAccount(instance);
+
+    expect(clearCacheResolved).toBe(true);
+  });
+
+  it('does nothing on bootstrap when no account is cached', async () => {
     const setActiveAccount = vi.fn();
     const clearCache = vi.fn();
     const instance = makeInstance({
@@ -96,13 +122,13 @@ describe('wireActiveAccount', () => {
       clearCache,
     });
 
-    wireActiveAccount(instance);
+    await wireActiveAccount(instance);
 
     expect(setActiveAccount).not.toHaveBeenCalled();
     expect(clearCache).not.toHaveBeenCalled();
   });
 
-  it('sets the active account on LOGIN_SUCCESS', () => {
+  it('sets the active account on LOGIN_SUCCESS', async () => {
     const setActiveAccount = vi.fn();
     let callback: ((event: EventMessage) => void) | undefined;
     const instance = makeInstance({
@@ -113,7 +139,7 @@ describe('wireActiveAccount', () => {
       setActiveAccount,
     });
 
-    wireActiveAccount(instance);
+    await wireActiveAccount(instance);
     callback?.({
       eventType: EventType.LOGIN_SUCCESS,
       payload: { account: accountB },
@@ -122,7 +148,7 @@ describe('wireActiveAccount', () => {
     expect(setActiveAccount).toHaveBeenCalledWith(accountB);
   });
 
-  it('sets the active account on ACQUIRE_TOKEN_SUCCESS', () => {
+  it('sets the active account on ACQUIRE_TOKEN_SUCCESS', async () => {
     const setActiveAccount = vi.fn();
     let callback: ((event: EventMessage) => void) | undefined;
     const instance = makeInstance({
@@ -133,7 +159,7 @@ describe('wireActiveAccount', () => {
       setActiveAccount,
     });
 
-    wireActiveAccount(instance);
+    await wireActiveAccount(instance);
     callback?.({
       eventType: EventType.ACQUIRE_TOKEN_SUCCESS,
       payload: { account: accountB },
@@ -142,7 +168,7 @@ describe('wireActiveAccount', () => {
     expect(setActiveAccount).toHaveBeenCalledWith(accountB);
   });
 
-  it('ignores unrelated events and events with no account in the payload', () => {
+  it('ignores unrelated events and events with no account in the payload', async () => {
     const setActiveAccount = vi.fn();
     let callback: ((event: EventMessage) => void) | undefined;
     const instance = makeInstance({
@@ -153,14 +179,14 @@ describe('wireActiveAccount', () => {
       setActiveAccount,
     });
 
-    wireActiveAccount(instance);
+    await wireActiveAccount(instance);
     callback?.({ eventType: EventType.LOGOUT_SUCCESS, payload: null } as EventMessage);
     callback?.({ eventType: EventType.LOGIN_SUCCESS, payload: {} } as EventMessage);
 
     expect(setActiveAccount).not.toHaveBeenCalled();
   });
 
-  it('removes its event callback when the returned cleanup runs', () => {
+  it('removes its event callback when the returned cleanup runs', async () => {
     // Guards against React StrictMode's dev double-invoke (mount, unmount, mount)
     // registering this callback twice.
     const removeEventCallback = vi.fn();
@@ -169,20 +195,20 @@ describe('wireActiveAccount', () => {
       removeEventCallback,
     });
 
-    const cleanup = wireActiveAccount(instance);
+    const cleanup = await wireActiveAccount(instance);
     cleanup();
 
     expect(removeEventCallback).toHaveBeenCalledWith('callback-id');
   });
 
-  it('does nothing on cleanup when addEventCallback returned no id', () => {
+  it('does nothing on cleanup when addEventCallback returned no id', async () => {
     const removeEventCallback = vi.fn();
     const instance = makeInstance({
       addEventCallback: vi.fn().mockReturnValue(null),
       removeEventCallback,
     });
 
-    const cleanup = wireActiveAccount(instance);
+    const cleanup = await wireActiveAccount(instance);
     cleanup();
 
     expect(removeEventCallback).not.toHaveBeenCalled();

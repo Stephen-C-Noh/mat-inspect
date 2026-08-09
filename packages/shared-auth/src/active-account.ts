@@ -25,9 +25,9 @@ export const getActiveAccount = (
   null;
 
 // Keeps MSAL's active-account designation current. Call once per PublicClientApplication
-// instance, before rendering with it (see each app's MsalProviderWrapper), and call the
-// returned cleanup on unmount so a remount (React StrictMode's dev double-invoke, or a
-// second MsalProviderWrapper instance) does not accumulate duplicate event callbacks.
+// instance and await it before rendering with it (see each app's MsalProviderWrapper), and
+// call the returned cleanup on unmount so a remount (React StrictMode's dev double-invoke,
+// or a second MsalProviderWrapper instance) does not accumulate duplicate event callbacks.
 //
 // Bootstraps from the cache on first load, since a session restored from a previous page
 // load fires no LOGIN_SUCCESS event to hang the designation off of, then tracks every
@@ -40,13 +40,22 @@ export const getActiveAccount = (
 // this module exists to close. msal-react's useIsAuthenticated only checks accounts.length,
 // not the active designation, so leaving the choice merely unset would not force a re-login;
 // clearing the cache does.
-export const wireActiveAccount = (instance: IPublicClientApplication): (() => void) => {
+//
+// clearCache is awaited, not fired and forgotten: MsalProvider's initial state reads
+// instance.getAllAccounts() synchronously on its first render (a useReducer lazy
+// initializer), with no re-render when clearCache later finishes, since clearCache emits no
+// MSAL event. A caller that renders MsalProvider before this promise settles would freeze
+// that first render's account list to whatever was cached before the clear, defeating the
+// whole point of clearing it.
+export const wireActiveAccount = async (
+  instance: IPublicClientApplication,
+): Promise<() => void> => {
   if (!instance.getActiveAccount()) {
     const cached = instance.getAllAccounts();
     if (cached.length === 1) {
       instance.setActiveAccount(cached[0]);
     } else if (cached.length > 1) {
-      void instance.clearCache();
+      await instance.clearCache();
     }
   }
 

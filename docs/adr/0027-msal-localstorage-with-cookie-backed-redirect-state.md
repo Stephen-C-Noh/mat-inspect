@@ -133,6 +133,16 @@ or more cached accounts and no active designation is exactly the ambiguous case 
 designation, so leaving the choice merely unset would not have forced a re-login on its
 own; the cache has to actually be cleared.
 
+`wireActiveAccount` is `async` and its call sites `await` it before rendering
+`MsalProvider`, because `clearCache()` is genuinely asynchronous (it awaits
+`browserStorage.clear()` and `clearKeystore()`) and emits no MSAL event when it finishes.
+`MsalProvider`'s initial account list is a `useReducer` lazy initializer that calls
+`instance.getAllAccounts()` synchronously on its first render and does not re-run on its
+own; rendering it before `clearCache()` settles would freeze that first render's account
+list to whatever was cached before the clear, defeating the bootstrap guard above. An
+earlier version of this change fired `clearCache()` without awaiting it for exactly this
+reason, caught in review before merge.
+
 `wireActiveAccount` returns a cleanup function that removes its `addEventCallback`
 registration. Both apps' `MsalProviderWrapper` call it from the `useEffect` cleanup, so
 React StrictMode's dev-only double-invoke (mount, unmount, mount) does not register the
@@ -142,6 +152,16 @@ The `loginRedirect` round-trip fix (concern 1) is still unverified on a real And
 device with the PWA actually installed. `storeAuthStateInCookie` is the documented,
 low-downside response to the failure mode described, and is not conditioned on that
 verification landing first.
+
+`account-menu.tsx` and `switch-account-button.tsx`'s targeted, single-account sign-out
+was written to leave any other cached account in place, so Entra's account picker can be
+skipped on a device signing in as someone else next. The bootstrap guard above makes that
+convenience moot in practice: once a second cached account exists with no active
+designation, the guard clears the whole cache anyway, so a switch-account flow now behaves
+identically to `settings/page.tsx`'s plain `logoutRedirect()`. Whether to keep the two
+call sites' different `EndSessionRequest` shapes for the `login_hint` behavior alone, or
+collapse them to one full sign-out everywhere, is a product decision on its own and is
+left as a follow-up rather than folded into this ADR.
 
 ## Alternatives considered
 
