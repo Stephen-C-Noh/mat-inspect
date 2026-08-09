@@ -62,7 +62,8 @@ export const wireActiveAccount = async (
   if (!instance.getActiveAccount()) {
     const cached = instance.getAllAccounts();
     if (cached.length === 1) {
-      instance.setActiveAccount(cached[0]);
+      const [onlyCached] = cached;
+      if (onlyCached) instance.setActiveAccount(onlyCached);
     } else if (cached.length > 1) {
       await instance.clearCache();
     }
