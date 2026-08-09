@@ -24,6 +24,15 @@ export const getActiveAccount = (
   accounts[0] ??
   null;
 
+// The account's login_hint claim, passed as EndSessionRequest.logoutHint so Entra can skip
+// its own "which account do you want to sign out of?" picker when the browser holds more
+// than one Microsoft session. Independent of EndSessionRequest.account: passing a hint does
+// not scope what logoutRedirect clears locally (DEV-151).
+export const getLogoutHint = (account: AccountInfo | null): string | undefined => {
+  const claims = account?.idTokenClaims as Record<string, unknown> | undefined;
+  return typeof claims?.['login_hint'] === 'string' ? claims['login_hint'] : undefined;
+};
+
 // Keeps MSAL's active-account designation current. Call once per PublicClientApplication
 // instance and await it before rendering with it (see each app's MsalProviderWrapper), and
 // call the returned cleanup on unmount so a remount (React StrictMode's dev double-invoke,

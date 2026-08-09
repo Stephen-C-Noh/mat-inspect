@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AccountInfo, EventMessage, IPublicClientApplication } from '@azure/msal-browser';
 import { EventType } from '@azure/msal-browser';
-import { getActiveAccount, wireActiveAccount } from './active-account';
+import { getActiveAccount, getLogoutHint, wireActiveAccount } from './active-account';
 
 const accountA = { homeAccountId: 'a', username: 'a@sait.ca' } as AccountInfo;
 const accountB = { homeAccountId: 'b', username: 'b@sait.ca' } as AccountInfo;
@@ -16,6 +16,27 @@ const makeInstance = (overrides: Partial<IPublicClientApplication>): IPublicClie
     clearCache: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }) as unknown as IPublicClientApplication;
+
+describe('getLogoutHint', () => {
+  it('reads the login_hint claim from the account', () => {
+    const account = { idTokenClaims: { login_hint: 'jane@sait.ca' } } as unknown as AccountInfo;
+    expect(getLogoutHint(account)).toBe('jane@sait.ca');
+  });
+
+  it('returns undefined when there is no login_hint claim', () => {
+    const account = { idTokenClaims: { roles: ['operator'] } } as unknown as AccountInfo;
+    expect(getLogoutHint(account)).toBeUndefined();
+  });
+
+  it('returns undefined for a null account', () => {
+    expect(getLogoutHint(null)).toBeUndefined();
+  });
+
+  it('returns undefined when login_hint is not a string', () => {
+    const account = { idTokenClaims: { login_hint: 12345 } } as unknown as AccountInfo;
+    expect(getLogoutHint(account)).toBeUndefined();
+  });
+});
 
 describe('getActiveAccount', () => {
   it('prefers the MSAL-designated active account over accounts[0]', () => {

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { Bell, CheckCircle, ChevronRight, LogOut, Shield } from 'lucide-react';
-import { getActiveAccount, getRolesFromAccount } from '@mat-inspect/shared-auth';
+import { getActiveAccount, getLogoutHint, getRolesFromAccount } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
 
 // Roles are checked in this order for the single badge shown on the account card: a manager
@@ -35,7 +35,10 @@ function SettingsContent(): ReactElement {
 
   const handleSignOut = async (): Promise<void> => {
     try {
-      await instance.logoutRedirect();
+      // logoutHint lets Entra skip its own account picker when the browser holds more than
+      // one Microsoft session (DEV-151); no account field, so the whole local MSAL cache
+      // clears, same as account-menu.tsx's sign-out.
+      await instance.logoutRedirect({ logoutHint: getLogoutHint(account) });
     } catch {
       // swallowed
     }

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactElement, type ReactNode } from 'react';
 import { useMsal } from '@azure/msal-react';
-import { getActiveAccount } from '@mat-inspect/shared-auth';
+import { getActiveAccount, getLogoutHint } from '@mat-inspect/shared-auth';
 import {
   ChevronRight,
   Bell,
@@ -106,7 +106,10 @@ function SettingsContent(): ReactElement {
 
   const handleSignOut = async () => {
     try {
-      await instance.logoutRedirect();
+      // logoutHint lets Entra skip its own account picker when the browser holds more than
+      // one Microsoft session (DEV-151); no account field, so the whole local MSAL cache
+      // clears, same as account-menu.tsx's sign-out.
+      await instance.logoutRedirect({ logoutHint: getLogoutHint(account) });
     } catch {
       // swallowed
     }

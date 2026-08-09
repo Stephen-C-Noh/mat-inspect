@@ -153,15 +153,19 @@ device with the PWA actually installed. `storeAuthStateInCookie` is the document
 low-downside response to the failure mode described, and is not conditioned on that
 verification landing first.
 
-`account-menu.tsx` and `switch-account-button.tsx`'s targeted, single-account sign-out
-was written to leave any other cached account in place, so Entra's account picker can be
-skipped on a device signing in as someone else next. The bootstrap guard above makes that
-convenience moot in practice: once a second cached account exists with no active
-designation, the guard clears the whole cache anyway, so a switch-account flow now behaves
-identically to `settings/page.tsx`'s plain `logoutRedirect()`. Whether to keep the two
-call sites' different `EndSessionRequest` shapes for the `login_hint` behavior alone, or
-collapse them to one full sign-out everywhere, is a product decision on its own and is
-left as a follow-up rather than folded into this ADR.
+`account-menu.tsx` and `switch-account-button.tsx`'s sign-out originally passed
+`EndSessionRequest.account`, targeting a single account so it could leave any other cached
+account in place while still using `logoutHint` to skip Entra's account picker. The
+bootstrap guard above made that convenience moot in practice: once a second cached account
+existed with no active designation, the guard cleared the whole cache anyway on the next
+load, so the two call sites converged on the same end state through different paths. Since
+`EndSessionRequest.account` and `EndSessionRequest.logoutHint` are independent fields, both
+call sites (and `settings/page.tsx`, which previously passed neither) now call
+`logoutRedirect({ logoutHint })` with no `account`: one sign-out shape everywhere,
+`packages/shared-auth`'s new `getLogoutHint` helper reading the `login_hint` claim so the
+three call sites do not each repeat the same claim lookup, immediate full-cache clearing
+with no reliance on the bootstrap guard reaching a safe state on the next load, and no loss
+of the Entra picker-skip UX.
 
 ## Alternatives considered
 

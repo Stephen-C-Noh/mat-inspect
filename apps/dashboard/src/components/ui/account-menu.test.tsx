@@ -38,16 +38,16 @@ describe('AccountMenu', () => {
     expect(screen.getByText('jane.doe@example.edu')).toBeTruthy();
   });
 
-  // Passing the active account and its login_hint lets Entra skip the "which account do you
-  // want to sign out of?" picker when the browser holds more than one Microsoft session.
-  it('signs out targeting the active account and its login_hint', async () => {
+  // No account field: sign-out clears the whole local MSAL cache, not just this one (DEV-151).
+  // logoutHint still lets Entra skip its own "which account do you want to sign out of?"
+  // picker when the browser holds more than one Microsoft session.
+  it('signs out clearing the whole cache, hinting the active account to Entra', async () => {
     render(<AccountMenu />);
 
     await userEvent.click(screen.getByRole('button', { name: /account menu/i }));
     await userEvent.click(screen.getByRole('menuitem', { name: /sign out/i }));
 
     expect(logoutRedirect).toHaveBeenCalledWith({
-      account,
       logoutHint: 'jane.doe@example.edu',
     });
   });
