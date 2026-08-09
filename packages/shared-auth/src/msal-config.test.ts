@@ -19,10 +19,12 @@ describe('createMsalConfig', () => {
     expect(config.auth.postLogoutRedirectUri).toBe('');
   });
 
-  it('keeps the token cache in sessionStorage', () => {
+  it('keeps the token cache in localStorage and backs up redirect state to a cookie', () => {
+    // Both apps are installed PWAs whose Android process can be killed between launches
+    // (DEV-151); sessionStorage would force a relogin on nearly every relaunch.
     const config = createMsalConfig({ clientId: CLIENT_ID, tenantId: TENANT_ID });
-    expect(config.cache?.cacheLocation).toBe('sessionStorage');
-    expect(config.cache?.storeAuthStateInCookie).toBe(false);
+    expect(config.cache?.cacheLocation).toBe('localStorage');
+    expect(config.cache?.storeAuthStateInCookie).toBe(true);
   });
 });
 

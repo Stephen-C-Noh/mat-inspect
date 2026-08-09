@@ -24,9 +24,15 @@ export const createMsalConfig = ({ clientId, tenantId }: EntraConfig): Configura
     redirectUri: typeof window !== 'undefined' ? window.location.origin : '',
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : '',
   },
+  // localStorage: both apps are installed PWAs (DEV-144) whose Android process can be
+  // killed between launches; sessionStorage would force a relogin on almost every
+  // relaunch. storeAuthStateInCookie: true backs up the redirect-in-progress state to a
+  // cookie, since MSAL always keeps that temporary state in sessionStorage/memory
+  // regardless of cacheLocation, and an installed PWA's out-of-scope navigation to
+  // login.microsoftonline.com may not return to the same browsing context. See DEV-151.
   cache: {
-    cacheLocation: 'sessionStorage',
-    storeAuthStateInCookie: false,
+    cacheLocation: 'localStorage',
+    storeAuthStateInCookie: true,
   },
 });
 
