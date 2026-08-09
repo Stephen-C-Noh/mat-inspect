@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
+import { getActiveAccount } from '@mat-inspect/shared-auth';
 import { HelpCircle, LogOut, Settings, User } from 'lucide-react';
 
 export const AccountMenu = (): ReactElement | null => {
   const { instance, accounts } = useMsal();
-  const activeAccount = accounts[0];
+  const activeAccount = getActiveAccount(instance, accounts);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

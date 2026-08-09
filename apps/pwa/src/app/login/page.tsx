@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
-import { hasAllowedRole } from '@mat-inspect/shared-auth';
+import { getActiveAccount, hasAllowedRole } from '@mat-inspect/shared-auth';
 import { ALLOWED_ROLES, loginRequest } from '@/lib/auth';
 
 export default function LoginPage() {
@@ -13,12 +13,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (hasAllowedRole(accounts[0] ?? null, ALLOWED_ROLES)) {
+    if (hasAllowedRole(getActiveAccount(instance, accounts), ALLOWED_ROLES)) {
       router.replace('/');
     } else {
       router.replace('/unauthorized');
     }
-  }, [isAuthenticated, accounts, router]);
+  }, [isAuthenticated, accounts, instance, router]);
 
   async function handleSignIn(): Promise<void> {
     try {

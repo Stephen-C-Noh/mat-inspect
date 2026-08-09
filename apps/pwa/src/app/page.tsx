@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useMsal } from '@azure/msal-react';
-import { hasAllowedRole } from '@mat-inspect/shared-auth';
+import { getActiveAccount, hasAllowedRole } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
 import { DASHBOARD_LINK_ROLES } from '@/lib/auth';
 import { useEquipmentList } from '../hooks/use-equipment';
@@ -36,7 +36,7 @@ function EquipmentIcon({ name }: { name: string }) {
 }
 
 function LandingPageContent() {
-  const { accounts } = useMsal();
+  const { instance, accounts } = useMsal();
   const { data: equipmentList, isLoading } = useEquipmentList();
   const { data: recentInspections } = useMyInspections({ limit: 3 });
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,7 +44,10 @@ function LandingPageContent() {
 
   // Operators have no manager dashboard to go to; supervisors (and, in principle, manager/admin,
   // though those roles never reach the PWA per its own ALLOWED_ROLES) do.
-  const canSeeDashboard = hasAllowedRole(accounts[0] ?? null, DASHBOARD_LINK_ROLES);
+  const canSeeDashboard = hasAllowedRole(
+    getActiveAccount(instance, accounts),
+    DASHBOARD_LINK_ROLES,
+  );
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
 
   const equipmentById = useMemo(

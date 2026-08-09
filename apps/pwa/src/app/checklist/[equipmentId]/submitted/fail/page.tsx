@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, type ReactElement } from 'react';
 import { CheckCircle, Home, History, RotateCcw, Forklift, AlertTriangle } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
+import { getActiveAccount } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
 import { useEquipmentList } from '@/hooks/use-equipment';
 import { EvidencePhoto } from '@/components/checklist/evidence-photo';
@@ -49,7 +50,7 @@ function FailureCard({
 
 function SubmittedFailContent(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
-  const { accounts } = useMsal();
+  const { instance, accounts } = useMsal();
   const { data: equipmentList } = useEquipmentList();
   const { result } = useInspectionDraft();
 
@@ -72,7 +73,7 @@ function SubmittedFailContent(): ReactElement {
     ' · ' +
     new Date().toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
 
-  const inspectorName = accounts[0]?.name ?? 'MAT Lab Tech';
+  const inspectorName = getActiveAccount(instance, accounts)?.name ?? 'MAT Lab Tech';
 
   return (
     <main className="min-h-screen bg-muted px-4 py-8">

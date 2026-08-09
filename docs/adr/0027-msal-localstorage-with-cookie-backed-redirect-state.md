@@ -105,15 +105,18 @@ though the dashboard is not an installed PWA and was never the reason for this c
 Nothing about the dashboard's threat model argues against it; a manager's own device
 staying signed in across a browser restart is an unremarkable, expected default there.
 
-`accounts[0]` is used across both apps' components as the active account, with no
+`accounts[0]` was used across both apps' components as the active account, with no
 `setActiveAccount` call after a redirect response and no consuming code preferring
-`instance.getActiveAccount()`. This was already true before this change and tied to the
-current tab's `sessionStorage`; it is not fixed here, since resolving it means auditing
-every `accounts[0]` read in both apps (`apps/pwa/src/**`, `apps/dashboard/src/**`) and is
-a larger change than this ADR's scope. It is a pre-existing correctness gap, not one this
-ADR introduces, and worth its own ticket regardless of this decision: with `localStorage`
-extending how long a stale account entry survives in the account list, cleaning it up
-matters more than it did with `sessionStorage`.
+`instance.getActiveAccount()`. This predates this change and was already a correctness
+gap tied to cache insertion order, not to `cacheLocation`, but `localStorage` extends how
+long a stale account entry survives in the cache, so it is fixed in the same change:
+`packages/shared-auth/src/active-account.ts` adds `wireActiveAccount` (called once from
+each app's `MsalProviderWrapper`, bootstrapping the active account from the cache on load
+and then tracking it on every `LOGIN_SUCCESS` and `ACQUIRE_TOKEN_SUCCESS` event) and
+`getActiveAccount` (`instance.getActiveAccount() ?? accounts[0]`, the resolution every
+consumer should use instead of reading `accounts[0]` directly). Every such read in both
+apps (`apps/pwa/src/**`, `apps/dashboard/src/**`) and in `access-token.ts`'s token
+acquisition calls now goes through it.
 
 The `loginRedirect` round-trip fix (concern 1) is still unverified on a real Android
 device with the PWA actually installed. `storeAuthStateInCookie` is the documented,

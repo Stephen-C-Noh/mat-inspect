@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactElement, type ReactNode } from 'react';
 import { useMsal } from '@azure/msal-react';
+import { getActiveAccount } from '@mat-inspect/shared-auth';
 import {
   ChevronRight,
   Bell,
@@ -98,7 +99,7 @@ function SectionLabel({ children }: { children: string }): ReactElement {
 function SettingsContent(): ReactElement {
   const { instance, accounts } = useMsal();
   const router = useRouter();
-  const account = accounts[0];
+  const account = getActiveAccount(instance, accounts);
   const { isDark, toggle: toggleDark } = useTheme();
 
   const [language, setLanguage] = useState<'en' | 'fr' | 'es'>('en');

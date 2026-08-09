@@ -1,4 +1,5 @@
 export { acquireApiToken, acquireApiTokenSilent } from './access-token';
+export { getActiveAccount, wireActiveAccount } from './active-account';
 export {
   apiScope,
   createLoginRequest,

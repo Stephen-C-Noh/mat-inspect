@@ -4,7 +4,7 @@ import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { getRolesFromAccount, hasAllowedRole } from '@mat-inspect/shared-auth';
+import { getActiveAccount, getRolesFromAccount, hasAllowedRole } from '@mat-inspect/shared-auth';
 import { ALLOWED_ROLES, hasOperationalRole, loginRequest, resolveLandingPath } from '@/lib/auth';
 import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 
@@ -22,7 +22,7 @@ function LoginContent() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const activeAccount = accounts[0] ?? null;
+    const activeAccount = getActiveAccount(instance, accounts);
     if (hasAllowedRole(activeAccount, ALLOWED_ROLES)) {
       const roles = getRolesFromAccount(activeAccount);
       // AuthGuard sends unauthenticated deep links here as ?redirect=<path> (DEV-128); honor it
@@ -38,14 +38,15 @@ function LoginContent() {
     } else {
       router.replace('/unauthorized');
     }
-  }, [isAuthenticated, accounts, router, searchParams]);
+  }, [isAuthenticated, accounts, instance, router, searchParams]);
 
   const handleSignIn = async () => {
     try {
       // Redirect, not popup: iOS runs every browser on WebKit and blocks or drops the
       // popup-to-opener handshake, so loginPopup silently fails on iPhone. Matches the PWA.
-      // MsalProvider processes the redirect response; consumers read accounts[0], so no
-      // setActiveAccount is needed here.
+      // wireActiveAccount (MsalProviderWrapper) marks the signed-in account active on
+      // MSAL's LOGIN_SUCCESS event, so consumers reading getActiveAccount() see it without
+      // any extra call here (ADR 0027).
       await instance.loginRedirect(loginRequest);
     } catch {
       // Redirect failed to start; stay on login page.

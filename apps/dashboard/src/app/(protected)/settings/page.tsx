@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { Bell, CheckCircle, ChevronRight, LogOut, Shield } from 'lucide-react';
-import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import { getActiveAccount, getRolesFromAccount } from '@mat-inspect/shared-auth';
 import { AuthGuard } from '@/components/auth-guard';
 
 // Roles are checked in this order for the single badge shown on the account card: a manager
@@ -28,7 +28,7 @@ function SectionLabel({ children }: { children: string }): ReactElement {
 function SettingsContent(): ReactElement {
   const { instance, accounts } = useMsal();
   const router = useRouter();
-  const account = accounts[0];
+  const account = getActiveAccount(instance, accounts);
 
   const roles = getRolesFromAccount(account ?? null);
   const roleLabel = ROLE_DISPLAY_PRIORITY.find((role) => roles.includes(role));

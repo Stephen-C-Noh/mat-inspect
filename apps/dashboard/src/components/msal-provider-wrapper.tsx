@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
+import { wireActiveAccount } from '@mat-inspect/shared-auth';
 import { msalConfig } from '@/lib/auth';
 
 const msalInstance = new PublicClientApplication(msalConfig);
@@ -15,7 +16,10 @@ export const MsalProviderWrapper = ({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    msalInstance.initialize().then(() => setReady(true));
+    msalInstance.initialize().then(() => {
+      wireActiveAccount(msalInstance);
+      setReady(true);
+    });
   }, []);
 
   if (!ready) {
