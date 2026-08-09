@@ -24,8 +24,15 @@ export const MsalProviderWrapper = ({
       // Awaited: MsalProvider reads getAllAccounts() synchronously on its first render, so
       // it must not mount until any cache clear wireActiveAccount performs has finished
       // (see the comment on wireActiveAccount).
-      unwireActiveAccount = await wireActiveAccount(msalInstance);
-      if (cancelled) return;
+      const unwire = await wireActiveAccount(msalInstance);
+      if (cancelled) {
+        // Unmounted while the await above was pending: the callback is already registered
+        // (wireActiveAccount resolved), so it must be removed here or the cleanup below,
+        // which already ran before this promise settled, never gets the chance to.
+        unwire();
+        return;
+      }
+      unwireActiveAccount = unwire;
       setReady(true);
     });
 
