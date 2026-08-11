@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactElement, type ReactNode } from 'react';
 import { useMsal } from '@azure/msal-react';
+import { getActiveAccount, getLogoutHint } from '@mat-inspect/shared-auth';
 import {
   ChevronRight,
   Bell,
@@ -98,14 +99,17 @@ function SectionLabel({ children }: { children: string }): ReactElement {
 function SettingsContent(): ReactElement {
   const { instance, accounts } = useMsal();
   const router = useRouter();
-  const account = accounts[0];
+  const account = getActiveAccount(instance, accounts);
   const { isDark, toggle: toggleDark } = useTheme();
 
   const [language, setLanguage] = useState<'en' | 'fr' | 'es'>('en');
 
   const handleSignOut = async () => {
     try {
-      await instance.logoutRedirect();
+      // logoutHint lets Entra skip its own account picker when the browser holds more than
+      // one Microsoft session (DEV-151); no account field, so the whole local MSAL cache
+      // clears, same as account-menu.tsx's sign-out.
+      await instance.logoutRedirect({ logoutHint: getLogoutHint(account) });
     } catch {
       // swallowed
     }

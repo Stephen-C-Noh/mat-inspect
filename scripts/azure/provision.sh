@@ -40,6 +40,7 @@ BUILD_IMAGES="${BUILD_IMAGES:-true}"       # set false if images are already in 
 require() { if [ -z "${!1:-}" ]; then echo "ERROR: required env var $1 is not set" >&2; exit 1; fi; }
 for v in ENTRA_TENANT_ID ENTRA_CLIENT_ID APPLICATIONINSIGHTS_CONNECTION_STRING \
          PG_ADMIN_PASSWORD AUDIT_MIGRATOR_DB_PASSWORD AUDIT_WRITER_DB_PASSWORD \
+         CORE_API_MIGRATOR_DB_PASSWORD CORE_API_WRITER_DB_PASSWORD \
          AUDIT_INGEST_TOKEN CORE_API_INTERNAL_TOKEN REPORT_SIGNING_PRIVATE_KEY; do
   require "$v"
 done
@@ -96,7 +97,7 @@ az postgres flexible-server firewall-rule create -g "$RG" --server-name "$PG" \
   --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 -o none
 PG_FQDN="${PG}.postgres.database.azure.com"
 
-echo ">> Databases and least-privilege audit roles (mirrors infra/docker/postgres-init.sh)"
+echo ">> Databases and least-privilege audit + core_api roles (mirrors infra/docker/postgres-init.sh, DEV-146)"
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
   --querytext "CREATE DATABASE core_db;" -o none || true
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
@@ -105,6 +106,10 @@ az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_P
   --querytext "CREATE ROLE audit_migrator LOGIN PASSWORD '${AUDIT_MIGRATOR_DB_PASSWORD}';" -o none || true
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
   --querytext "CREATE ROLE audit_writer LOGIN PASSWORD '${AUDIT_WRITER_DB_PASSWORD}';" -o none || true
+az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
+  --querytext "CREATE ROLE core_api_migrator LOGIN PASSWORD '${CORE_API_MIGRATOR_DB_PASSWORD}';" -o none || true
+az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d postgres \
+  --querytext "CREATE ROLE core_api_writer LOGIN PASSWORD '${CORE_API_WRITER_DB_PASSWORD}';" -o none || true
 az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d audit_db \
   --querytext "ALTER SCHEMA public OWNER TO audit_migrator; \
     GRANT CREATE ON DATABASE audit_db TO audit_migrator; \
@@ -112,9 +117,54 @@ az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_P
     ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public GRANT SELECT, INSERT ON TABLES TO audit_writer; \
     ALTER DEFAULT PRIVILEGES FOR ROLE audit_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO audit_writer;" \
   -o none
+# core_api_writer gets UPDATE too (equipment status, defect lifecycle, outbox.processed_at), unlike
+# audit_writer's INSERT+SELECT-only grant; core-api never deletes a row, so no DELETE grant either.
+#
+# Unlike audit_db (created together with audit_migrator/audit_writer from day one), core_db may
+# already have tables owned by $PG_ADMIN_USER from a pre-DEV-146 run of this script, or from any
+# earlier migration run against the admin-role CORE_API_DB_URL. The ALTER TABLE/SEQUENCE loop below
+# + GRANT ... ON ALL TABLES cover that existing data; ALTER DEFAULT PRIVILEGES alone only ever
+# applies to objects created after it runs, so it would silently grant nothing on tables that
+# already exist (this is what -o none swallowing a prior partial run would otherwise hide).
+# REASSIGN OWNED BY looks like the obvious tool here but fails against the official Postgres
+# Docker image's bootstrap superuser with "cannot reassign ownership of objects ... required by
+# the database system" (confirmed locally); the ALTER ... OWNER TO loop has no such restriction
+# and needs only what ALTER SCHEMA public OWNER TO already relies on just below.
+# drizzle holds __drizzle_migrations, the journal table migrate.ts reads and writes on every run.
+# A rerun of this script against a database that already has migration history (drizzle schema
+# already exists, owned by $PG_ADMIN_USER) needs it handed over too, or core_api_migrator can
+# CREATE SCHEMA IF NOT EXISTS "drizzle" but not record the migration it just applied (DEV-149). A
+# fresh provision has no drizzle schema yet, so this is a no-op there: the migrator creates and
+# owns it itself.
+az postgres flexible-server execute -n "$PG" -u "$PG_ADMIN_USER" -p "$PG_ADMIN_PASSWORD" -d core_db \
+  --querytext "ALTER SCHEMA public OWNER TO core_api_migrator; \
+    DO \$\$ \
+    BEGIN \
+      IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'drizzle') THEN \
+        EXECUTE 'ALTER SCHEMA drizzle OWNER TO core_api_migrator'; \
+      END IF; \
+    END \$\$; \
+    DO \$\$ \
+    DECLARE r RECORD; \
+    BEGIN \
+      FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('public', 'drizzle') LOOP \
+        EXECUTE format('ALTER TABLE %I.%I OWNER TO core_api_migrator', r.schemaname, r.tablename); \
+      END LOOP; \
+      FOR r IN SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname IN ('public', 'drizzle') LOOP \
+        EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO core_api_migrator', r.schemaname, r.sequencename); \
+      END LOOP; \
+    END \$\$; \
+    GRANT CREATE ON DATABASE core_db TO core_api_migrator; \
+    GRANT CONNECT ON DATABASE core_db TO core_api_writer; \
+    GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO core_api_writer; \
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO core_api_writer; \
+    ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE ON TABLES TO core_api_writer; \
+    ALTER DEFAULT PRIVILEGES FOR ROLE core_api_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO core_api_writer;" \
+  -o none
 
 # Derived connection strings (never printed). All carry sslmode=require (Azure PG mandates TLS).
-CORE_API_DB_URL="postgres://${PG_ADMIN_USER}:${PG_ADMIN_PASSWORD}@${PG_FQDN}:5432/core_db?sslmode=require"
+CORE_API_DB_URL="postgres://core_api_writer:${CORE_API_WRITER_DB_PASSWORD}@${PG_FQDN}:5432/core_db?sslmode=require"
+CORE_MIGRATOR_DB_URL="postgres://core_api_migrator:${CORE_API_MIGRATOR_DB_PASSWORD}@${PG_FQDN}:5432/core_db?sslmode=require"
 AUDIT_API_DB_URL="postgres://audit_writer:${AUDIT_WRITER_DB_PASSWORD}@${PG_FQDN}:5432/audit_db?sslmode=require"
 AUDIT_MIGRATOR_DB_URL="postgres://audit_migrator:${AUDIT_MIGRATOR_DB_PASSWORD}@${PG_FQDN}:5432/audit_db?sslmode=require"
 
@@ -181,9 +231,14 @@ echo ">> core-api"
 # ACA rejects a secret with an empty value. The notification channels are optional (ADR 0013): add
 # their secrets and secretref env-vars only when set, so a blank TEAMS_WEBHOOK_URL / SMTP_PASS leaves
 # the channel silent instead of failing app creation.
-CORE_SECRETS=("coredb=$CORE_API_DB_URL" "ingest=$AUDIT_INGEST_TOKEN" \
+CORE_SECRETS=("coredb=$CORE_API_DB_URL" "coremigrator=$CORE_MIGRATOR_DB_URL" "ingest=$AUDIT_INGEST_TOKEN" \
   "appinsights=$APPLICATIONINSIGHTS_CONNECTION_STRING" "internaltoken=$CORE_API_INTERNAL_TOKEN")
-CORE_ENV=("DATABASE_URL=secretref:coredb" \
+# CORE_MIGRATOR_DB_URL is set here (not just derived above) so `az containerapp exec -n core-api
+# ... node ../../db/dist/migrate.js` (the documented way to migrate core_db on the Azure demo,
+# runbook Part B step 2 below) can find it inside the running container's own environment. It is
+# never read by the server itself (only db/migrate.ts reads it); DATABASE_URL above (core_api_writer)
+# is what the running app uses.
+CORE_ENV=("DATABASE_URL=secretref:coredb" "CORE_MIGRATOR_DB_URL=secretref:coremigrator" \
   "ENTRA_TENANT_ID=$ENTRA_TENANT_ID" "ENTRA_CLIENT_ID=$ENTRA_CLIENT_ID" \
   "APPLICATIONINSIGHTS_CONNECTION_STRING=secretref:appinsights" \
   "AUDIT_INGEST_TOKEN=secretref:ingest" "CORE_API_INTERNAL_TOKEN=secretref:internaltoken" \
@@ -261,6 +316,23 @@ make_routes mat-inspect-dashboard og-dash
 PWA_EP=$(az afd endpoint show -g "$RG" --profile-name "$FD" --endpoint-name mat-inspect-pwa --query hostName -o tsv)
 DASH_EP=$(az afd endpoint show -g "$RG" --profile-name "$FD" --endpoint-name mat-inspect-dashboard --query hostName -o tsv)
 
+# NEXT_PUBLIC_DASHBOARD_URL (DEV-148) is inlined at build time (Next.js), but the dashboard app and
+# its Front Door endpoint (DASH_EP) do not exist until this point in the script, well after the
+# first pwa image build above. Rebuild pwa now that DASH_EP is known, and redeploy it. This second
+# build uses a distinct tag rather than reusing "$TAG": `az containerapp update --image` with an
+# unchanged image reference string can skip creating a new revision even though the ACR content
+# changed underneath that tag, so a plain rebuild-in-place under "$TAG" would silently leave the
+# first, dashboard-URL-less image running.
+if [ "$BUILD_IMAGES" = "true" ]; then
+  echo ">> Rebuilding pwa with the dashboard's Front Door endpoint baked in"
+  PWA_TAG="${TAG}-dashboard-url"
+  az acr build -r "$ACR" -t "${IMG_PREFIX}/pwa:${PWA_TAG}" -f apps/pwa/Dockerfile --target runtime \
+    --build-arg NEXT_PUBLIC_AZURE_TENANT_ID="$ENTRA_TENANT_ID" \
+    --build-arg NEXT_PUBLIC_AZURE_CLIENT_ID="$ENTRA_CLIENT_ID" \
+    --build-arg NEXT_PUBLIC_DASHBOARD_URL="https://${DASH_EP}" . -o none
+  az containerapp update -g "$RG" -n pwa --image "${ACR_SERVER}/${IMG_PREFIX}/pwa:${PWA_TAG}" -o none
+fi
+
 cat <<EOF
 
 Provisioning complete (resources added to existing RG: $RG).
@@ -272,8 +344,9 @@ Front Door default endpoints (usable immediately for testing):
 Next steps (runbook Part B):
   1. Upload AI model weights to the '${AI_SHARE}' Azure Files share and confirm the ai app mounts
      them at /models (az containerapp update --yaml, see the runbook).
-  2. Run migrations: core-api against core_db, audit against audit_db as audit_migrator
-     (AUDIT_MIGRATOR_DB_URL). Then seed synthetic data (db/seed.ts) into core_db.
+  2. Run migrations: core-api against core_db as core_api_migrator (CORE_MIGRATOR_DB_URL), audit
+     against audit_db as audit_migrator (AUDIT_MIGRATOR_DB_URL). Then seed synthetic data
+     (db/seed.ts) into core_db.
   3. Add custom domains on the two Front Door endpoints (az afd custom-domain create), add the DNS
      records, and validate.
   4. Add the front-end origins (custom domains, or the default endpoints above) as SPA redirect URIs

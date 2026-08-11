@@ -19,10 +19,23 @@ describe('createMsalConfig', () => {
     expect(config.auth.postLogoutRedirectUri).toBe('');
   });
 
-  it('keeps the token cache in sessionStorage', () => {
+  it('keeps the token cache in localStorage and backs up redirect state to a Secure cookie', () => {
+    // The PWA is installed to the home screen (DEV-144) and Android can kill its process
+    // between launches; sessionStorage would force a relogin on nearly every relaunch.
+    // secureCookies must be explicit: MSAL defaults it to false, which would send the
+    // redirect-state cookie over a plain-HTTP hop (ADR 0027).
     const config = createMsalConfig({ clientId: CLIENT_ID, tenantId: TENANT_ID });
-    expect(config.cache?.cacheLocation).toBe('sessionStorage');
-    expect(config.cache?.storeAuthStateInCookie).toBe(false);
+    expect(config.cache?.cacheLocation).toBe('localStorage');
+    expect(config.cache?.storeAuthStateInCookie).toBe(true);
+    expect(config.cache?.secureCookies).toBe(true);
+  });
+
+  it('leaves navigateToLoginRequestUrl at the MSAL default', () => {
+    // The dashboard's AuthGuard sends unauthenticated deep links to /login?redirect=<path>
+    // (DEV-128) and depends on MSAL's default post-login hop back to that URL. Setting this
+    // false (an earlier version of this config did) silently drops that redirect (ADR 0027).
+    const config = createMsalConfig({ clientId: CLIENT_ID, tenantId: TENANT_ID });
+    expect(config.auth.navigateToLoginRequestUrl).toBeUndefined();
   });
 });
 

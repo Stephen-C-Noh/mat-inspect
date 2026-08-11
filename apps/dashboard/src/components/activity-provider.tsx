@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getRolesFromAccount } from '@mat-inspect/shared-auth';
+import { getActiveAccount, getRolesFromAccount } from '@mat-inspect/shared-auth';
 import { activityFeedSchema, type ActivityInspection } from '@mat-inspect/shared-schemas';
 import { acquireAccessToken, acquireAccessTokenSilent, hasOperationalRole } from '@/lib/auth';
 import { ACTIVITY_POLL_INTERVAL_MS } from '@/lib/polling';
@@ -37,7 +37,9 @@ export const ActivityProvider = ({ children }: { children: ReactNode }): ReactEl
   // accept auditor (read-only, and not about "what did operators just do"). Without this gate
   // an auditor session polled it every ACTIVITY_POLL_INTERVAL_MS, each call landing a 403
   // (DEV-112 follow-up).
-  const isOperational = hasOperationalRole(getRolesFromAccount(accounts[0] ?? null));
+  const isOperational = hasOperationalRole(
+    getRolesFromAccount(getActiveAccount(instance, accounts)),
+  );
 
   // Ids this provider has already reacted to. The feed repeats an undismissed inspection on every
   // poll by design, so "is anything here new" is answered against what was seen, not against a

@@ -31,18 +31,31 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_OWNER: ${{ github.repository_owner }}
+          # The commit CI just built and pushed images for (DEV-99), not "whatever git pull lands
+          # on": those usually agree, but a second push landing between CI finishing and this step
+          # running is exactly the race that made a stale image look healthy before. Pinning TAG to
+          # it, instead of the moving "latest", also makes a deploy reproducible: re-running this
+          # job (or docker compose pull/up by hand with the same TAG) always fetches this same build.
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_OWNER
+          envs: GHCR_TOKEN,GHCR_OWNER,DEPLOY_SHA
           script: |
+            set -e
+            # Without this, appleboy/ssh-action reports the step's outcome from the last command
+            # only: docker-health-check.sh failing mid-script (DEV-99's commit-mismatch assertion,
+            # or the pre-existing not-all-healthy check) printed its error and kept going straight
+            # into smoke-gateway.sh, which then passed and made the whole deploy look green.
+            # Confirmed happening in run 31271090854 before this fix.
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_OWNER" --password-stdin
             cd ~/projects/mat-inspect
             git pull
+            export TAG="sha-${DEPLOY_SHA}"
             docker compose pull
             docker compose up -d --remove-orphans --wait --wait-timeout 180
-            ./scripts/docker-health-check.sh
+            ./scripts/docker-health-check.sh "$DEPLOY_SHA"
             # Healthy containers are not a working gateway. This checks the routing table through
             # the real front door, and that the AI Service still has no unauthenticated path from
             # the browser (ADR 0020). The authenticated end-to-end transcribe check needs an

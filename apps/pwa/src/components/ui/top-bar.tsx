@@ -1,14 +1,15 @@
 'use client';
 
 import { useMsal } from '@azure/msal-react';
+import { getActiveAccount } from '@mat-inspect/shared-auth';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { AccountMenu } from '@/components/ui/account-menu';
 
 export const TopBar = function (): ReactElement | null {
-  const { accounts } = useMsal();
-  const activeAccount = accounts[0];
+  const { instance, accounts } = useMsal();
+  const activeAccount = getActiveAccount(instance, accounts);
 
   if (!activeAccount) return null;
 

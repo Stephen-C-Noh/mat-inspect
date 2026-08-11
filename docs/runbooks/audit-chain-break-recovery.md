@@ -18,6 +18,20 @@ writes the inspection, its responses, and an outbox row in one `core_db` transac
 is asynchronous. With the Audit Service unreachable, `services/core-api/src/outbox/poller.ts` retries
 delivery every tick indefinitely (no retry cap, no dead-letter queue) and just logs a warning.
 
+A row that will never deliver (a permanently malformed payload, the DEV-142 class of bug) has no
+delete escape hatch as of DEV-146: `outbox`'s immutability trigger rejects DELETE unconditionally,
+even for a superuser connection (`db/migrations/0011_outbox_immutability_trigger.sql`). To stop the
+poller from retrying such a row forever, set `processed_at` by hand instead of deleting it — the
+trigger allows that column through, and the poller only ever re-selects rows where `processed_at IS
+NULL`:
+
+```sql
+UPDATE outbox SET processed_at = now() WHERE id = '<poison row id>';
+```
+
+This silences the row without erasing evidence that it existed; record the row's `id` and why it was
+silenced in the incident log (section 8) the same way a restore's outbox reset is recorded.
+
 Still working during the outage: inspection submit, equipment lockout, defect creation, supervisor
 notifications, computed readiness.
 
@@ -311,7 +325,67 @@ draining to zero.
 
 ---
 
-## 9. Out of scope
+## 9. `core_db` trust boundary (DEV-146)
+
+Section 5 redelivers audit events by reading `core_db.outbox.payload` and trusts it as the source
+of truth, on the premise that "`core_db` was never the compromised system." DEV-146 closed part of
+the gap behind that premise. This section states exactly what is now true and what is still not
+proven, so the premise is not taken on faith during a real recovery.
+
+### 9.1 What the premise now rests on
+
+- `core-api`'s runtime connection uses the `core_api_writer` role (`infra/docker/postgres-init.sh`,
+  `scripts/azure/provision.sh`), not the Postgres admin/owner role. `core_api_writer` has SELECT,
+  INSERT, UPDATE on `core_db` tables and no DELETE grant.
+- `core_api_writer` does not own `inspections`, `inspection_responses`, or `outbox`, and is not the
+  owner of their immutability triggers. `core_api_migrator` owns the schema; `core_api_writer`
+  cannot `ALTER TABLE ... DISABLE TRIGGER` any of them (`services/core-api/src/db/roles.integration.test.ts`
+  proves this directly). This closes the exact mechanism DEV-145's drill used deliberately to
+  corrupt the chain: disabling a trigger from the same connection that writes through it.
+- `outbox` now has an immutability trigger (`db/migrations/0011_outbox_immutability_trigger.sql`).
+  `processed_at` can be updated (the poller needs this); `id`, `event_type`, `payload`, and
+  `created_at` cannot be changed after insert, and DELETE/TRUNCATE are rejected outright, at the
+  row level and the role level both. There is no delete-based escape hatch for a permanently bad
+  row; see section 1's `processed_at` workaround.
+- Migrations on `core_db` run as `core_api_migrator` (`CORE_MIGRATOR_DB_URL`), a role separate from
+  the one the running service uses, the same separation rule ARCHITECTURE.md 8.4 rule 8 already
+  applied to `audit_db`.
+
+Together, once an `outbox` row is written, nothing reachable through `core_api_writer` (the
+credential the running `core-api` process actually holds) can alter or remove it. That is the
+property the redelivery step in section 5 depends on.
+
+### 9.2 What it still doesn't prove
+
+- **Fabrication, not just tampering.** `core_api_writer` still has INSERT, because core-api's normal
+  job requires it. Role separation stops a compromised process from editing an `outbox` row after
+  the fact; it does nothing to stop that same process from inserting a row with a false `payload` in
+  the first place. The transactional-outbox invariant (ADR 0008: the row is written in the same
+  transaction as the `inspections`/`defects` row it describes) is an application-code guarantee, not
+  a database-enforced one. This ticket did not add a constraint that ties an `outbox` row's payload
+  to the source row it claims to describe.
+- **A leaked `core_api_migrator` credential defeats all of it.** That role owns the schema and the
+  triggers; it can drop or alter them the same way `audit_migrator` could on `audit_db`. Section
+  3's "Migration" row in the audit_db triage table applies here too: a migration is still the one
+  path that can touch chain-adjacent tables outside normal INSERT/UPDATE, and it still has no
+  out-of-band approval step enforced in tooling, only in process.
+- **Host-level or superuser Postgres access bypasses role grants entirely.** Same caveat that
+  applies to `audit_db`: this is a defense against a compromised or buggy `core-api` process using
+  its own normal credentials, not a defense against someone with direct database admin access.
+- **No hash chain on `core_db` itself.** `audit_events` has a cryptographic chain; `outbox` does not.
+  The immutability trigger proves a row cannot be edited after insert, but there is no equivalent of
+  `verifyChainSegment` that lets a recovery operator cryptographically confirm an `outbox` row's
+  `payload` matches what was true at insert time, only that it has not changed since.
+
+If the "core_db wasn't compromised" premise needs to hold up to more scrutiny than this (for example
+for a real tampering investigation, not just an ordinary restore-artifact recovery), treat 9.2's
+first point as the standing gap: check whether the source rows the `outbox` payload claims to
+describe (`inspections`, `defects`) are internally consistent with it, not just whether the
+`outbox` row itself looks unmodified.
+
+---
+
+## 10. Out of scope
 
 A quarantine mode — refuse new writes but keep serving exports of the cryptographically verified
 prefix up to `brokenAtSeq`, labelled as ending at that sequence, instead of the whole service going
@@ -319,3 +393,8 @@ dark — would shorten the outage in section 1 for report export specifically. I
 to a compliance-critical service (an export endpoint would need to distinguish "verified" from
 "unverified but present" data) and needs its own ADR and two reviewers. This runbook does not
 implement it; raise it separately if the team decides the export downtime is worth solving.
+
+Re-architecting `core_db`'s connection topology beyond the `core_api_migrator`/`core_api_writer`
+split (per-route credentials, connection pooling changes, tying an `outbox` row to its source row
+with a database-level constraint) is DEV-146's own stated out-of-scope list. It would close 9.2's
+fabrication gap; it is a larger change than this ticket.

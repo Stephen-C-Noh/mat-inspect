@@ -53,8 +53,9 @@ safety check.
 Negative: attestation trusts the server. An actor with direct database write access
 could, in principle, fabricate an Inspection under an operator's identity. A real
 per-operator cryptographic signature would prevent this. That residual risk is accepted
-for the capstone because per-user key provisioning on shared lab tablets is out of scope.
-This limitation is stated rather than hidden.
+for the capstone because per-user key provisioning and secure key storage on individually
+assigned operator devices is out of scope for a thirteen-week build. This limitation is
+stated rather than hidden.
 
 Several documents reference the old HMAC and must be updated to match: CLAUDE.md
 (sections 2 and 6), ARCHITECTURE.md (sections 3, 6, 7.1, 8.8), and the inspections
@@ -69,5 +70,5 @@ digest (ADR 0008) already provides this, making a second per-row stamp redundant
 Per-operator cryptographic signatures: each operator holds a private key and signs;
 the server verifies with the public key. This is the only design where "operator forges
 a signature" is a meaningful defended threat. Rejected for the capstone: it requires key
-provisioning, storage, and recovery on shared devices, none of which the plan provisions
-in thirteen weeks.
+provisioning, storage, and recovery per operator device, none of which the plan
+provisions in thirteen weeks.

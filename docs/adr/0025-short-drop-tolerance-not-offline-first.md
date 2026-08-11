@@ -60,6 +60,16 @@ The mechanism is specified in FRS Section 9.1 and ARCHITECTURE Section 10.1:
 In-progress inspections live in `sessionStorage` for the duration of the browser
 session. A hard device failure ends the session and the in-progress inspection is lost.
 
+## Amendment (2026-08-08, DEV-144)
+
+Point 6 above and "The offline foundation does not exist" under Reasons said the PWA has no
+service worker. DEV-144 added one, for installability only: Chrome gates the home-screen
+install prompt on a service worker with a fetch handler. It does not change this ADR's
+decision. `apps/pwa/public/sw.js` passes every request straight to the network, uncached; it
+has no Cache Storage read or write path. A device with no connectivity still gets the "no
+connection" error in point 6, not a cached checklist. Do not add caching to that file without
+first amending this decision, not just the file's own comment.
+
 ## Reasons
 
 ### The client bought the descope with a WiFi commitment
@@ -99,14 +109,15 @@ storage. Offline-first is not "add IndexedDB" on top of the current app; it is t
 shell, the cache strategy, the queue, and the blob handling for photos, built from
 nothing. The 3-to-5-day estimate in ARCHITECTURE Section 10.1 reflects that.
 
-### `sessionStorage` over `localStorage` on shared devices
+### `sessionStorage` over `localStorage` on the operator's device
 
-Lab devices are shared between operators. A draft holds defect notes, which may be
-voice-transcribed, and evidence photos. `sessionStorage` bounds that content to the
-browser session, so it does not carry to the next operator. `localStorage` would survive
-a device power-off and satisfy the old FRS 13.2 promise, but it would leave one
-operator's PII on a shared phone indefinitely and would need explicit expiry and
-operator-boundary handling (FOIP). The cross-session resume case is deferred to v2 along
+Devices are individually assigned per operator, not shared between operators.
+`sessionStorage` still bounds a draft's defect notes and evidence photos to the browser
+session rather than leaving them on the device indefinitely: a lost or stolen phone, or
+one later reassigned or sold, does not carry the last inspection's PII with it.
+`localStorage` would survive a device power-off and satisfy the old FRS 13.2 promise, but
+it would need explicit expiry and PII-retention handling (FOIP) to avoid that exposure.
+The cross-session resume case is deferred to v2 along
 with the rest of offline-first.
 
 ## Consequences
@@ -143,8 +154,8 @@ and the client already committed to the lab coverage that makes it unnecessary.
 
 **`localStorage` with a 24-hour expiry, matching the old FRS 13.2.** Rejected. It solves
 only the device-failure case, not offline submission, so it does not deliver what a
-reader of the old text expects, and it puts operator PII on a shared device with no
-clear owner.
+reader of the old text expects, and a 24-hour window still leaves operator PII on the
+device past the inspection it belongs to, with no expiry logic built to enforce it.
 
 **No client persistence at all, the state before DEV-125.** Rejected. It fails FRS
 Section 9.1 outright and silently discards completed inspections, which is what DEV-125

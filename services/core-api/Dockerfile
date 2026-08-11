@@ -81,6 +81,14 @@ COPY --from=build /repo/db/dist db/dist
 # nothing else, so without this the image ships db/dist/migrate.js pointing at a migrations folder
 # that is not there, and a box with only the images cannot create its schema (DEV-97).
 COPY --from=build /repo/db/migrations db/dist/migrations
+# GIT_SHA (DEV-99): the commit this image was built from, reported in /health so a deployed
+# stack can be asked from outside whether every service is on the same commit and whether that
+# commit is the head of main. ci.yml passes it as a build arg; docker-compose.yml's local build
+# falls back to "local" when unset. Unknown by default so a hand build never lies about its origin.
+# Placed after the COPY layers, not before: this value changes on every commit, and putting it
+# earlier would bust BuildKit's cache for every COPY that follows it on every single build.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 USER appuser
 WORKDIR /repo/services/core-api
 EXPOSE 3000

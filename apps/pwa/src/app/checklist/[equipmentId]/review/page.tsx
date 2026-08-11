@@ -1,6 +1,7 @@
 'use client';
 
 import { useMsal } from '@azure/msal-react';
+import { getActiveAccount } from '@mat-inspect/shared-auth';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
@@ -23,7 +24,7 @@ import { submitErrorMessage } from '@/lib/submit-error-message';
 function ReviewView(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
   const router = useRouter();
-  const { accounts } = useMsal();
+  const { instance, accounts } = useMsal();
   const { restored: draft, save, clear } = useInspectionDraftStore(params.equipmentId);
 
   const { setResult } = useInspectionDraft();
@@ -62,7 +63,7 @@ function ReviewView(): ReactElement {
   if (!draft || !evidenceComplete) return <></>;
 
   const summary = attestationSummary(draft.items, draft.answers);
-  const account = accounts[0];
+  const account = getActiveAccount(instance, accounts);
   const operator = account ? operatorDisplayName(account) : '';
   const isSubmitting = submitInspection.isPending;
 

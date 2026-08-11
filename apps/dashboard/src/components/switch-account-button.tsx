@@ -1,21 +1,21 @@
 'use client';
 
 import { useMsal } from '@azure/msal-react';
+import { getLogoutHint } from '@mat-inspect/shared-auth';
 
-// Signs the current user out so a denied account can return to /login and sign in
-// with a different one. Passing the active account and its login_hint targets that
-// one account, so Entra skips the "which account do you want to sign out of?" picker
-// when the browser holds more than one Microsoft session. A real SAIT user has a
-// single account and never sees the picker regardless.
+// Signs the current user out so a denied account can return to /login and sign in with a
+// different one. Clears the whole local MSAL cache (not just the active account), so no
+// stale cached account is left for DEV-151's ADR 0027 bootstrap guard to clear on the next
+// load anyway. login_hint still targets the active account's Entra session, so Entra skips
+// the "which account do you want to sign out of?" picker when the browser holds more than
+// one Microsoft session. A real SAIT user has a single account and never sees the picker
+// regardless.
 export const SwitchAccountButton = (): React.ReactElement => {
   const { instance } = useMsal();
 
   const handleSignOut = () => {
     const account = instance.getActiveAccount() ?? instance.getAllAccounts()[0] ?? null;
-    const claims = account?.idTokenClaims as Record<string, unknown> | undefined;
-    const logoutHint =
-      typeof claims?.['login_hint'] === 'string' ? claims['login_hint'] : undefined;
-    void instance.logoutRedirect({ account, logoutHint });
+    void instance.logoutRedirect({ logoutHint: getLogoutHint(account) });
   };
 
   return (

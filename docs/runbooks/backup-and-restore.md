@@ -152,12 +152,49 @@ dumps only is up to 24 hours.
    ```
    Restore `audit_db` the same way. `audit_db` rows are append-only; the immutability triggers allow
    the COPY load a restore uses.
-5. Start the rest of the stack: `docker compose up -d`.
-6. Run the smoke checks: `./scripts/docker-health-check.sh` and `./scripts/smoke-gateway.sh`, then have
+5. **Re-establish `core_db` ownership (DEV-146).** `--no-owner` makes `pg_restore` create every
+   restored table owned by the connecting role (`$POSTGRES_USER`, the admin), not
+   `core_api_migrator`. Table-level grants for `core_api_writer` (SELECT/INSERT/UPDATE) usually
+   come back via the ACL entries the dump already carries (`pg_dump` here has no `--no-acl`), but
+   a dump taken before DEV-146 rolled out carries no such grants at all, and either way
+   `core_api_migrator` no longer owns anything it would need to run a later migration. Run this
+   once, right after every `core_db` restore, before starting the rest of the stack. `REASSIGN
+OWNED BY` looks like the tool for this but fails against `$POSTGRES_USER` here (it is the
+   image's initdb bootstrap superuser; Postgres refuses to `REASSIGN OWNED BY` that specific
+   role), so use the same `ALTER ... OWNER TO` loop as the existing-volume bootstrap below:
+
+   ```
+   docker compose exec -T postgres psql -U "$POSTGRES_USER" -d core_db <<-SQL
+     ALTER SCHEMA drizzle OWNER TO core_api_migrator;
+     DO \$\$
+     DECLARE r RECORD;
+     BEGIN
+       FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('public', 'drizzle') LOOP
+         EXECUTE format('ALTER TABLE %I.%I OWNER TO core_api_migrator', r.schemaname, r.tablename);
+       END LOOP;
+       FOR r IN SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname IN ('public', 'drizzle') LOOP
+         EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO core_api_migrator', r.schemaname, r.sequencename);
+       END LOOP;
+     END \$\$;
+     GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO core_api_writer;
+     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO core_api_writer;
+   SQL
+   ```
+
+   The `drizzle` schema holds `__drizzle_migrations`, the journal table migrate.ts reads and writes
+   on every run; skipping it here leaves that table owned by the admin role and a later migration
+   fails to record itself even though it applied (DEV-149). `core_api_writer` does not need access
+   to `drizzle`, only the migrator does.
+
+   Same recipe as the existing-volume bootstrap in `docs/QUICKSTART.md`'s
+   `CORE_MIGRATOR_DB_URL must be set` section; see that section if this fails partway.
+
+6. Start the rest of the stack: `docker compose up -d`.
+7. Run the smoke checks: `./scripts/docker-health-check.sh` and `./scripts/smoke-gateway.sh`, then have
    an operator log in, read the equipment list, and submit one test inspection. The first two scripts
    check reachability and the auth surface; neither logs in, so a login-level regression (for example
    a redirect URI or role-claim break) is invisible to them.
-7. Record the time taken and any issue found. The DR runbook is a capstone deliverable.
+8. Record the time taken and any issue found. The DR runbook is a capstone deliverable.
 
 ### 3.3 Drill log
 

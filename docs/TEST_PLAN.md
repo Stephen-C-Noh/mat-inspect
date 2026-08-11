@@ -355,11 +355,11 @@ Severity codes: **BLOCKING** (release cannot proceed), **HIGH** (must fix before
 - Expected result: API returns 403 with code `CERT_EXPIRED`; PWA shows certification expiry message; submission is not recorded
 - Failure severity: BLOCKING
 
-**TC-AUTH-008: Tokens are not stored in localStorage**
+**TC-AUTH-008: Redirect-state cookie carries no token and is issued Secure**
 
-- Preconditions: Logged-in Operator session in PWA
-- Steps: Open browser DevTools; inspect `localStorage`; inspect `sessionStorage`
-- Expected result: No JWT or refresh token found in either storage; tokens are in httpOnly cookies only
+- Preconditions: Logged-in Operator session in PWA, served over HTTPS through Caddy
+- Steps: Open browser DevTools; inspect `localStorage` (MSAL's token cache, ADR 0027); inspect cookies set during login
+- Expected result: `localStorage` holds MSAL's account and token cache entries, as expected for an SPA with no backend session store. The MSAL redirect-state cookie (PKCE verifier, `state`, `nonce`) carries no JWT, access token, or refresh token, and is set with the `Secure` attribute
 - Failure severity: BLOCKING
 
 **TC-AUTH-009: Expired access token triggers silent refresh**
