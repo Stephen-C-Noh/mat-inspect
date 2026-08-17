@@ -23,8 +23,13 @@ WORKDIR /app
 # libgomp1: llama.cpp is compiled against the system OpenMP runtime in the build stage above, and
 # python:3.12-slim does not ship it. Without it `import llama_cpp` fails and the advisory silently
 # stays UNAVAILABLE. (ctranslate2 bundles its own, so whisper does not need this.)
-# hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+# apt-get upgrade: the base image lags the Debian security archive between tag refreshes, so
+# base packages (util-linux et al.) carry HIGH CVEs the Trivy image gate blocks on even though
+# nothing in this repo changed. Upgrading here pulls the fixed versions in, matching the no-apt-pin
+# policy above; DL3005 is expected and intentional (DEV-153, CVE-2026-53615).
+# hadolint ignore=DL3005,DL3008
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r appgroup && useradd -r -g appgroup --home-dir /app appuser && chown -R appuser:appgroup /app
 COPY --from=build /app/packages ./packages
