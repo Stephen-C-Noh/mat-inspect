@@ -28,8 +28,11 @@ the database, not just in application code:
   `TRUNCATE` does not fire row-level triggers and would otherwise empty the hash chain
   outright.
 - Independently of the triggers, the `audit_writer` database role (what the Audit Service
-  connects as at runtime) is granted `INSERT` and `SELECT` only. It has no `UPDATE` or
-  `DELETE` grant to fall back on even if a trigger were ever disabled.
+  connects as at runtime) holds `INSERT` and `SELECT` only on `audit_events`, with no
+  `UPDATE` or `DELETE` grant to fall back on even if a trigger were ever disabled. Its one
+  `UPDATE` grant is a deliberate, table-scoped carve-out on `report_jobs` (a job-status
+  table that is not part of the hash chain; see `services/audit/db/schema/report-jobs.ts`),
+  not a way into the append-only tables.
 
 A correction to a submitted inspection is a new, linked inspection row, never an edit to the
 old one. If a workflow, a support request, or a "just this once" data-fix ever seems to call
@@ -175,11 +178,14 @@ live database.
 | ------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Nightly database backup (`db-backup`) | 02:00 UTC (`BACKUP_TIME`)             | `docker compose exec db-backup cat /backups/backup.log`; `docker compose exec db-backup ls -la /backups` |
 | Audit chain full verification         | 02:30 lab-local (`CHAIN_VERIFY_TIME`) | `docker compose logs audit \| grep -i "chain verif"`                                                     |
-| Voice-clip retention purge            | 03:30 UTC (`RETENTION_TIME`)          | `docker compose logs voice-retention`                                                                    |
+| Voice-clip retention purge            | 03:30 UTC (`VOICE_RETENTION_TIME`)    | `docker compose logs voice-retention`                                                                    |
 
 The 02:00 / 02:30 / 03:30 stagger is deliberate, not arbitrary: it keeps the backup, the
 chain verification, and the retention purge from overlapping on the same box. Do not move
-one without checking the others stay clear.
+one without checking the others stay clear. The retention time is overridden from `.env` as
+`VOICE_RETENTION_TIME`; `docker-compose.yml` maps it onto the in-container `RETENTION_TIME`,
+so setting `RETENTION_TIME` directly in `.env` has no effect (`voice-audio-retention.md` has
+the same override name).
 
 The backup and retention services report healthy based on a liveness heartbeat, not job
 freshness (section 2); a nightly job is idle 23 hours out of 24, so "healthy" does not by
@@ -228,10 +234,12 @@ carved out of the rule; it never needed one.
 **Drill cadence:** rehearsed twice per the project plan, once in Sprint 4 and once before
 the capstone demo (ARCHITECTURE.md 12.5). The Sprint 4 drill (DEV-45, 2026-08-04) is logged
 in `backup-and-restore.md` section 3.3, including the AI-weights gap above and a second
-finding: nothing currently stops an operator from submitting a fresh inspection against
-equipment that is already OUT_OF_SERVICE (tracked separately as DEV-143, not fixed by this
-doc). The second drill's evidence lands in DEV-49. A drill that worked on the host it was
-rehearsed on is not evidence it works on this one; rehearse it here too.
+finding, since fixed: at drill time nothing stopped an operator from submitting a fresh
+inspection against equipment that was already OUT_OF_SERVICE. DEV-143 (merged) closed this;
+submit now rejects it with a 409 (`EQUIPMENT_OUT_OF_SERVICE`, or `EQUIPMENT_RETIRED` for
+retired equipment) in `services/core-api/src/routes/inspections/submit.ts`. The second
+drill's evidence lands in DEV-49. A drill that worked on the host it was rehearsed on is not
+evidence it works on this one; rehearse it here too.
 
 ---
 
