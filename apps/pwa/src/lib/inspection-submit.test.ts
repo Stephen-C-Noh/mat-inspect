@@ -59,6 +59,7 @@ describe('buildSubmitPayload', () => {
         answers: { forks: { kind: 'BOOLEAN', passed: true } },
         notes: {},
         photoIds: {},
+        categories: {},
         attested: false,
       }),
     ).toThrow(/attest/i);
@@ -78,6 +79,7 @@ describe('buildSubmitPayload', () => {
       answers,
       notes: {},
       photoIds: {},
+      categories: {},
       attested: true,
     });
 
@@ -86,8 +88,8 @@ describe('buildSubmitPayload', () => {
       templateId: TEMPLATE_ID,
       attested: true,
       responses: [
-        { itemKey: 'forks', value: true, passed: true, photoIds: [] },
-        { itemKey: 'horn', value: true, passed: true, photoIds: [] },
+        { itemKey: 'forks', value: true, passed: true, photoIds: [], defectCategory: null },
+        { itemKey: 'horn', value: true, passed: true, photoIds: [], defectCategory: null },
       ],
     });
   });
@@ -100,11 +102,12 @@ describe('buildSubmitPayload', () => {
       answers: { forks: { kind: 'BOOLEAN', passed: false } },
       notes: {},
       photoIds: {},
+      categories: {},
       attested: true,
     });
 
     expect(payload.responses).toEqual([
-      { itemKey: 'forks', value: false, passed: false, photoIds: [] },
+      { itemKey: 'forks', value: false, passed: false, photoIds: [], defectCategory: null },
     ]);
   });
 
@@ -116,6 +119,7 @@ describe('buildSubmitPayload', () => {
       answers: { remarks: { kind: 'TEXT', value: 'runs hot after 20 min' } },
       notes: {},
       photoIds: {},
+      categories: {},
       attested: true,
     });
 
@@ -132,11 +136,12 @@ describe('buildSubmitPayload', () => {
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
       notes: {},
       photoIds: {},
+      categories: {},
       attested: true,
     });
 
     expect(payload.responses).toEqual([
-      { itemKey: 'forks', value: true, passed: true, photoIds: [] },
+      { itemKey: 'forks', value: true, passed: true, photoIds: [], defectCategory: null },
     ]);
   });
 
@@ -148,6 +153,7 @@ describe('buildSubmitPayload', () => {
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
       notes: { forks: typed('slight surface rust, still safe') },
       photoIds: {},
+      categories: {},
       attested: true,
     });
 
@@ -159,6 +165,7 @@ describe('buildSubmitPayload', () => {
         notes: 'slight surface rust, still safe',
         notesSource: 'TYPED',
         photoIds: [],
+        defectCategory: null,
       },
     ]);
   });
@@ -171,11 +178,12 @@ describe('buildSubmitPayload', () => {
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
       notes: { forks: typed('   ') },
       photoIds: {},
+      categories: {},
       attested: true,
     });
 
     expect(payload.responses).toEqual([
-      { itemKey: 'forks', value: true, passed: true, photoIds: [] },
+      { itemKey: 'forks', value: true, passed: true, photoIds: [], defectCategory: null },
     ]);
   });
 
@@ -197,6 +205,7 @@ describe('buildSubmitPayload', () => {
         },
       },
       photoIds: { forks: [photoId] },
+      categories: {},
       attested: true,
     });
 
@@ -208,9 +217,10 @@ describe('buildSubmitPayload', () => {
         notes: 'left fork cracked at the heel',
         notesSource: 'VOICE_TRANSCRIBED',
         photoIds: [photoId],
+        defectCategory: null,
       },
       // The passing item is untouched: no notes, no photos.
-      { itemKey: 'horn', value: true, passed: true, photoIds: [] },
+      { itemKey: 'horn', value: true, passed: true, photoIds: [], defectCategory: null },
     ]);
   });
 
@@ -226,6 +236,7 @@ describe('buildSubmitPayload', () => {
       answers: { forks: { kind: 'BOOLEAN', passed: true } },
       notes: { forks: typed('heel reground, within spec') },
       photoIds: { forks: ['some-photo-id'] },
+      categories: {},
       attested: true,
     });
 
@@ -237,8 +248,66 @@ describe('buildSubmitPayload', () => {
         notes: 'heel reground, within spec',
         notesSource: 'TYPED',
         photoIds: ['some-photo-id'],
+        defectCategory: null,
       },
     ]);
+  });
+
+  // ADR 0028: only what the Operator confirmed on the review screen is ever sent. The raw
+  // suggestion is a draft-only, ephemeral value.
+  it('sends the confirmed category, not the raw suggestion', () => {
+    const payload = buildSubmitPayload({
+      equipmentId: EQUIPMENT_ID,
+      templateId: TEMPLATE_ID,
+      items: [booleanItem],
+      answers: { forks: { kind: 'BOOLEAN', passed: false } },
+      notes: { forks: typed('oil leaking from the mast') },
+      photoIds: {},
+      categories: { forks: { suggested: 'LEAK', confirmed: 'LEAK' } },
+      attested: true,
+    });
+
+    expect(payload.responses).toEqual([
+      {
+        itemKey: 'forks',
+        value: false,
+        passed: false,
+        notes: 'oil leaking from the mast',
+        notesSource: 'TYPED',
+        photoIds: [],
+        defectCategory: 'LEAK',
+      },
+    ]);
+  });
+
+  it('sends null when the suggestion was dismissed', () => {
+    const payload = buildSubmitPayload({
+      equipmentId: EQUIPMENT_ID,
+      templateId: TEMPLATE_ID,
+      items: [booleanItem],
+      answers: { forks: { kind: 'BOOLEAN', passed: false } },
+      notes: { forks: typed('oil leaking from the mast') },
+      photoIds: {},
+      categories: { forks: { suggested: 'LEAK', confirmed: null } },
+      attested: true,
+    });
+
+    expect(payload.responses[0]).toMatchObject({ defectCategory: null });
+  });
+
+  it('sends null when the item has no category entry at all', () => {
+    const payload = buildSubmitPayload({
+      equipmentId: EQUIPMENT_ID,
+      templateId: TEMPLATE_ID,
+      items: [booleanItem],
+      answers: { forks: { kind: 'BOOLEAN', passed: false } },
+      notes: { forks: typed('oil leaking from the mast') },
+      photoIds: {},
+      categories: {},
+      attested: true,
+    });
+
+    expect(payload.responses[0]).toMatchObject({ defectCategory: null });
   });
 });
 

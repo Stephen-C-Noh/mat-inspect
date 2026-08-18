@@ -4,8 +4,9 @@ Applies to any box that runs the `ai` container: the team mini-PC today, a SAIT-
 deployment after handover. Run this once per box, before the first `docker compose up`. Feeds the
 deployment runbook (DEV-89).
 
-Related: ADR 0017 (transcription scaling), ADR 0018 (advisory check),
-`services/ai/benchmark/RESULTS.md` (the numbers these exact weights produced).
+Related: ADR 0017 (transcription scaling), ADR 0028 (advisory check, retargeted to defect-category
+classification; amends ADR 0018), `services/ai/benchmark/RESULTS.md` (the numbers these exact
+weights produced).
 
 ---
 
@@ -14,7 +15,7 @@ Related: ADR 0017 (transcription scaling), ADR 0018 (advisory check),
 | Model                                   | Purpose                                  | Size    | Source                            |
 | --------------------------------------- | ---------------------------------------- | ------- | --------------------------------- |
 | faster-whisper `small.en` (CTranslate2) | voice note transcription (`/transcribe`) | 461 MB  | `Systran/faster-whisper-small.en` |
-| Qwen2.5-1.5B-Instruct Q4_K_M (GGUF)     | advisory defect signal (`/advisory`)     | 1066 MB | `Qwen/Qwen2.5-1.5B-Instruct-GGUF` |
+| Qwen2.5-1.5B-Instruct Q4_K_M (GGUF)     | advisory defect category (`/advisory`)   | 1066 MB | `Qwen/Qwen2.5-1.5B-Instruct-GGUF` |
 
 The llama.cpp runtime itself (`llama-cpp-python`) is **in the image**, not here. Only the weights
 are provisioned per box.
@@ -35,7 +36,7 @@ Mounted, because:
 
 The cost of this choice is a provisioning step that is easy to forget. That failure is soft, not
 silent: with `/models` empty the service still boots, `/transcribe` answers 503 and `/advisory`
-answers `UNAVAILABLE`, and inspection submit is never blocked (ADR 0017, ADR 0018). The way you
+answers `UNAVAILABLE`, and inspection submit is never blocked (ADR 0017, ADR 0028). The way you
 notice is that no transcript ever arrives. Verify with the checks at the bottom of this page.
 
 ## Provision
@@ -97,12 +98,14 @@ docker compose exec ai python -c "import llama_cpp; print(llama_cpp.__version__)
 Then exercise both endpoints from a container on the same network:
 
 ```bash
-# advisory: expect {"flagged":true,"status":"OK"} — not UNAVAILABLE
+# advisory: expect {"category":"LEAK","status":"OK"} — not UNAVAILABLE. The endpoint takes
+# note_text only (ADR 0028): it is called for a FAIL item's note, and the caller (core-api) is
+# what gates on the item being FAIL, not this request body.
 docker compose exec core-api node -e '
   fetch("http://ai:8000/advisory", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ note_text: "hydraulic hose is leaking", item_marked_pass: true }),
+    body: JSON.stringify({ note_text: "hydraulic hose is leaking" }),
   }).then((r) => r.text()).then(console.log);
 '
 
@@ -121,6 +124,11 @@ print(urllib.request.urlopen(req).read().decode())
 
 A `sample.wav` is not shipped with the repo (voice clips are biometric PII under FOIP; no real clip
 is committed). Record a short one on the box, or reuse the clip the DEV-83 benchmark used.
+
+The latency numbers below still apply to the retargeted `/advisory` (same model, same prompt size,
+same fail-open budget). Per-note classification accuracy on the real 1.5B model is a separate,
+still-open question (ADR 0028 Consequences) and needs its own mini-PC benchmark pass; the fixed
+enum plus OTHER and fail-open cover what the model misses in the meantime.
 
 ## Failure modes
 
@@ -161,7 +169,7 @@ for every CPU it can see on the host (16) while the cgroup admits two.
 
 The consequence today: transcription runs at about twice the 5-second target, and the advisory sits
 within 0.4 s of its own 4-second fail-open timeout, so a little extra load will start returning
-UNAVAILABLE at nominal usage. Neither failure blocks inspection submit (ADR 0017, ADR 0018): a slow
-transcript arrives late, and a missing advisory shows no prompt. Tracked separately; do not "fix" it
-by raising `AI_CPUS`, which would raise the concurrency cap in lockstep and make transcription
-slower still.
+UNAVAILABLE at nominal usage. Neither failure blocks inspection submit (ADR 0017, ADR 0028): a slow
+transcript arrives late, and a missing advisory shows no suggested category chip. Tracked
+separately; do not "fix" it by raising `AI_CPUS`, which would raise the concurrency cap in lockstep
+and make transcription slower still.

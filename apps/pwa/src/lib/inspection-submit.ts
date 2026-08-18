@@ -2,6 +2,7 @@ import type { ChecklistItem } from '@mat-inspect/shared-types';
 import type { InspectionResponse, SubmitInspection } from '@mat-inspect/shared-schemas';
 import type { ChecklistAnswers } from './checklist-answers';
 import type { ItemNote } from './voice-notes';
+import type { ItemCategory } from './defect-category';
 
 export type FailedItem = { itemKey: string; prompt: string };
 
@@ -46,6 +47,10 @@ type BuildParams = {
   answers: ChecklistAnswers;
   notes: Record<string, ItemNote>;
   photoIds: Record<string, string[]>;
+  // The Advisory Check suggestion and the Operator's confirmed category per item (ADR 0028).
+  // Only the confirmed value is ever sent; the raw suggestion never leaves the draft (only what
+  // the Operator confirmed is a human-owned value, per s.257).
+  categories: Record<string, ItemCategory>;
   // The operator's explicit confirm, taken on the review screen after seeing a summary of their
   // answers (ADR 0007). Passed in rather than hardcoded so no code path can produce an attested
   // payload without one.
@@ -87,6 +92,9 @@ export const buildSubmitPayload = (params: BuildParams): SubmitInspection => {
         passed: answer.passed,
         ...(note && trimmedNotes ? { notes: trimmedNotes, notesSource: note.notesSource } : {}),
         photoIds: params.photoIds[item.key] ?? [],
+        // Only a confirmed value is ever a real category; undefined ("not yet acted on") and
+        // null ("dismissed") both submit as no category, the same as an item with no note at all.
+        defectCategory: params.categories[item.key]?.confirmed ?? null,
       });
     } else {
       // A TEXT item has no pass/fail state (checklist-answers failedCount); the typed string is

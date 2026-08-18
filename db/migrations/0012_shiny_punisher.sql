@@ -1,0 +1,2 @@
+CREATE TYPE "public"."defect_category" AS ENUM('LEAK', 'DAMAGE', 'WEAR', 'MALFUNCTION', 'MISSING', 'CONTAMINATION', 'NOISE_VIBRATION', 'OTHER');--> statement-breakpoint
+ALTER TABLE "inspection_responses" ADD COLUMN "defect_category" "defect_category";

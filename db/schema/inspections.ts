@@ -9,6 +9,7 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
+import { DEFECT_CATEGORY_VALUES } from '@mat-inspect/shared-types';
 import { equipment } from './equipment.js';
 import { users } from './users.js';
 import { checklistTemplates } from './checklist-templates.js';
@@ -24,6 +25,12 @@ export const notesSourceEnum = pgEnum('notes_source', [
   'VOICE_TRANSCRIBED',
   'VOICE_EDITED',
 ]);
+
+// ADR 0028: the Advisory Check suggests a failure-mode category on a FAIL note; the Operator
+// confirms, changes, or dismisses it. Values come from the single shared source
+// (DEFECT_CATEGORY_VALUES, packages/shared-types), reused by the Zod submit validation and the
+// PWA chip set so the taxonomy is defined once.
+export const defectCategoryEnum = pgEnum('defect_category', DEFECT_CATEGORY_VALUES);
 
 // Immutable once written: UPDATE/DELETE-blocking triggers added in the
 // inspection_immutability_triggers migration (ADR 0008). Corrections are new linked
@@ -79,4 +86,10 @@ export const inspectionResponses = pgTable('inspection_responses', {
   // Set once at INSERT; the UPDATE/DELETE-blocking trigger above keeps them immutable. Sealed
   // into the inspection content hash, so a swapped or removed reference is tamper-evident.
   photoIds: uuid('photo_ids').array().notNull().default([]),
+  // The Operator-confirmed failure-mode category (ADR 0028), set once at INSERT with the rest of
+  // the response and sealed into the canonical content hash (shared-crypto ContentHashResponse),
+  // the same pattern as photoIds above. Raw model output is ephemeral and never persisted; this
+  // column only ever holds what the Operator confirmed. Null when the note has no confirmed
+  // category (no note, dismissed suggestion, or model UNAVAILABLE).
+  defectCategory: defectCategoryEnum('defect_category'),
 });

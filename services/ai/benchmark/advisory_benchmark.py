@@ -166,7 +166,7 @@ def _worker(
             note_text = notes[(worker_id + i) % len(notes)]
 
         t1 = time.perf_counter()
-        advisory.signals_defect(note_text)
+        advisory.categorize_note(note_text)
         local.advisory_s.append(time.perf_counter() - t1)
         local.combined_s.append(time.perf_counter() - start)
 
@@ -246,7 +246,7 @@ def main() -> None:
             else None
         )
         advisory = _load_advisory(args.advisory_model, threads_per_worker)
-        advisory.signals_defect("warm up")
+        advisory.categorize_note("warm up")
         if whisper is not None:
             _transcribe(whisper, args.audio)
         worker_models.append((whisper, advisory))

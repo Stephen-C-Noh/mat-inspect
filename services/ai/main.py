@@ -18,7 +18,8 @@ from starlette.formparsers import MultiPartParser
 
 from advisory import (
     AdvisoryStatus,
-    DefectSignalModel,
+    DefectCategory,
+    DefectCategoryModel,
     SerializedDefectModel,
     assess_note,
 )
@@ -82,10 +83,10 @@ def _parse_bool(raw: str) -> bool:
     raise ValueError(raw)
 
 
-def _load_advisory_model() -> DefectSignalModel | None:
+def _load_advisory_model() -> DefectCategoryModel | None:
     # The advisory model is optional and lazy. If ADVISORY_MODEL_PATH is unset, or the runtime
     # or weights are missing, the service still boots and the advisory path returns UNAVAILABLE
-    # (fail-open), so the PWA simply shows no prompt (ADR 0017, ADR 0018).
+    # (fail-open), so the PWA simply shows no prompt (ADR 0017, ADR 0028).
     model_path = os.environ.get("ADVISORY_MODEL_PATH")
     if not model_path:
         return None
@@ -97,7 +98,7 @@ def _load_advisory_model() -> DefectSignalModel | None:
         # the weights, so the first pass faults them in. On the mini-PC that cold pass took 4.4 s
         # and blew the 4 s advisory budget, which made the first advisory after every deploy
         # UNAVAILABLE. Pay it here, at boot, instead of on an operator's first note.
-        model.signals_defect("warmup")
+        model.categorize_note("warmup")
         return model
     except Exception:
         logger.exception(
@@ -204,7 +205,7 @@ async def limit_transcribe_body(
     return await call_next(request)
 
 
-def get_advisory_model(request: Request) -> DefectSignalModel | None:
+def get_advisory_model(request: Request) -> DefectCategoryModel | None:
     return request.app.state.advisory_model
 
 
@@ -236,30 +237,28 @@ def health() -> dict[str, str]:
 
 
 class AdvisoryRequest(BaseModel):
-    # Note text is the voice transcript or a typed note. Identity and the mark come from the
-    # caller; the advisory reads text only.
+    # Note text is the voice transcript or a typed note on a FAIL item. Identity and the mark come
+    # from the caller (core-api gates on FAIL plus non-empty note); the advisory reads text only.
     note_text: str = Field(..., max_length=4000)
-    item_marked_pass: bool
 
 
 class AdvisoryResponse(BaseModel):
-    flagged: bool
+    category: DefectCategory | None
     status: AdvisoryStatus
 
 
 @app.post("/advisory", response_model=AdvisoryResponse)
 async def advisory(
     body: AdvisoryRequest,
-    model: DefectSignalModel | None = Depends(get_advisory_model),
+    model: DefectCategoryModel | None = Depends(get_advisory_model),
 ) -> AdvisoryResponse:
     # Ephemeral: the result is returned in the response only. Nothing is persisted here, and the
-    # AI Service holds no client to the Inspection or the Audit Chain (ADR 0018).
+    # AI Service holds no client to the Inspection or the Audit Chain (ADR 0028).
     result = await assess_note(
         note_text=body.note_text,
-        item_marked_pass=body.item_marked_pass,
         model=model,
     )
-    return AdvisoryResponse(flagged=result.flagged, status=result.status)
+    return AdvisoryResponse(category=result.category, status=result.status)
 
 
 class TranscriptionResponse(BaseModel):

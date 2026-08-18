@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import type { ChecklistItem } from '@mat-inspect/shared-types';
+import { DEFECT_CATEGORY_VALUES } from '@mat-inspect/shared-types';
 import type { ChecklistAnswers } from './checklist-answers';
 import type { ItemNote } from './voice-notes';
+import type { ItemCategory } from './defect-category';
 
 // The part of the Storage interface this module needs. Narrow on purpose: it keeps the module
 // testable without a DOM, and nothing here needs key enumeration or clear().
@@ -27,6 +29,11 @@ export type DraftSnapshot = {
   // on unload, so persisting one restores a reference that fetch() cannot read. Photos are
   // uploaded at capture time and only the returned id is kept (ADR 0023).
   photoIds: Record<string, string[]>;
+  // The Advisory Check suggestion and the Operator's confirmed category per FAIL item (ADR
+  // 0028), keyed the same way as notes and photoIds. Reset alongside notes/photoIds whenever the
+  // item's pass/fail answer flips (see inspect/[equipmentId]/page.tsx), so a stale suggestion can
+  // never ride along onto a re-answered item.
+  categories: Record<string, ItemCategory>;
   // The idempotency key minted for the first submit attempt, kept so a retry after a failed or
   // lost POST replays the original 201 rather than recording a second inspection (ADR 0009).
   // Absent until the operator confirms on the review screen.
@@ -66,6 +73,14 @@ const itemNoteSchema = z.object({
   rawTranscript: z.string().nullable(),
 });
 
+const defectCategoryValueSchema = z.enum(DEFECT_CATEGORY_VALUES);
+
+const itemCategorySchema = z.object({
+  requested: z.literal(true).optional(),
+  suggested: defectCategoryValueSchema.optional(),
+  confirmed: defectCategoryValueSchema.nullable().optional(),
+});
+
 const storedDraftSchema = z.object({
   savedAt: z.string().datetime(),
   draft: z.object({
@@ -75,6 +90,9 @@ const storedDraftSchema = z.object({
     answers: z.record(answerSchema),
     notes: z.record(itemNoteSchema),
     photoIds: z.record(z.array(z.string())),
+    // .default({}) tolerates a draft written before this field existed (an open tab mid-deploy),
+    // the same forward-compat pattern the other draft fields would use if they needed it.
+    categories: z.record(itemCategorySchema).default({}),
     submitIdempotencyKey: z.string().optional(),
   }),
 });

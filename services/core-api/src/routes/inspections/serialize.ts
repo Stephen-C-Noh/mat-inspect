@@ -39,6 +39,7 @@ export const serializeInspectionResponse = (
   notes: row.notes,
   notesSource: row.notesSource,
   photoIds: row.photoIds,
+  defectCategory: row.defectCategory,
 });
 
 export const serializeInspectionDetail = (

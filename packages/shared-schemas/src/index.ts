@@ -1,6 +1,38 @@
 import { z } from 'zod';
+import {
+  DEFECT_CATEGORY_VALUES,
+  MODEL_SUGGESTABLE_DEFECT_CATEGORY_VALUES,
+} from '@mat-inspect/shared-types';
 
 export const uuidSchema = z.string().uuid();
+
+// ADR 0028: the failure-mode category taxonomy, shared with the Postgres pgEnum
+// (db/schema/inspections.ts) and the PWA chip set via the single source in shared-types.
+export const defectCategorySchema = z.enum(DEFECT_CATEGORY_VALUES);
+
+// The subset the Advisory Check model may suggest (OTHER is Operator-only). Validates the
+// core-api /ai/categorize proxy response against the AI Service's /advisory contract.
+export const modelSuggestableDefectCategorySchema = z.enum(
+  MODEL_SUGGESTABLE_DEFECT_CATEGORY_VALUES,
+);
+
+// Contract for POST /api/v1/ai/categorize (ADR 0028). Called only for a FAIL item's note; the
+// AI Service classifies text only, so the caller (not the AI Service) gates on the item's
+// pass/fail mark. Fail-open at every layer: a missing note, a busy/timed-out/unavailable model,
+// or an unreachable AI Service all answer 200 with category: null, status: "UNAVAILABLE", never
+// an error status, so the review screen never has to special-case a categorize failure.
+export const categorizeNoteRequestSchema = z.object({
+  noteText: z.string().min(1).max(4000),
+});
+
+export type CategorizeNoteRequest = z.infer<typeof categorizeNoteRequestSchema>;
+
+export const categorizeNoteResponseSchema = z.object({
+  category: modelSuggestableDefectCategorySchema.nullable(),
+  status: z.enum(['OK', 'UNAVAILABLE']),
+});
+
+export type CategorizeNoteResponse = z.infer<typeof categorizeNoteResponseSchema>;
 
 export const equipmentTypeSchema = z.enum([
   'OVERHEAD_CRANE',
@@ -172,6 +204,10 @@ export const inspectionResponseSchema = z.object({
   // as-is; submit does not require a photo on a failed BOOLEAN_PHOTO_ON_FAIL item and does not
   // check that the ids resolve. Capped so one response cannot carry an unbounded array.
   photoIds: z.array(uuidSchema).max(10).default([]),
+  // The Operator-confirmed failure-mode category (ADR 0028). Optional/nullable: a FAIL note with
+  // no confirmed category (no suggestion, dismissed, or the Advisory Check was UNAVAILABLE) is a
+  // valid submission. The model never suggests OTHER; the Operator may still pick it manually.
+  defectCategory: defectCategorySchema.nullable().optional(),
 });
 
 export const submitInspectionSchema = z.object({
@@ -237,6 +273,8 @@ export const inspectionResponseRecordSchema = z.object({
   notesSource: z.enum(['TYPED', 'VOICE_TRANSCRIBED', 'VOICE_EDITED']).nullable(),
   // Media blob references for this item (ADR 0023). Empty array when the operator took no photo.
   photoIds: z.array(uuidSchema),
+  // The Operator-confirmed failure-mode category (ADR 0028). Null when the response has none.
+  defectCategory: defectCategorySchema.nullable(),
 });
 
 export type InspectionResponseRecord = z.infer<typeof inspectionResponseRecordSchema>;
@@ -528,6 +566,10 @@ export const reportInspectionResponseSchema = z.object({
   // reconstructs the content hash from this field, so core-api returns the real column; the
   // .default([]) tolerates an older core-api that has not yet been redeployed.
   photoIds: z.array(uuidSchema).default([]),
+  // The Operator-confirmed failure-mode category (ADR 0028), from inspection_responses.
+  // defect_category. audit reconstructs the content hash from this field too (see photoIds
+  // above); the .default(null) gives the same forward-compat tolerance for an older core-api.
+  defectCategory: defectCategorySchema.nullable().default(null),
 });
 
 export type ReportInspectionResponse = z.infer<typeof reportInspectionResponseSchema>;

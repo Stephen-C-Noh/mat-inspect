@@ -2,13 +2,17 @@
 
 import { useMsal } from '@azure/msal-react';
 import { getActiveAccount } from '@mat-inspect/shared-auth';
+import type { DefectCategory } from '@mat-inspect/shared-types';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { useInspectionDraft } from '@/components/inspection-draft-provider';
 import { useInspectionDraftStore } from '@/hooks/use-inspection-draft-store';
 import { useSubmitInspection } from '@/hooks/use-submit-inspection';
+import { useDefectCategorySuggestions } from '@/hooks/use-defect-category-suggestions';
 import { attestationSummary, operatorDisplayName } from '@/lib/attestation-summary';
+import type { ItemCategory } from '@/lib/defect-category';
+import { DefectCategoryPicker } from '@/components/checklist/defect-category-picker';
 import {
   buildSubmitPayload,
   collectFailedItems,
@@ -40,6 +44,68 @@ function ReviewView(): ReactElement {
     () => (draft ? collectFailedItems(draft.items, draft.answers) : []),
     [draft],
   );
+
+  // Seeded from the draft the same way notes and photoIds are (they live in local state, not
+  // read live off `draft`, because useInspectionDraftStore's `restored` never updates after the
+  // first render). This is the only screen that writes to it (ADR 0028); the checklist screen
+  // carries it through its own save calls unread so it is never clobbered back to empty.
+  const [categories, setCategories] = useState<Record<string, ItemCategory>>(
+    () => draft?.categories ?? {},
+  );
+
+  // Every write from this screen has to carry both fields this screen mutates: the confirmed
+  // categories and the submit idempotency key. saveDraft REPLACES the stored record (it does not
+  // merge), and `draft` (restored) never updates after the first render, so a save that spreads
+  // `draft` and adds only one of the two silently clobbers the other. Routing all writes through
+  // one helper keeps them from overwriting each other: a dropped key would mint a second key on
+  // reload and record a duplicate inspection on retry, and dropped categories would lose the
+  // Operator's confirmations if a submit failed and they came back.
+  const persistDraft = useCallback(() => {
+    if (!draft) return;
+    save({
+      ...draft,
+      categories,
+      submitIdempotencyKey: idempotencyKeyRef.current || draft.submitIdempotencyKey,
+    });
+  }, [draft, categories, save]);
+
+  useEffect(() => {
+    persistDraft();
+  }, [persistDraft]);
+
+  const notedFailures = useMemo(
+    () =>
+      draft
+        ? failedItems
+            .filter((item) => (draft.notes[item.itemKey]?.notes.trim().length ?? 0) > 0)
+            .map((item) => ({ itemKey: item.itemKey, noteText: draft.notes[item.itemKey]!.notes }))
+        : [],
+    [draft, failedItems],
+  );
+
+  useDefectCategorySuggestions(
+    notedFailures,
+    // requested covers the abstain/UNAVAILABLE case, where suggested and confirmed are both left
+    // undefined but the call already happened (see ItemCategory.requested).
+    (itemKey) =>
+      categories[itemKey]?.requested === true ||
+      categories[itemKey]?.suggested !== undefined ||
+      categories[itemKey]?.confirmed !== undefined,
+    (itemKey, suggested) => {
+      setCategories((prev) => ({
+        ...prev,
+        [itemKey]: { ...prev[itemKey], requested: true, suggested: suggested ?? undefined },
+      }));
+    },
+  );
+
+  const handleConfirmCategory = (itemKey: string, value: DefectCategory): void => {
+    setCategories((prev) => ({ ...prev, [itemKey]: { ...prev[itemKey], confirmed: value } }));
+  };
+
+  const handleDismissCategory = (itemKey: string): void => {
+    setCategories((prev) => ({ ...prev, [itemKey]: { ...prev[itemKey], confirmed: null } }));
+  };
 
   // Same gate the checklist screen applies before handing off (lib/inspection-submit.ts, shared so
   // the two can't drift apart). Repeating it here closes the path where the operator reaches the
@@ -76,7 +142,9 @@ function ReviewView(): ReactElement {
 
     if (idempotencyKeyRef.current === '') {
       idempotencyKeyRef.current = crypto.randomUUID();
-      save({ ...draft, submitIdempotencyKey: idempotencyKeyRef.current });
+      // Persist through the shared helper so the just-minted key is stored alongside the live
+      // categories, not on top of a stale draft that would drop one of the two.
+      persistDraft();
     }
 
     try {
@@ -87,6 +155,7 @@ function ReviewView(): ReactElement {
         answers: draft.answers,
         notes: draft.notes,
         photoIds: draft.photoIds,
+        categories,
         attested: true,
       });
 
@@ -171,7 +240,16 @@ function ReviewView(): ReactElement {
                   >
                     <p className="font-bold">{item.prompt}</p>
                     {note?.notes.trim() && (
-                      <p className="mt-1 italic text-muted-foreground">{note.notes}</p>
+                      <>
+                        <p className="mt-1 italic text-muted-foreground">{note.notes}</p>
+                        <div className="mt-2">
+                          <DefectCategoryPicker
+                            category={categories[item.itemKey] ?? {}}
+                            onConfirm={(value) => handleConfirmCategory(item.itemKey, value)}
+                            onDismiss={() => handleDismissCategory(item.itemKey)}
+                          />
+                        </div>
+                      </>
                     )}
                     {photos > 0 && (
                       <p className="mt-1 text-xs font-semibold text-muted-foreground">

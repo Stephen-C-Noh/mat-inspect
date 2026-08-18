@@ -1,13 +1,15 @@
-"""Assistive Advisory Check logic (DEV-83).
+"""Assistive Advisory Check logic (DEV-154).
 
-The advisory flags when an Operator's free-text note appears to signal a defect on an item
-they marked PASS. It is assistive only (OHS s.257): it never blocks submission, never changes
-the Inspection Result, and is dismissible. It is ephemeral: nothing here is persisted. See
-ADR 0018 (Advisory Check) and ADR 0017 (shared mini-PC CPU budget).
+The advisory suggests a defect category for a note the Operator writes on an item they marked
+FAIL. It is assistive only (OHS s.257): it never decides pass or fail, never blocks or delays
+submission, and is dismissible. The Operator confirms, changes, or dismisses the suggestion; the
+confirmed category is the Operator's, not the model's. It is ephemeral here: this module returns a
+suggestion, nothing is persisted in the AI Service. See ADR 0028 (Advisory Check, retargeted) and
+ADR 0017 (shared mini-PC CPU budget).
 
 This module holds the pure decision logic and the model interface. The concrete on-prem model
-(llama.cpp / GGUF) lives in advisory_model.py and is injected, so this logic is testable
-without the model runtime or its weights.
+(llama.cpp / GGUF) lives in advisory_model.py and is injected, so this logic is testable without
+the model runtime or its weights.
 """
 
 from __future__ import annotations
@@ -32,16 +34,33 @@ class AdvisoryStatus(str, Enum):
     UNAVAILABLE = "UNAVAILABLE"
 
 
+class DefectCategory(str, Enum):
+    """Failure-mode taxonomy (ADR 0028). Fixed enum shared with the Postgres enum, the Zod submit
+    validation, and the PWA chip set.
+
+    OTHER is deliberately absent: it is an Operator-only manual choice for a note that fits none
+    of these seven, not something the model suggests.
+    """
+
+    LEAK = "LEAK"
+    DAMAGE = "DAMAGE"
+    WEAR = "WEAR"
+    MALFUNCTION = "MALFUNCTION"
+    MISSING = "MISSING"
+    CONTAMINATION = "CONTAMINATION"
+    NOISE_VIBRATION = "NOISE_VIBRATION"
+
+
 @dataclass(frozen=True)
 class AdvisoryResult:
-    flagged: bool
+    category: DefectCategory | None
     status: AdvisoryStatus
 
 
-class DefectSignalModel(Protocol):
-    """Judges whether note text reports a defect, damage, or problem with the item."""
+class DefectCategoryModel(Protocol):
+    """Classifies the failure mode a note describes, or abstains."""
 
-    def signals_defect(self, note_text: str) -> bool: ...
+    def categorize_note(self, note_text: str) -> DefectCategory | None: ...
 
 
 class ModelBusy(Exception):
@@ -69,15 +88,15 @@ class SerializedDefectModel:
     backlog outlive the request that caused it.
     """
 
-    def __init__(self, model: DefectSignalModel) -> None:
+    def __init__(self, model: DefectCategoryModel) -> None:
         self._model = model
         self._in_flight = threading.Lock()
 
-    def signals_defect(self, note_text: str) -> bool:
+    def categorize_note(self, note_text: str) -> DefectCategory | None:
         if not self._in_flight.acquire(blocking=False):
             raise ModelBusy
         try:
-            return self._model.signals_defect(note_text)
+            return self._model.categorize_note(note_text)
         finally:
             self._in_flight.release()
 
@@ -85,43 +104,41 @@ class SerializedDefectModel:
 async def assess_note(
     *,
     note_text: str,
-    item_marked_pass: bool,
-    model: DefectSignalModel | None,
+    model: DefectCategoryModel | None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> AdvisoryResult:
-    """Return whether the note should raise an advisory against a PASS mark.
+    """Suggest a defect category for a FAIL-item note.
 
-    Fails open: a missing, slow, or erroring model yields UNAVAILABLE (no prompt), never an
-    exception, so submit is never blocked or delayed.
+    The caller (core-api) gates on FAIL plus non-empty note before calling this; this function
+    only classifies the text it is given.
+
+    Fails open: a missing, slow, or erroring model yields UNAVAILABLE (no suggestion), never an
+    exception, so submit is never blocked or delayed. Abstaining is a normal OK outcome (the model
+    ran and found no confident match), not UNAVAILABLE (the model did not run at all).
     """
-    # MVP direction: only a note on a PASS item can contradict the mark. A FAIL item is out of
-    # scope, so the model is not consulted.
-    if not item_marked_pass:
-        return AdvisoryResult(flagged=False, status=AdvisoryStatus.OK)
-
     if not note_text.strip():
-        return AdvisoryResult(flagged=False, status=AdvisoryStatus.OK)
+        return AdvisoryResult(category=None, status=AdvisoryStatus.OK)
 
     if model is None:
-        return AdvisoryResult(flagged=False, status=AdvisoryStatus.UNAVAILABLE)
+        return AdvisoryResult(category=None, status=AdvisoryStatus.UNAVAILABLE)
 
     try:
         # Inference is synchronous CPU work; run it off the event loop with a hard timeout.
-        flagged = await asyncio.wait_for(
-            asyncio.to_thread(model.signals_defect, note_text),
+        category = await asyncio.wait_for(
+            asyncio.to_thread(model.categorize_note, note_text),
             timeout=timeout_seconds,
         )
     except ModelBusy:
         # Load shed, not a failure: another note is being assessed. Logged at info so it does not
         # read as an incident when several operators are on shift at once.
         logger.info("advisory model busy; returning UNAVAILABLE")
-        return AdvisoryResult(flagged=False, status=AdvisoryStatus.UNAVAILABLE)
+        return AdvisoryResult(category=None, status=AdvisoryStatus.UNAVAILABLE)
     except asyncio.TimeoutError:
         logger.warning("advisory model timed out; returning UNAVAILABLE")
-        return AdvisoryResult(flagged=False, status=AdvisoryStatus.UNAVAILABLE)
+        return AdvisoryResult(category=None, status=AdvisoryStatus.UNAVAILABLE)
     except Exception:
-        # Broad by design: the advisory must never propagate a failure to the caller (ADR 0018).
+        # Broad by design: the advisory must never propagate a failure to the caller (ADR 0028).
         logger.exception("advisory model failed; returning UNAVAILABLE")
-        return AdvisoryResult(flagged=False, status=AdvisoryStatus.UNAVAILABLE)
+        return AdvisoryResult(category=None, status=AdvisoryStatus.UNAVAILABLE)
 
-    return AdvisoryResult(flagged=bool(flagged), status=AdvisoryStatus.OK)
+    return AdvisoryResult(category=category, status=AdvisoryStatus.OK)
