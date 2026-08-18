@@ -18,10 +18,25 @@ from advisory import DefectCategory
 
 logger = logging.getLogger("ai.advisory")
 
+# A one-line definition per label, not a bare list. On the mini-PC benchmark (DEV-155) the bare
+# list scored 63.2%: DAMAGE was read as WEAR and non-defect notes were rarely abstained on. The
+# definitions raise it to 71.9% (84.4% on genuine-defect notes), mainly by fixing DAMAGE and by
+# keeping MALFUNCTION and NOISE_VIBRATION on their own sides of the "still operates" line. See
+# services/ai/benchmark/CATEGORY_RESULTS.md and ADR 0028.
 _SYSTEM_PROMPT = (
     "You review equipment pre-use inspection fail notes. Classify the failure mode the note "
-    "describes into exactly one of: LEAK, DAMAGE, WEAR, MALFUNCTION, MISSING, CONTAMINATION, "
-    "NOISE_VIBRATION. Answer with one word, the label only. If you are not sure, answer NONE."
+    "describes into exactly one of these seven labels:\n"
+    "LEAK: fluid or air escaping from a component, seal, or hose.\n"
+    "DAMAGE: a discrete break, crack, dent, bend, or tear.\n"
+    "WEAR: gradual material loss or thinning from use (worn, frayed, stretched, thinned).\n"
+    "MALFUNCTION: a function does not operate or produces no output (does not turn on, will not "
+    "raise, no response), but not merely an abnormal sound or vibration.\n"
+    "MISSING: a required part or item is absent.\n"
+    "CONTAMINATION: foreign material present (dirt, mud, dust, grease, spill, corrosion buildup).\n"
+    "NOISE_VIBRATION: abnormal sound or vibration (grinding, squealing, rattling, shaking, "
+    "screeching), even if the equipment still operates.\n"
+    "Answer with one word, the label only. If the note describes no defect, or a problem that "
+    "fits none of the seven, answer NONE."
 )
 
 

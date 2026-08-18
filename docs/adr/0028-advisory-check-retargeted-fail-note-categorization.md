@@ -110,11 +110,21 @@ Text stays on-prem, so the FOIP posture from ADR 0018 is unchanged.
 
 Negative: adding a persisted category field to `inspection_responses` changes the canonical
 content hash, so dev and dev-staging need a clean re-seed, the same operational cost ADR 0023
-incurred. The category taxonomy is fixed above (a closed failure-mode enum); its per-note
-accuracy on the small model still needs validation on the mini-PC benchmark, with OTHER and
-fail-open covering the notes it misses. A small on-prem model produces weaker category quality
-than a frontier model; the Foundry conditional-upgrade path from ADR 0018 still applies if
-quality proves insufficient.
+incurred. The category taxonomy is fixed above (a closed failure-mode enum), with OTHER and
+fail-open covering the notes the model misses. A small on-prem model produces weaker category
+quality than a frontier model; the Foundry conditional-upgrade path from ADR 0018 still applies
+if quality proves insufficient.
+
+Per-note accuracy was validated on the mini-PC benchmark (DEV-155,
+`services/ai/benchmark/CATEGORY_RESULTS.md`): Qwen2.5-1.5B-Instruct Q4 scores 71.9% overall and
+84.4% on genuine-defect notes, 6 of 7 categories at 5-7 of 7. That result depends on the prompt:
+a bare label list scored 63.2%, and adding a one-line definition per label (and sharpening the
+MALFUNCTION vs NOISE_VIBRATION boundary) raised it to 71.9%. The shipped prompt in
+`advisory_model.py` uses the definitions. Two known limits stay: MALFUNCTION is under-suggested
+(biased toward WEAR), and the model does not reliably abstain on non-defect notes (a 25% ceiling
+that prompt tuning could not lift); the FAIL-only trigger keeps the second largely out of scope.
+The result is adequate for the assistive, Operator-confirmed use, so no model upgrade is proposed
+now.
 
 Follow-on updates required: the Advisory Check term in CONTEXT.md still describes the retired
 contradiction use and must be rewritten to the categorization use. The `assess_note` signature

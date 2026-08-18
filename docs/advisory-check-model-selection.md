@@ -93,7 +93,9 @@ Audit Chain (ADR 0018, ADR 0028). Only the Operator-confirmed category persists,
   defect on an item marked PASS) is retired because the PWA no longer captures notes on PASS
   items.
 - Category taxonomy (fixed enum versus model-open labels) is a ticket-level decision, validated
-  on the mini-PC benchmark alongside latency.
+  on the mini-PC benchmark alongside latency. Result (DEV-155,
+  `services/ai/benchmark/CATEGORY_RESULTS.md`): the fixed-enum classifier scores 71.9% overall
+  (84.4% on genuine-defect notes) with the definitions prompt, adequate for the assistive use.
 - Fail-open: on timeout, model-unavailable, or a 429 from the concurrency cap, the path returns
   "no advisory" and the PWA shows no suggestion. Submit is never blocked or delayed (ADR 0017,
   ADR 0018).
