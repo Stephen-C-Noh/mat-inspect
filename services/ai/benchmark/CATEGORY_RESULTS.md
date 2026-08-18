@@ -4,8 +4,8 @@ Date: TBD
 Hardware: mini-PC, AMD Ryzen 7 5825U (8c/16t, Zen3, AVX2), 32 GB, CPU-only, Ubuntu (Python 3.14).
 Model: Qwen2.5-1.5B-Instruct (Q4_K_M GGUF), llama.cpp, same weights and prompt as production
 (`services/ai/advisory_model.py`).
-Dataset: `category_notes.jsonl`, 57 labeled FAIL-item notes (7 to 8 per substantive category,
-plus NONE rows for negation, all-clear, and notes that fit none of the 7). See `README.md` for
+Dataset: `category_notes.jsonl`, 57 labeled FAIL-item notes (6 to 7 per substantive category,
+plus 12 NONE rows for negation, all-clear, and notes that fit none of the 7). See `README.md` for
 the dataset description and `category_accuracy.py` for the scorer.
 
 TBD: Opus fills in the numbers below after running this on the mini-PC (weights present there;
