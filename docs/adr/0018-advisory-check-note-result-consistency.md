@@ -1,7 +1,7 @@
 # ADR 0018: Assistive Advisory Check on Note/Result Consistency (On-Prem SLM, Text-Only, Ephemeral)
 
 Date: 2026-07-09
-Status: Accepted
+Status: Accepted (amended by ADR-0028: advisory retargeted from PASS-note contradiction to FAIL-note categorization plus manager-side defect summarization)
 
 ## Context
 

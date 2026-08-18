@@ -73,14 +73,26 @@ and never decides pass or fail.
 
 ## Advisory Check
 
-An assistive prompt that surfaces a possible inconsistency for the Operator to
-consider, for example a note describing a defect on an item the Operator marked as
-passing. It is advisory only: the Operator may act on it or dismiss it. It never
-determines the Inspection Result, never blocks submission, and leaves no trace on the
-Inspection record. Consistent with OHS s.257, the competent human makes every pass or
+An assistive, on-prem machine-learning feature that reads Operator note text and helps
+without deciding. It has two uses (ADR 0028). In the operator flow, on an item marked
+FAIL with a note, it suggests a defect category and coarse severity as dismissible chips
+at the review-before-submit step; the Operator confirms, edits, or ignores them. In the
+manager flow, it runs in batch on accumulated fail notes to summarize defects, cluster
+recurring issues per equipment, and draft maintenance work-order text.
+
+It is advisory only: the Operator may act on a suggestion or dismiss it. It never
+determines the Inspection Result and never blocks or delays submission. The raw model
+output leaves no trace on the Inspection record; only the Operator-confirmed category
+persists, and it persists as the Operator's value, not the model's. The manager-flow
+summary is a derived, regenerable view, not written to the Audit Chain or the immutable
+Inspection tables. Consistent with OHS s.257, the competent human makes every pass or
 fail judgment; an Advisory Check informs that judgment, it does not make it. Whether an
 Advisory Check is computed by rules or by a machine-learning model does not change this:
 the assistive-only limit binds the role, not the implementation.
+
+An earlier design (ADR 0018) flagged a note describing a defect on an item marked PASS.
+That check is retired: the PWA no longer captures notes on passing items, so its input no
+longer exists.
 
 ## App Role
 

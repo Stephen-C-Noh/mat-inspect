@@ -2,8 +2,15 @@
 
 Date: 2026-07-09
 Ticket: DEV-83
-References: ADR 0018 (Advisory Check), ADR 0017 (shared mini-PC CPU budget),
-AI_USAGE_GUIDE section 1 (self-hosted model vetting).
+References: ADR 0018 (Advisory Check), ADR 0028 (Advisory Check retargeted),
+ADR 0017 (shared mini-PC CPU budget), AI_USAGE_GUIDE section 1 (self-hosted model vetting).
+
+Amended by ADR 0028. The task changed. The advisory no longer flags a defect on an item
+marked PASS (that input no longer exists; the PWA captures notes only on FAIL items). It now
+suggests a defect category on a FAIL note, which the Operator confirms, and a manager-side
+batch summarizes fail notes. The model choice below is unchanged: a prompted, instruction-tuned
+generative SLM still fits both tasks, since a category label is the "small fixed JSON" output
+this doc already anticipated. Only the Interface section is revised.
 
 This note records the model choice for the Advisory Check and the reasons. It is a
 ticket-level decision that ADR 0018 left open ("the exact model, and whether to use a
@@ -75,14 +82,22 @@ mini-PC benchmark, not by this document.
 ## Interface (text-in / signal-out)
 
 The AI Service exposes a text-in endpoint so the advisory does not depend on the voice
-transcription endpoint (DEV-31) being finished. Input is note text plus the pass/fail mark;
-output is a boolean advisory signal. The response is ephemeral: it is not persisted, and
-nothing about the advisory is written to the Inspection or the Audit Chain (ADR 0018).
+transcription endpoint (DEV-31) being finished. Input is the FAIL note text; output is a
+suggested defect category (and coarse severity), a small fixed label set, not free text. The
+raw model output is ephemeral: nothing the model produces is written to the Inspection or the
+Audit Chain (ADR 0018, ADR 0028). Only the Operator-confirmed category persists, on the
+`inspection_responses` row, as the Operator's value.
 
-- MVP direction only: flag a note that signals a defect on an item marked PASS. The reverse
-  direction (a clean note on a FAIL) is out of scope for the MVP.
+- Direction (ADR 0028): suggest a defect category on a FAIL note. The earlier direction (flag a
+  defect on an item marked PASS) is retired because the PWA no longer captures notes on PASS
+  items.
+- Category taxonomy (fixed enum versus model-open labels) is a ticket-level decision, validated
+  on the mini-PC benchmark alongside latency.
+- Manager-side use (ADR 0028): the same model runs in batch on accumulated fail notes to
+  summarize and cluster defects. It is off the operator latency path and does not touch the
+  pass or fail result.
 - Fail-open: on timeout, model-unavailable, or a 429 from the concurrency cap, the path returns
-  "no advisory" and the PWA shows no prompt. Submit is never blocked or delayed (ADR 0017,
+  "no advisory" and the PWA shows no suggestion. Submit is never blocked or delayed (ADR 0017,
   ADR 0018).
 
 ## Benchmark plan (separate AC, runs on the mini-PC)

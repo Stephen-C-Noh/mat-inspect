@@ -275,7 +275,7 @@
 
 - AC-4.2.1: Transcription returns within 5 seconds for a 15-second clip
 - AC-4.2.2: AI Service unavailable does not block submission; UI shows "voice unavailable, type your notes"
-- AC-4.2.3: Voice clip is retained 90 days, then deleted by lifecycle job; transcript retained 7 years on the Inspection record
+- AC-4.2.3: Raw voice audio is never persisted. The clip is forwarded to the AI Service, transcribed, and discarded; only the transcript text is retained, 7 years on the Inspection record. Not storing biometric audio at all is the stronger FOIP posture (no retention window to enforce)
 - AC-4.2.4: Audit event VOICE_TRANSCRIBED is logged
 
 ---
@@ -587,14 +587,14 @@ If the PWA cannot reach the server on initial load (e.g., operator scans QR befo
 
 ### 11.1 Retention Policy
 
-| Data Type                    | Retention                      | Enforcement                                                                     |
-| ---------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
-| Inspection records           | 7 years from `submittedAt`     | Lifecycle job tags records for review; no automatic deletion in MVP             |
-| Audit events                 | 7 years from event time        | Never auto-deleted; legal-hold flag prevents deletion if set                    |
-| Voice audio clips            | 90 days from creation          | Lifecycle job deletes from Azure Blob Storage; transcripts remain on Inspection |
-| Photos                       | 7 years from upload            | Tied to Inspection retention                                                    |
-| User accounts (soft-deleted) | Indefinite (audit integrity)   | Hard delete only on documented legal request                                    |
-| Backups                      | 30 days local, 1 year off-site | Backup retention policy on storage target                                       |
+| Data Type                    | Retention                                     | Enforcement                                                                                                                     |
+| ---------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Inspection records           | 7 years from `submittedAt`                    | Lifecycle job tags records for review; no automatic deletion in MVP                                                             |
+| Audit events                 | 7 years from event time                       | Never auto-deleted; legal-hold flag prevents deletion if set                                                                    |
+| Raw voice audio              | Not persisted (discarded after transcription) | Forwarded to the AI Service and transcribed in-flight; never written to storage. Only the transcript remains, on the Inspection |
+| Photos                       | 7 years from upload                           | Tied to Inspection retention                                                                                                    |
+| User accounts (soft-deleted) | Indefinite (audit integrity)                  | Hard delete only on documented legal request                                                                                    |
+| Backups                      | 30 days local, 1 year off-site                | Backup retention policy on storage target                                                                                       |
 
 ### 11.2 Right to Data Access (FOIP)
 
