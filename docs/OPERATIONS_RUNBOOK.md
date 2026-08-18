@@ -217,7 +217,14 @@ Compose does not do that part on its own.
   pointing at real Blob Storage, which carries its own managed redundancy (see
   DEPLOYMENT.md section 4).
 - Configuration. It lives in Git and `.env`; back up `.env` itself through whatever secret
-  storage this deployment uses. It is deliberately not in the `db_backups` volume.
+  storage this deployment uses. It is deliberately not in the `db_backups` volume. One caveat
+  for a full rebuild: a restore onto a fresh `postgres_data` volume needs `.env` complete
+  before the first `docker compose up`. `infra/docker/postgres-init.sh` reads the DEV-146 role
+  passwords (`CORE_API_MIGRATOR_DB_PASSWORD`, `CORE_API_WRITER_DB_PASSWORD`, and the audit
+  pair) to create the database roles, and aborts before postgres starts if any is blank,
+  naming the empty variable in its log. A `pg_dump` restore alone does not carry them; a
+  running stack survives without them only because its volume was initialized once, earlier,
+  when they were present.
 
 **Restoring:** a scratch-database restore (non-destructive, alongside the live databases)
 and a full host rebuild are both documented in
@@ -237,9 +244,15 @@ in `backup-and-restore.md` section 3.3, including the AI-weights gap above and a
 finding, since fixed: at drill time nothing stopped an operator from submitting a fresh
 inspection against equipment that was already OUT_OF_SERVICE. DEV-143 (merged) closed this;
 submit now rejects it with a 409 (`EQUIPMENT_OUT_OF_SERVICE`, or `EQUIPMENT_RETIRED` for
-retired equipment) in `services/core-api/src/routes/inspections/submit.ts`. The second
-drill's evidence lands in DEV-49. A drill that worked on the host it was rehearsed on is not
-evidence it works on this one; rehearse it here too.
+retired equipment) in `services/core-api/src/routes/inspections/submit.ts`. The second drill
+(DEV-49, 2026-08-17) ran a clean-room build of the frozen handover commit in an isolated
+Compose project: clone, migrate, seed, full stack, both smoke scripts, and the db-backup
+on-start dump self-verifying restore-readable. It passed, and surfaced the config drift now
+recorded in the "Configuration" bullet above, where a reused `.env` that predated DEV-146
+halted `postgres-init.sh` on the fresh volume. dev-staging's own `.env` was then checked and
+carries those role passwords, so a mini-PC fresh-volume restore is not exposed to that gap. A
+drill that worked on the host it was rehearsed on is not evidence it works on this one;
+rehearse it here too.
 
 ---
 
