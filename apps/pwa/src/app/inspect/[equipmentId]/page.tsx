@@ -17,6 +17,7 @@ import {
 } from '@/lib/checklist-answers';
 import { failuresDocumented } from '@/lib/inspection-submit';
 import { applyTextEdit, applyTranscript, emptyItemNote, type ItemNote } from '@/lib/voice-notes';
+import type { ItemCategory } from '@/lib/defect-category';
 
 function ChecklistView(): ReactElement {
   const params = useParams<{ equipmentId: string }>();
@@ -65,6 +66,11 @@ function ChecklistView(): ReactElement {
   const [photoIds, setPhotoIds] = useState<Record<string, string[]>>(
     () => restored?.photoIds ?? {},
   );
+  // Set only by the review screen (ADR 0028); carried here unread so a later save from this
+  // screen does not clobber it back to empty.
+  const [categories, setCategories] = useState<Record<string, ItemCategory>>(
+    () => restored?.categories ?? {},
+  );
 
   // Persist on every answer, not only on the way to review. The reported defect lost inspections
   // that had never reached a failure screen at all, because nothing was stored until then. Waits
@@ -83,11 +89,12 @@ function ChecklistView(): ReactElement {
       answers,
       notes,
       photoIds,
+      categories,
       ...(restored?.submitIdempotencyKey
         ? { submitIdempotencyKey: restored.submitIdempotencyKey }
         : {}),
     });
-  }, [answers, notes, photoIds, template, equipment, save, restored]);
+  }, [answers, notes, photoIds, categories, template, equipment, save, restored]);
 
   // A note or evidence photo captured while an item read one way must not silently ride along
   // once the operator re-inspects it and the pass/fail value changes: sending it would misattribute
@@ -110,6 +117,16 @@ function ChecklistView(): ReactElement {
       // in full on every later change, so that padding rode along on all of them.
       if (notes[itemKey]) setNotes((prev) => ({ ...prev, [itemKey]: emptyItemNote() }));
       if (photoIds[itemKey]?.length) setPhotoIds((prev) => ({ ...prev, [itemKey]: [] }));
+      // A category suggestion or confirmation was made against the note that just got reset
+      // above; it must not silently ride along onto whatever note the operator writes next
+      // (ADR 0008, the same reasoning as the note/photo reset).
+      if (categories[itemKey]) {
+        setCategories((prev) => {
+          const next = { ...prev };
+          delete next[itemKey];
+          return next;
+        });
+      }
     }
     setAnswers((prev) => ({ ...prev, [itemKey]: next }));
   };

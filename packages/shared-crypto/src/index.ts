@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import canonicalize from 'canonicalize';
-import type { InspectionResult, NotesSource } from '@mat-inspect/shared-types';
+import type { DefectCategory, InspectionResult, NotesSource } from '@mat-inspect/shared-types';
 
 // RFC 8785 (JSON Canonicalization Scheme): fixed key order, fixed number formatting, no
 // whitespace. The same logical record always produces the same byte sequence, which is what
@@ -38,6 +38,10 @@ export type ContentHashResponse = {
   // (submit) and the verify side (audit, reading it back) hash the same bytes. Not sorted, for
   // the same reason value/notes are not: only the multi-row response set needs itemKey sorting.
   photoIds: string[];
+  // The Operator-confirmed failure-mode category (ADR 0028), or null when the note has no
+  // confirmed category. Sealed into the content hash the same way photoIds is: the seal side
+  // (submit) and the verify side (audit) must hash the same value.
+  defectCategory: DefectCategory | null;
 };
 
 export type ContentHashInput = {

@@ -174,6 +174,7 @@ describe('POST /internal/reports-data', () => {
         notes: 'Grinding noise on engagement',
         notesSource: 'TYPED',
         photoIds: [BRAKE_PHOTO_A, BRAKE_PHOTO_B],
+        defectCategory: null,
       },
     ]);
     expect(inspection.defects).toHaveLength(1);

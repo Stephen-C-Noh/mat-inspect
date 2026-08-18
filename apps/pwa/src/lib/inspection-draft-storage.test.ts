@@ -45,6 +45,7 @@ const snapshot = (overrides: Partial<DraftSnapshot> = {}): DraftSnapshot => ({
     'wire-rope': { notes: 'frayed near the drum', notesSource: 'TYPED', rawTranscript: null },
   },
   photoIds: {},
+  categories: {},
   ...overrides,
 });
 
@@ -111,5 +112,42 @@ describe('inspection draft storage', () => {
     saveDraft(storage, snapshot(), new Date('2026-07-26T06:15:00-06:00'));
 
     expect(loadDraft(storage, 'eq-1', new Date('2026-07-26T23:58:00-06:00'))).toEqual(snapshot());
+  });
+
+  // ADR 0028: the Advisory Check suggestion and the Operator's confirmed category round-trip the
+  // same way notes and photoIds do, including the null that a dismissed suggestion sends (not
+  // simply an absent key).
+  it('round-trips a suggested and a confirmed defect category', () => {
+    const storage = fakeStorage();
+    const draft = snapshot({
+      categories: {
+        'wire-rope': { suggested: 'WEAR', confirmed: 'WEAR' },
+        hours: { confirmed: null },
+      },
+    });
+    saveDraft(storage, draft, NOW);
+
+    expect(loadDraft(storage, 'eq-1', NOW)).toEqual(draft);
+  });
+
+  // A draft written before ADR 0028 added this field has no `categories` key at all. It must
+  // still restore (losing a draft over a forward-compat gap strands the operator), with an empty
+  // categories record rather than a crash on the first `categories[itemKey]` read.
+  it('defaults categories to an empty record for a draft written before the field existed', () => {
+    const storage = fakeStorage({
+      'mat-inspect.inspection-draft': JSON.stringify({
+        savedAt: NOW.toISOString(),
+        draft: {
+          equipmentId: 'eq-1',
+          templateId: 'tpl-1',
+          items,
+          answers: { hours: { kind: 'TEXT', value: '1420' } },
+          notes: {},
+          photoIds: {},
+        },
+      }),
+    });
+
+    expect(loadDraft(storage, 'eq-1', NOW)?.categories).toEqual({});
   });
 });

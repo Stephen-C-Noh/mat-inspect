@@ -232,6 +232,10 @@ export const submitInspectionRoute: FastifyPluginAsync = async (app) => {
             // the operator's capture order and is preserved through the uuid[] column, so a later
             // verifier reconstructs the same bytes.
             photoIds: response.photoIds,
+            // The Operator-confirmed failure-mode category (ADR 0028), sealed into the content
+            // hash the same way photoIds is. Raw model output never reaches here; the client only
+            // ever sends what the Operator confirmed on the review screen.
+            defectCategory: response.defectCategory ?? null,
           }));
 
           if (normalizedResponses.length > 0) {

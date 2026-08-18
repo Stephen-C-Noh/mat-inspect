@@ -108,6 +108,9 @@ export const reportsDataRoute: FastifyPluginAsync = async (app) => {
           // these, so they must be the real column, not a placeholder, or export-time digest
           // verification fails.
           photoIds: row.photoIds,
+          // The Operator-confirmed failure-mode category (ADR 0028). Same reason as photoIds:
+          // audit reconstructs the content hash from the real column.
+          defectCategory: row.defectCategory,
           // Falls back to the item key when a template was edited or deleted such that the key
           // no longer resolves; the PDF still shows something identifiable rather than throwing.
           prompt: promptByTemplateAndKey.get(`${templateId}:${row.itemKey}`) ?? row.itemKey,

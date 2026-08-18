@@ -392,6 +392,7 @@ describe('inspections API', () => {
         notes: r.notes ?? null,
         notesSource: r.notesSource ?? null,
         photoIds: r.photoIds,
+        defectCategory: r.defectCategory ?? null,
       })),
     });
     expect(recomputed).toBe(payload['contentHash']);

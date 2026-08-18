@@ -25,7 +25,8 @@ The dependency graph, in the order things need to exist:
    migration run first (separate migration, separate role: `audit_migrator`).
 5. **ai** — independent of the rest. Optional: without a mounted model file it
    reports the advisory feature as `UNAVAILABLE` and submit is unaffected
-   (ADR 0017, ADR 0018). Skip it unless you are testing advisory suggestions.
+   (ADR 0017, ADR 0028). Skip it unless you are testing advisory defect-category
+   suggestions.
 6. **caddy** — waits for core-api, media, audit, and ai to start (not to pass
    their healthchecks), and only matters if you are testing through the
    `mat-inspect.staging` hostname instead of `localhost`.

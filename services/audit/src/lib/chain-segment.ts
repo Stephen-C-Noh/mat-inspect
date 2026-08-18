@@ -85,6 +85,8 @@ export const buildChainSegmentForInspections = async (
         // make every inspection that carries photos (and every one that carries none, since []
         // is still in the hashed shape) report a false mismatch.
         photoIds: response.photoIds,
+        // Part of the sealed digest since ADR 0028, same reason as photoIds above.
+        defectCategory: response.defectCategory,
       })),
     });
 

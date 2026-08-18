@@ -86,6 +86,7 @@ const seedDraft = (overrides: Partial<Parameters<typeof saveDraft>[1]> = {}): vo
       },
       notes: {},
       photoIds: {},
+      categories: {},
       ...overrides,
     },
     new Date(),
@@ -382,5 +383,99 @@ describe('review and confirm screen', () => {
     const sent = (fetchMock.mock.calls[0]![1] as RequestInit).headers as Record<string, string>;
     const stored = loadDraft(window.sessionStorage, EQUIPMENT_ID, new Date());
     expect(stored?.submitIdempotencyKey).toBe(sent['Idempotency-Key']);
+  });
+
+  // Regression (ADR 0028 + ADR 0009): this screen mutates two draft fields, the confirmed
+  // categories and the idempotency key, and saveDraft REPLACES the record. A category change after
+  // a failed submit must not drop the key. It used to: the category effect saved a stale draft that
+  // erased the freshly minted key, so a reload minted a second key and a retried submit recorded a
+  // duplicate (immutable) inspection.
+  it('keeps the idempotency key when a category changes after a failed submit', async () => {
+    seedDraft({
+      answers: {
+        forks: { kind: 'BOOLEAN', passed: false },
+        horn: { kind: 'BOOLEAN', passed: true },
+        remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
+      },
+      notes: {
+        forks: {
+          notes: 'left fork cracked at the heel',
+          notesSource: 'VOICE_TRANSCRIBED',
+          rawTranscript: null,
+        },
+      },
+      photoIds: { forks: ['33333333-3333-3333-3333-333333333333'] },
+    });
+    // Both the category suggestion and the submit hit the network and fail: the suggestion is then
+    // unavailable (so the operator adds a category by hand) and the submit rejects (so a retry has
+    // to replay the original key).
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+
+    renderReview();
+
+    await userEvent.click(screen.getByRole('button', { name: /confirm and submit/i }));
+    await waitFor(() =>
+      expect(
+        loadDraft(window.sessionStorage, EQUIPMENT_ID, new Date())?.submitIdempotencyKey,
+      ).toBeTruthy(),
+    );
+    const key = loadDraft(window.sessionStorage, EQUIPMENT_ID, new Date())!.submitIdempotencyKey;
+
+    // The operator now records a failure-mode category on the failed item.
+    await userEvent.click(screen.getByRole('button', { name: /add category/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Leak' }));
+
+    const stored = loadDraft(window.sessionStorage, EQUIPMENT_ID, new Date());
+    expect(stored?.submitIdempotencyKey).toBe(key);
+    expect(stored?.categories.forks?.confirmed).toBe('LEAK');
+  });
+
+  // Regression (ADR 0028): an abstained suggestion (category: null, status: OK) left suggested
+  // and confirmed both undefined, which looked identical to "never asked" and fired another
+  // /ai/categorize call on every remount, spending the shared mini-PC inference budget (ADR 0017)
+  // on a result already known. requested marks the call as resolved so a remount does not re-ask.
+  it('does not re-request an abstained category suggestion when the review screen remounts', async () => {
+    seedDraft({
+      answers: {
+        forks: { kind: 'BOOLEAN', passed: false },
+        horn: { kind: 'BOOLEAN', passed: true },
+        remarks: { kind: 'TEXT', value: 'runs hot after 20 min' },
+      },
+      notes: {
+        forks: {
+          notes: 'left fork cracked at the heel',
+          notesSource: 'VOICE_TRANSCRIBED',
+          rawTranscript: null,
+        },
+      },
+      photoIds: { forks: ['33333333-3333-3333-3333-333333333333'] },
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ category: null, status: 'OK' }),
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = renderReview();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/v1/ai/categorize');
+    await waitFor(() =>
+      expect(
+        loadDraft(window.sessionStorage, EQUIPMENT_ID, new Date())?.categories.forks?.requested,
+      ).toBe(true),
+    );
+
+    // Simulate navigating away (checklist) and back (review), which remounts this screen against
+    // the same persisted draft.
+    unmount();
+    renderReview();
+
+    await waitFor(() =>
+      expect(screen.getByRole('list', { name: /failed items/i }).textContent).toContain(
+        'Forks intact?',
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
