@@ -1,0 +1,57 @@
+{"note": "hydraulic line has a slow leak near the coupling", "expected": "LEAK"}
+{"note": "oil is dripping steadily from the gearbox seal", "expected": "LEAK"}
+{"note": "coolant leak under the cab, small puddle forming overnight", "expected": "LEAK"}
+{"note": "air hose fitting is leaking, hissing sound at the connector", "expected": "LEAK"}
+{"note": "brake fluid reservoir is weeping around the cap", "expected": "LEAK"}
+{"note": "hoist rope lubricant is seeping out of the drum housing", "expected": "LEAK"}
+{"note": "tilt cylinder seal is failing, hydraulic fluid dripping steadily near a patch of surface rust on the mast", "expected": "LEAK"}
+{"note": "forks are bent at the tips", "expected": "DAMAGE"}
+{"note": "seatbelt latch is cracked and will not click in", "expected": "DAMAGE"}
+{"note": "boom section has a visible dent near the mid-point", "expected": "DAMAGE"}
+{"note": "windshield has a spider crack across the driver side", "expected": "DAMAGE"}
+{"note": "hook safety latch is bent and does not close fully", "expected": "DAMAGE"}
+{"note": "load backrest bracket is broken off on one side", "expected": "DAMAGE"}
+{"note": "left rear tire is worn down to the cords", "expected": "WEAR"}
+{"note": "brake pads are worn thin, less than 2mm remaining", "expected": "WEAR"}
+{"note": "wire rope shows significant fraying near the drum", "expected": "WEAR"}
+{"note": "chain has stretched past the wear indicator mark", "expected": "WEAR"}
+{"note": "forks show visible thinning at the heel from years of use", "expected": "WEAR"}
+{"note": "brake shoe lining is worn down close to the rivets", "expected": "WEAR"}
+{"note": "wire rope is fraying badly and the drum makes a grinding noise when spooling", "expected": "WEAR"}
+{"note": "horn did not sound when tested", "expected": "MALFUNCTION"}
+{"note": "backup alarm does not activate in reverse", "expected": "MALFUNCTION"}
+{"note": "hydraulic lift will not raise past half height", "expected": "MALFUNCTION"}
+{"note": "parking brake does not hold on an incline", "expected": "MALFUNCTION"}
+{"note": "headlights flicker and cut out intermittently", "expected": "MALFUNCTION"}
+{"note": "emergency stop button does not cut power when pressed", "expected": "MALFUNCTION"}
+{"note": "fire extinguisher bracket is empty, unit not present", "expected": "MISSING"}
+{"note": "one wheel lug nut is missing", "expected": "MISSING"}
+{"note": "first aid kit is missing from the cab", "expected": "MISSING"}
+{"note": "safety pin is missing from the hitch coupling", "expected": "MISSING"}
+{"note": "mirror on the passenger side is gone entirely", "expected": "MISSING"}
+{"note": "guard cover over the chain sprocket is missing", "expected": "MISSING"}
+{"note": "hitch coupling is missing its retaining bolt and rattles loosely when towing", "expected": "MISSING"}
+{"note": "grease has built up thick on the fork carriage", "expected": "CONTAMINATION"}
+{"note": "mud and debris packed into the wheel wells", "expected": "CONTAMINATION"}
+{"note": "control panel is coated in a layer of dust", "expected": "CONTAMINATION"}
+{"note": "spilled hydraulic fluid on the deck plating, slippery underfoot", "expected": "CONTAMINATION"}
+{"note": "windshield is caked with dried mud, obstructing view", "expected": "CONTAMINATION"}
+{"note": "battery terminals have corrosion buildup", "expected": "CONTAMINATION"}
+{"note": "engine makes a grinding noise on startup", "expected": "NOISE_VIBRATION"}
+{"note": "steering wheel vibrates heavily above idle", "expected": "NOISE_VIBRATION"}
+{"note": "hoist motor squeals when lifting a load", "expected": "NOISE_VIBRATION"}
+{"note": "cab shakes noticeably when the boom extends", "expected": "NOISE_VIBRATION"}
+{"note": "brakes make a high pitched screech when applied", "expected": "NOISE_VIBRATION"}
+{"note": "gearbox rattles loudly in neutral", "expected": "NOISE_VIBRATION"}
+{"note": "no leak found near the coupling", "expected": "NONE"}
+{"note": "not worn, just dirty", "expected": "NONE"}
+{"note": "checked the brake pads, no unusual wear noted", "expected": "NONE"}
+{"note": "horn works fine, no issues", "expected": "NONE"}
+{"note": "all clear, unit ready for use", "expected": "NONE"}
+{"note": "checked all fluids, no issues found", "expected": "NONE"}
+{"note": "tires, lights, and horn all fine", "expected": "NONE"}
+{"note": "walked the full circle check, nothing to report", "expected": "NONE"}
+{"note": "fire extinguisher inspection tag is expired", "expected": "NONE"}
+{"note": "operator manual in the cab is an outdated revision", "expected": "NONE"}
+{"note": "load rating placard is faded and hard to read", "expected": "NONE"}
+{"note": "unit is parked blocking the marked fire lane", "expected": "NONE"}
