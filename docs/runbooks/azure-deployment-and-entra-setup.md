@@ -3,8 +3,17 @@
 This runbook has two parts. Part A registers the Entra ID application. Part B provisions the Azure
 infrastructure and deploys the stack on Azure Container Apps with Azure Front Door. It is written as
 the procedure the capstone team ran on its own Azure tenant for the live demo (ADR 0024), so a future
-SAIT owner can replicate it by changing the tenant, the region, and the connection strings (ADR 0016,
-ADR 0002). It contains no secrets.
+SAIT owner must replicate it in a SAIT-controlled tenant by changing the tenant, the region, and the
+connection strings (ADR 0016, ADR 0002). It contains no secrets.
+
+**The identity tenant and the Azure subscription used here are team-owned and are not part of the
+handover.** The Entra app registration runs on a team member's personal Entra tenant, and the demo
+infrastructure runs on a personal Azure subscription that is torn down at the end of the capstone
+(2026-08-21). Neither is handed to SAIT, and a SAIT deployment cannot reuse them. The school must
+create a new app registration in a SAIT-controlled Entra tenant (Part A) and provision new resources
+in a SAIT subscription (Part B). None of the team's tenant values (tenant ID, client ID) carry over:
+everything below documents what to create, not credentials to inherit. See ADR 0016 and
+`docs/SAIT_IT_BRIEF.md`.
 
 Read first:
 
@@ -32,8 +41,10 @@ service images. Set shell variables once, for example `RG=mat-inspect-demo`, `LO
 ## Part A: Entra ID app registration
 
 One app registration serves both front ends (the PWA and the dashboard) and the APIs (ADR 0002,
-ADR 0012). For the capstone the team reuses its existing registration and only adds the Front Door
-hostnames as redirect URIs. For a SAIT deployment, repeat every step below in the SAIT tenant.
+ADR 0012). For the capstone the team reuses its existing registration on the team's personal tenant
+and only adds the Front Door hostnames as redirect URIs. That registration is not transferred to
+SAIT. For a SAIT deployment, create a new registration and repeat every step below in the SAIT
+tenant.
 
 ### A.1 Create (or reuse) the registration
 
