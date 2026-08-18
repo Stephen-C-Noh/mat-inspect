@@ -74,18 +74,17 @@ and never decides pass or fail.
 ## Advisory Check
 
 An assistive, on-prem machine-learning feature that reads Operator note text and helps
-without deciding. It has two uses (ADR 0028). In the operator flow, on an item marked
-FAIL with a note, it suggests a defect category and coarse severity as dismissible chips
-at the review-before-submit step; the Operator confirms, edits, or ignores them. In the
-manager flow, it runs in batch on accumulated fail notes to summarize defects, cluster
-recurring issues per equipment, and draft maintenance work-order text.
+without deciding. On an item marked FAIL with a note, it suggests a Defect Category (the
+failure mode the note describes: a leak, physical damage, wear, a malfunction, and so on)
+as a dismissible chip at the review-before-submit step; the Operator confirms, edits, or
+ignores it (ADR 0028). It does not suggest severity: severity is fixed by the checklist
+item, not inferred from the note.
 
 It is advisory only: the Operator may act on a suggestion or dismiss it. It never
 determines the Inspection Result and never blocks or delays submission. The raw model
 output leaves no trace on the Inspection record; only the Operator-confirmed category
-persists, and it persists as the Operator's value, not the model's. The manager-flow
-summary is a derived, regenerable view, not written to the Audit Chain or the immutable
-Inspection tables. Consistent with OHS s.257, the competent human makes every pass or
+persists, and it persists as the Operator's value, not the model's. Consistent with OHS
+s.257, the competent human makes every pass or
 fail judgment; an Advisory Check informs that judgment, it does not make it. Whether an
 Advisory Check is computed by rules or by a machine-learning model does not change this:
 the assistive-only limit binds the role, not the implementation.

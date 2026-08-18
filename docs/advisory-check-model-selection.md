@@ -7,10 +7,11 @@ ADR 0017 (shared mini-PC CPU budget), AI_USAGE_GUIDE section 1 (self-hosted mode
 
 Amended by ADR 0028. The task changed. The advisory no longer flags a defect on an item
 marked PASS (that input no longer exists; the PWA captures notes only on FAIL items). It now
-suggests a defect category on a FAIL note, which the Operator confirms, and a manager-side
-batch summarizes fail notes. The model choice below is unchanged: a prompted, instruction-tuned
-generative SLM still fits both tasks, since a category label is the "small fixed JSON" output
-this doc already anticipated. Only the Interface section is revised.
+suggests a defect category on a FAIL note, which the Operator confirms. The model choice below
+is unchanged: a prompted, instruction-tuned generative SLM still fits, since a category label is
+the "small fixed JSON" output this doc already anticipated. Only the Interface section is
+revised. (A manager-side batch summarization use was considered and dropped from ADR 0028; see
+that ADR's "Out of scope" note.)
 
 This note records the model choice for the Advisory Check and the reasons. It is a
 ticket-level decision that ADR 0018 left open ("the exact model, and whether to use a
@@ -93,9 +94,6 @@ Audit Chain (ADR 0018, ADR 0028). Only the Operator-confirmed category persists,
   items.
 - Category taxonomy (fixed enum versus model-open labels) is a ticket-level decision, validated
   on the mini-PC benchmark alongside latency.
-- Manager-side use (ADR 0028): the same model runs in batch on accumulated fail notes to
-  summarize and cluster defects. It is off the operator latency path and does not touch the
-  pass or fail result.
 - Fail-open: on timeout, model-unavailable, or a 429 from the concurrency cap, the path returns
   "no advisory" and the PWA shows no suggestion. Submit is never blocked or delayed (ADR 0017,
   ADR 0018).

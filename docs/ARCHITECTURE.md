@@ -64,7 +64,7 @@ The system design enforces these Alberta OHS requirements directly in code, not 
 
 **Record retention:** Alberta OHS does not specify a hard minimum for inspection records, but the cross-jurisdiction best-practice default is 5 years. The system stores records for 7 years by default (configurable).
 
-**Critical compliance note on AI:** Alberta OHS s.257 requires the _operator_ (a competent human) to complete the visual inspection. The AI Service in this system is assistive only: it transcribes voice notes and, on a failed item, suggests a defect category the operator confirms or edits (ADR 0028). It never auto-passes or auto-fails an inspection. Final judgement is always the operator's, recorded under the operator's signed identity. A separate manager-side batch summarizes fail notes for maintenance planning; it runs after submission and does not touch the pass or fail result (ADR 0028).
+**Critical compliance note on AI:** Alberta OHS s.257 requires the _operator_ (a competent human) to complete the visual inspection. The AI Service in this system is assistive only: it transcribes voice notes and, on a failed item, suggests a defect category the operator confirms or edits (ADR 0028). It never auto-passes or auto-fails an inspection. Final judgement is always the operator's, recorded under the operator's signed identity.
 
 ---
 
