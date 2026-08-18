@@ -64,7 +64,7 @@ The system design enforces these Alberta OHS requirements directly in code, not 
 
 **Record retention:** Alberta OHS does not specify a hard minimum for inspection records, but the cross-jurisdiction best-practice default is 5 years. The system stores records for 7 years by default (configurable).
 
-**Critical compliance note on AI:** Alberta OHS s.257 requires the _operator_ (a competent human) to complete the visual inspection. The AI Service in this system is assistive only: it transcribes voice notes and (optionally) suggests defect categories. It never auto-passes or auto-fails an inspection. Final judgement is always the operator's, recorded under the operator's signed identity.
+**Critical compliance note on AI:** Alberta OHS s.257 requires the _operator_ (a competent human) to complete the visual inspection. The AI Service in this system is assistive only: it transcribes voice notes and, on a failed item, suggests a defect category the operator confirms or edits (ADR 0028). It never auto-passes or auto-fails an inspection. Final judgement is always the operator's, recorded under the operator's signed identity. A separate manager-side batch summarizes fail notes for maintenance planning; it runs after submission and does not touch the pass or fail result (ADR 0028).
 
 ---
 
@@ -626,18 +626,18 @@ The capstone scope cannot deliver active-active high availability. The architect
 
 **Full stack (all containers on one host):**
 
-| Container              | Role                                                                    |
-| ---------------------- | ----------------------------------------------------------------------- |
-| Caddy                  | TLS termination, reverse proxy, ACME cert renewal                       |
-| Core API               | Equipment registry, checklists, inspection submissions, defect workflow |
-| Media Service          | Photo and voice clip uploads, Azure Blob Storage client, SAS tokens     |
-| Audit / Report Service | Hash-chained audit log, PDF generation, CSV export                      |
-| AI Service             | Whisper `small.en` transcription; Advisory Check SLM (ADR 0017, 0018)   |
-| Operator PWA           | Mobile-first Next.js app for Lab Techs                                  |
-| Manager Dashboard      | Next.js app for supervisors and managers                                |
-| PostgreSQL 16          | Core and audit schemas (dev/dev-staging only; prod uses Azure Database) |
-| Azurite                | Azure Blob Storage emulator (dev/dev-staging only)                      |
-| Azure Monitor          | Metrics, logs, and availability checks (Azure-native, no containers)    |
+| Container              | Role                                                                        |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Caddy                  | TLS termination, reverse proxy, ACME cert renewal                           |
+| Core API               | Equipment registry, checklists, inspection submissions, defect workflow     |
+| Media Service          | Photo and voice clip uploads, Azure Blob Storage client, SAS tokens         |
+| Audit / Report Service | Hash-chained audit log, PDF generation, CSV export                          |
+| AI Service             | Whisper `small.en` transcription; Advisory Check SLM (ADR 0017, 0018, 0028) |
+| Operator PWA           | Mobile-first Next.js app for Lab Techs                                      |
+| Manager Dashboard      | Next.js app for supervisors and managers                                    |
+| PostgreSQL 16          | Core and audit schemas (dev/dev-staging only; prod uses Azure Database)     |
+| Azurite                | Azure Blob Storage emulator (dev/dev-staging only)                          |
+| Azure Monitor          | Metrics, logs, and availability checks (Azure-native, no containers)        |
 
 **Memory budget — Production (Azure VM, 8 GB):**
 
