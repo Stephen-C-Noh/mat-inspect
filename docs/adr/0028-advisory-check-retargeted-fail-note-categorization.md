@@ -1,7 +1,10 @@
-# ADR 0028: Advisory Check, Retargeted (Defect Categorization on Fail Notes plus Manager-Side Defect Summarization)
+# ADR 0028: Advisory Check, Retargeted (Defect Categorization on Fail Notes)
 
 Date: 2026-08-17
 Status: Accepted (amends ADR-0018)
+
+Revised 2026-08-17: the manager-side batch summarization use (previously Part 2) is dropped.
+See "Out of scope" below. This ADR now covers the operator-flow categorization use only.
 
 ## Context
 
@@ -24,14 +27,13 @@ retargeted advisory must read the data that exists, which is fail notes.
 Second, the constitutional parts of ADR 0018 still hold and are not in question: an on-prem
 SLM, text-only, no audio off-box, the ADR 0017 CPU budget and serialized inference, fail-open
 and non-blocking, and Azure Foundry retained only as a conditional post-handover upgrade.
-This ADR retargets what the model reads and adds a second use. It does not reopen those
-decisions.
+This ADR retargets what the model reads. It does not reopen those decisions.
 
 ## Decision
 
-Keep the on-prem SLM. Change what it reads, and add a manager-side batch use. Two parts.
+Keep the on-prem SLM. Change what it reads.
 
-### Part 1: Operator flow. Suggest a defect category on a FAIL note (assistive).
+### Operator flow: suggest a defect category on a FAIL note (assistive).
 
 When an Operator marks an item FAIL and dictates or types a note, the on-prem SLM reads the
 note text and suggests a defect category and, optionally, a coarse severity. The PWA surfaces
@@ -49,47 +51,45 @@ canonical content hash, mirroring ADR 0023 for photo references). What persists 
 Operator-confirmed value, not model output, so the s.257 posture holds: the human made the
 call, the record stores the human's call. No model-derived text enters the Audit Chain.
 
-### Part 2: Manager flow. Summarize and cluster fail notes (batch, off the operator path).
-
-After submission, the same on-prem model runs in batch on accumulated fail notes to produce
-manager-facing views: a shift or period defect summary, recurring-issue clusters per equipment,
-and a draft maintenance work-order description. This runs on the dashboard side, out of the
-operator latency path, on data that already exists.
-
-This use does not touch pass or fail, does not run during an Inspection, and does not gate
-submission, so OHS s.257 does not bear on it. Its output is a derived, regenerable view. It is
-not written to the Audit Chain and not written to the immutable Inspection tables. It is
-computed from the sealed fail notes on demand or cached, and can be regenerated from source at
-any time.
-
-### s.257 boundary (both parts)
+### s.257 boundary
 
 The Advisory Check remains assistive only. It never decides pass or fail, never blocks or
-delays submission, uses neutral wording, and is dismissible. Part 1 suggests a label the human
-confirms. Part 2 does not touch the pass/fail judgment at all. If the model is slow or
-unavailable, Part 1 shows no chips and Part 2 shows no summary; neither blocks anything.
+delays submission, uses neutral wording, and is dismissible. It suggests a label the human
+confirms. If the model is slow or unavailable, the PWA shows no chips, and nothing is blocked.
+
+### Out of scope
+
+A manager-side batch use was considered: run the same model on accumulated fail notes to
+produce a period defect summary, recurring-issue clusters per equipment, and a draft
+maintenance work-order description. It is dropped from this ADR.
+
+The reason is model capability, not compliance. The operator-flow use is single-label
+classification, which fits the small on-prem SLM chosen in `docs/advisory-check-model-selection.md`.
+The manager-side use is generative long-form output plus clustering. Summarization and
+work-order drafting stretch a 1.5B Q4 model well past the binary-judge task it was selected for,
+and "recurring-issue clusters per equipment" needs semantic grouping the current llama.cpp GGUF
+runtime has no embedding path for. Building a dashboard surface on top of output of uncertain
+quality is premature. If a manager-side summary is wanted later, it starts with a model-capability
+spike on the mini-PC benchmark and its own ADR, and the Azure Foundry conditional-upgrade path
+from ADR 0018 applies if a small on-prem model proves insufficient.
 
 ## Consequences
 
-Positive: the AI feature runs again, on data that exists, in both the operator flow (Part 1)
-and the manager flow (Part 2). Part 2 sidesteps the s.257 tightrope entirely because it never
-touches the result, and batch timing fits the ADR 0017 CPU budget without competing with
-transcription latency. Structured defect categories improve the dashboard and speed
-maintenance work-order creation. Text stays on-prem, so the FOIP posture from ADR 0018 is
-unchanged.
+Positive: the AI feature runs again, on data that exists, in the operator flow. Structured
+defect categories improve the dashboard and speed maintenance work-order creation downstream.
+Text stays on-prem, so the FOIP posture from ADR 0018 is unchanged.
 
 Negative: adding a persisted category field to `inspection_responses` changes the canonical
 content hash, so dev and dev-staging need a clean re-seed, the same operational cost ADR 0023
 incurred. The category taxonomy is a new decision (fixed enum versus model-open labels) and
-must be fixed at ticket level, validated on the mini-PC benchmark. Part 2 is a new surface on
-the dashboard with its own tickets. A small on-prem model produces weaker category and cluster
-quality than a frontier model; the Foundry conditional-upgrade path from ADR 0018 still applies
-if quality proves insufficient.
+must be fixed at ticket level, validated on the mini-PC benchmark. A small on-prem model
+produces weaker category quality than a frontier model; the Foundry conditional-upgrade path
+from ADR 0018 still applies if quality proves insufficient.
 
 Follow-on updates required: the Advisory Check term in CONTEXT.md still describes the retired
-contradiction use and must be rewritten to the categorization and summarization use. The
-`assess_note` signature and the PWA review-step wiring change. A schema migration adds the
-category field. All are ticket-level work under this ADR.
+contradiction use and must be rewritten to the categorization use. The `assess_note` signature
+and the PWA review-step wiring change. A schema migration adds the category field. All are
+ticket-level work under this ADR.
 
 ## Alternatives Considered
 
@@ -105,13 +105,3 @@ Operator confirmation keeps the stored value human-owned.
 Free-text categorization with no model (manual dropdown only). Rejected as the AI feature, kept
 as the fallback. A manual dropdown is not machine learning and does not satisfy the client's
 request. It stays available when the model is unavailable, consistent with fail-open.
-
-Write the Part 2 summary into the Audit Chain or the Inspection tables. Rejected. It places
-model-derived, regenerable output into the immutable legal record, the same objection ADR 0018
-raised for advisory outcomes. The summary is a derived view, computed from sealed source, not a
-record of what happened.
-
-Keep Part 2 in the operator flow (per-inspection, at review). Rejected. Summarization and
-clustering need the accumulated corpus, not one inspection, and running it inline would add a
-second model call to the latency-sensitive submit path. Batch on the manager side is the right
-placement.
