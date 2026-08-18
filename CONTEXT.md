@@ -74,9 +74,11 @@ and never decides pass or fail.
 ## Advisory Check
 
 An assistive, on-prem machine-learning feature that reads Operator note text and helps
-without deciding. On an item marked FAIL with a note, it suggests a defect category and
-coarse severity as dismissible chips at the review-before-submit step; the Operator
-confirms, edits, or ignores them (ADR 0028).
+without deciding. On an item marked FAIL with a note, it suggests a Defect Category (the
+failure mode the note describes: a leak, physical damage, wear, a malfunction, and so on)
+as a dismissible chip at the review-before-submit step; the Operator confirms, edits, or
+ignores it (ADR 0028). It does not suggest severity: severity is fixed by the checklist
+item, not inferred from the note.
 
 It is advisory only: the Operator may act on a suggestion or dismiss it. It never
 determines the Inspection Result and never blocks or delays submission. The raw model
