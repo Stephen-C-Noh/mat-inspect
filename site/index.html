@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAT-Inspect Team</title>
+<meta name="description" content="The five students who built MAT-Inspect, a digital pre-use equipment inspection system for SAIT Main Campus, and what each of them owns.">
+<meta property="og:title" content="MAT-Inspect Team">
+<meta property="og:description" content="Five students, one inspection system. SAIT capstone, May to August 2026.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://stephen-c-noh.github.io/mat-inspect/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%23101720%27/%3E%3Cpath d=%27M7 20h18M7 24h18%27 stroke=%27%23e9a13b%27 stroke-width=%273%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #101720;
+    --panel: #18212b;
+    --rule: #2b3945;
+    --rule-soft: #222d38;
+    --text: #e9eef2;
+    --body-text: #c6d1da;
+    --muted: #8fa0ae;
+    --amber: #e9a13b;
+    --green: #4fb286;
+
+    --display: "Oswald", "Arial Narrow", sans-serif;
+    --body: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 5.5rem) clamp(1.25rem, 4vw, 3.5rem) 0;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2.5rem, 5vw, 4.5rem);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: clamp(.66rem, .9vw, .78rem);
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+  }
+  .eyebrow::after {
+    content: "";
+    height: 1px;
+    flex: 1;
+    max-width: 10rem;
+    background: var(--rule);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(2.4rem, 6vw, 4.4rem);
+    line-height: 1.02;
+    margin: .7rem 0 0;
+    text-wrap: balance;
+  }
+
+  .intro {
+    margin: 1.1rem 0 0;
+    font-size: clamp(1rem, 1.35vw, 1.2rem);
+    color: var(--body-text);
+    max-width: 62ch;
+  }
+
+  /* ---- roster ---- */
+
+  .roster {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(310px, 100%), 1fr));
+    gap: 1px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+  }
+
+  .member {
+    background: var(--panel);
+    padding: clamp(1.3rem, 2.4vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .tagplate {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+  }
+  .initials {
+    position: relative;
+    width: 3.1rem;
+    height: 3.1rem;
+    flex: none;
+    border: 1px solid var(--rule);
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: 1rem;
+    letter-spacing: .06em;
+    color: var(--amber);
+  }
+  /* punch hole, like the tag hung on a machine */
+  .initials::before {
+    content: "";
+    position: absolute;
+    top: .32rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: .3rem;
+    height: .3rem;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+  }
+  .initials span { margin-top: .5rem; }
+
+  .who h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.25rem, 1.9vw, 1.6rem);
+    margin: 0;
+    line-height: 1.15;
+  }
+  .who p {
+    margin: .15rem 0 0;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .member > p {
+    margin: 0;
+    font-size: .95rem;
+    color: var(--body-text);
+  }
+
+  .owns {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    border-top: 1px solid var(--rule);
+    padding-top: 1rem;
+    margin-top: auto;
+  }
+  .owns li {
+    position: relative;
+    padding-left: 1.15rem;
+    font-size: .88rem;
+    color: var(--muted);
+  }
+  .owns li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .62em;
+    width: .42rem;
+    height: 1px;
+    background: var(--amber);
+  }
+
+  .second {
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--green);
+    border: 1px solid currentColor;
+    padding: .3rem .6rem;
+  }
+
+  /* ---- practice band ---- */
+
+  .practice h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.5rem, 2.8vw, 2.2rem);
+    margin: .6rem 0 0;
+  }
+  .practice .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+    gap: clamp(1.2rem, 2.5vw, 2.2rem);
+    margin-top: 1.8rem;
+  }
+  .practice article {
+    border-top: 2px solid var(--rule);
+    padding-top: .9rem;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+  }
+  .practice h3 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 1.15rem;
+    margin: 0;
+  }
+  .practice p {
+    margin: 0;
+    font-size: .92rem;
+    color: var(--muted);
+  }
+
+  /* ---- footer ---- */
+
+  footer {
+    margin-top: clamp(3rem, 6vw, 5rem);
+    border-top: 1px solid var(--rule);
+    padding: 1.6rem clamp(1.25rem, 4vw, 3.5rem) 0;
+    max-width: 1180px;
+    margin-inline: auto;
+  }
+  .foot-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 2.2rem;
+  }
+
+  .hazard {
+    height: 4px;
+    background: repeating-linear-gradient(-45deg, var(--amber) 0 10px, #101720 10px 20px);
+    opacity: .55;
+  }
+
+
+  /* ---- share / QR ---- */
+
+  .share {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 3.2rem);
+    align-items: center;
+    border: 1px solid var(--rule);
+    padding: clamp(1.4rem, 3vw, 2.4rem);
+  }
+  .qr-plate {
+    background: #f2f5f7;
+    padding: .7rem;
+    width: clamp(140px, 20vw, 200px);
+    justify-self: start;
+  }
+  .qr-plate svg { width: 100%; height: auto; display: block; }
+
+  .share-copy h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.5rem, 2.8vw, 2.2rem);
+    margin: .6rem 0 .6rem;
+  }
+  .share-copy p { margin: 0 0 .5rem; color: var(--body-text); max-width: 52ch; }
+  .share-copy .url {
+    font-family: var(--mono);
+    font-size: .82rem;
+    letter-spacing: .04em;
+    margin: 0;
+  }
+  .share-copy .url a { text-decoration: none; border-bottom: 1px solid var(--rule); }
+  .share-copy .url a:hover { border-bottom-color: var(--amber); }
+
+  @media (max-width: 620px) {
+    .share { grid-template-columns: 1fr; }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    .member, .share { background: #fff; border-color: #999; break-inside: avoid; }
+    .who h2, h1, .practice h3, .share-copy h2 { color: #000; }
+    .member > p, .owns li, .practice p, .intro, .share-copy p { color: #333; }
+    .hazard, footer { display: none; }
+  }
+
+  a { color: var(--amber); }
+  a:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">MAT-Inspect &nbsp;/&nbsp; SAIT Main Campus &nbsp;/&nbsp; May to August 2026</div>
+    <h1>Five students, one inspection system</h1>
+    <p class="intro">Each area of the system has a named owner who built it and answers for it. The split below is not a plan; it is what the ticket history and the code owners file actually show after thirteen weeks.</p>
+  </header>
+
+  <section class="roster" aria-label="Team roster">
+
+    <article class="member">
+      <div class="tagplate">
+        <div class="initials"><span>CN</span></div>
+        <div class="who">
+          <h2>Changbeom Noh</h2>
+          <p>Delivery, platform, security</p>
+        </div>
+      </div>
+      <p>Runs the pipeline the rest of the team ships through: repository, CI, containers, the identity setup, and the environment the system actually runs on.</p>
+      <ul class="owns">
+        <li>Entra sign-in and app roles, proven end to end across five roles</li>
+        <li>Threat model, plus security scanning in CI and an internal penetration test</li>
+        <li>On-premise voice-to-text service</li>
+        <li>Nightly backups and two full restore drills from the handover package</li>
+        <li>Handover package: deployment, security, and runbooks</li>
+      </ul>
+      <span class="second">Second reviewer &#183; compliance paths</span>
+    </article>
+
+    <article class="member">
+      <div class="tagplate">
+        <div class="initials"><span>EC</span></div>
+        <div class="who">
+          <h2>Enzo Campana</h2>
+          <p>Inspection domain, audit trail</p>
+        </div>
+      </div>
+      <p>Owns the rules that decide what an inspection means: what gets asked, what a submission does, and how the record proves it was not altered.</p>
+      <ul class="owns">
+        <li>Checklist templates and versioning for all four equipment classes</li>
+        <li>Inspection submit with operator attestation</li>
+        <li>Equipment readiness computed at read time, never stored stale</li>
+        <li>Audit delivery through the transactional outbox and hash chain</li>
+        <li>Signed PDF and CSV reports, plus chain verification on startup</li>
+      </ul>
+    </article>
+
+    <article class="member">
+      <div class="tagplate">
+        <div class="initials"><span>FE</span></div>
+        <div class="who">
+          <h2>Fathema Begum Ema</h2>
+          <p>Operator app</p>
+        </div>
+      </div>
+      <p>Builds everything the operator touches, on a phone, in a shop, often wearing gloves. This is the half of the system that has to survive real conditions.</p>
+      <ul class="owns">
+        <li>Sign-in on the phone, redirect-based so it works on iOS</li>
+        <li>QR scan and equipment lookup</li>
+        <li>Voice capture with a transcript the operator reviews before it is kept</li>
+        <li>Photo capture on a failed item</li>
+        <li>The lockout screen an operator sees when equipment is out of service</li>
+      </ul>
+    </article>
+
+    <article class="member">
+      <div class="tagplate">
+        <div class="initials"><span>AH</span></div>
+        <div class="who">
+          <h2>Adan Hernandez Rodriguez</h2>
+          <p>Equipment, defects, notifications</p>
+        </div>
+      </div>
+      <p>Owns what happens after a failure: the defect record, the people who need to know, and the files attached as evidence.</p>
+      <ul class="owns">
+        <li>Equipment registry and the ten machines in scope</li>
+        <li>Defect lifecycle: raise, acknowledge, return to service</li>
+        <li>Media service, uploading inspection photos to blob storage</li>
+        <li>Teams and email notification on a failed inspection</li>
+        <li>Retention lifecycle for seven-year records</li>
+      </ul>
+      <span class="second">Second reviewer &#183; compliance paths</span>
+    </article>
+
+    <article class="member">
+      <div class="tagplate">
+        <div class="initials"><span>SC</span></div>
+        <div class="who">
+          <h2>Sophia Canonizado</h2>
+          <p>Manager dashboard, user documentation</p>
+        </div>
+      </div>
+      <p>Builds the view a supervisor opens in the morning, and writes the guides that let someone use this system without being on the team that built it.</p>
+      <ul class="owns">
+        <li>Daily compliance grid with drilldown to a single inspection</li>
+        <li>Defect inbox with acknowledge and return to service</li>
+        <li>The unresolved-failure queue that does not clear itself</li>
+        <li>QR sticker artwork applied to the equipment</li>
+        <li>Role guides for operators, supervisors, and administrators</li>
+      </ul>
+    </article>
+
+  </section>
+
+  <section class="practice">
+    <div class="eyebrow">How the team worked</div>
+    <h2>Ownership you can check, not just claim</h2>
+    <div class="grid">
+      <article>
+        <h3>Every change carries a ticket</h3>
+        <p>Commits and pull requests lead with a ticket key, so any line of code traces back to the reason it was written and the person who took it on.</p>
+      </article>
+      <article>
+        <h3>Two reviewers where it counts</h3>
+        <p>The audit service, the authentication middleware, the inspection domain, and database migrations each require a second named reviewer before merge.</p>
+      </article>
+      <article>
+        <h3>Eight two-week sprints</h3>
+        <p>Each sprint ended on a demonstrable milestone rather than a status update: a checklist rendering, a failure locking out a machine, a verified audit chain.</p>
+      </article>
+      <article>
+        <h3>Drills, not assurances</h3>
+        <p>The handover package was tested by rebuilding the system from it on a clean machine, twice, rather than being written and filed.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="share" aria-labelledby="share-h">
+    <div class="qr-plate">
+      <svg viewBox="0 0 41 41" shape-rendering="crispEdges" role="img" aria-label="QR code linking to https://stephen-c-noh.github.io/mat-inspect/">
+        <path fill="#f2f5f7" d="M0 0h41v41H0z"/><path stroke="#101720" d="M4 4.5h7m1 0h6m2 0h4m3 0h1m2 0h7M4 5.5h1m5 0h1m1 0h2m2 0h2m4 0h1m1 0h4m2 0h1m5 0h1M4 6.5h1m1 0h3m1 0h1m2 0h2m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m3 0h1m1 0h3m1 0h1M4 7.5h1m1 0h3m1 0h1m1 0h3m3 0h1m1 0h1m2 0h6m1 0h1m1 0h3m1 0h1M4 8.5h1m1 0h3m1 0h1m2 0h2m1 0h3m5 0h1m2 0h1m2 0h1m1 0h3m1 0h1M4 9.5h1m5 0h1m2 0h3m1 0h1m3 0h4m3 0h1m1 0h1m5 0h1M4 10.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M12 11.5h3m1 0h1m4 0h1m2 0h1m1 0h1m1 0h1M4 12.5h1m1 0h2m1 0h3m2 0h3m1 0h1m1 0h4m1 0h1m1 0h1m2 0h1m2 0h1m1 0h2M8 13.5h1m6 0h1m6 0h4m1 0h1m2 0h2m1 0h2m1 0h1M4 14.5h1m1 0h1m3 0h1m2 0h2m3 0h1m2 0h1m5 0h1m2 0h4m1 0h2M4 15.5h4m3 0h1m2 0h1m2 0h4m1 0h1m1 0h1m5 0h2m1 0h1M4 16.5h1m2 0h1m2 0h1m1 0h2m2 0h1m2 0h1m2 0h2m1 0h1m2 0h2m2 0h2m1 0h2M4 17.5h2m1 0h1m1 0h1m1 0h2m1 0h1m2 0h1m2 0h3m2 0h2m2 0h1m1 0h1m1 0h1m1 0h1M7 18.5h4m2 0h2m1 0h2m1 0h4m2 0h1m4 0h1m2 0h1M6 19.5h4m2 0h2m3 0h2m1 0h1m2 0h3m3 0h2m1 0h3M4 20.5h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h4m2 0h4m1 0h4m1 0h1m1 0h1M4 21.5h2m2 0h1m4 0h1m3 0h3m1 0h1m2 0h5m1 0h1m1 0h2m1 0h2M4 22.5h1m1 0h1m3 0h3m1 0h2m1 0h5m4 0h1m4 0h2m1 0h2M9 23.5h1m1 0h2m2 0h3m2 0h1m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1m2 0h1M4 24.5h2m1 0h5m1 0h1m1 0h4m3 0h1m1 0h1m3 0h1m4 0h2m1 0h1M4 25.5h1m2 0h1m3 0h1m2 0h1m1 0h1m2 0h1m1 0h2m4 0h1m2 0h1m2 0h2m1 0h1M6 26.5h1m3 0h1m1 0h2m3 0h2m1 0h2m4 0h3m1 0h2m1 0h1m1 0h2M5 27.5h2m4 0h1m4 0h3m1 0h1m1 0h2m3 0h1m2 0h1m4 0h1M4 28.5h1m1 0h1m1 0h1m1 0h1m1 0h5m2 0h3m4 0h1m1 0h5m2 0h2M12 29.5h1m1 0h3m2 0h5m3 0h2m3 0h2M4 30.5h7m1 0h1m3 0h1m3 0h1m2 0h2m1 0h3m1 0h1m1 0h1m2 0h1M4 31.5h1m5 0h1m1 0h2m5 0h1m4 0h5m3 0h5M4 32.5h1m1 0h3m1 0h1m2 0h1m2 0h1m2 0h1m1 0h1m1 0h2m2 0h6m1 0h2M4 33.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h2m3 0h3m6 0h1m1 0h4M4 34.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h3m4 0h1m3 0h5m1 0h2M4 35.5h1m5 0h1m4 0h2m2 0h3m1 0h1m2 0h7m3 0h1M4 36.5h7m1 0h1m1 0h1m1 0h1m2 0h4m2 0h3m4 0h1m1 0h1"/>
+      </svg>
+    </div>
+    <div class="share-copy">
+      <div class="eyebrow">Take it with you</div>
+      <h2 id="share-h">Scan the tag</h2>
+      <p>The same QR habit this system is built on. Scan to open this page on a phone, or go straight to the source.</p>
+      <p class="url"><a href="https://stephen-c-noh.github.io/mat-inspect/">stephen-c-noh.github.io/mat-inspect</a></p>
+      <p class="url"><a href="https://github.com/Stephen-C-Noh/mat-inspect">github.com/Stephen-C-Noh/mat-inspect</a></p>
+      <p class="url"><a href="deck.html">Project overview deck &#8594;</a></p>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="foot-inner">
+    <span>Sponsor &#183; SAIT School of Manufacturing, Automation, and Transportation</span>
+    <span>Capstone 2026</span>
+  </div>
+</footer>
+<div class="hazard"></div>
+</body>
+</html>
+
