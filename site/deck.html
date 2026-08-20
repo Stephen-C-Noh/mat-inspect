@@ -4,29 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MAT-Inspect Overview</title>
-<meta name="description" content="A self-advancing introduction to MAT-Inspect, a digital pre-use equipment inspection system built for SAIT Main Campus.">
+<meta name="description" content="A looping introduction to MAT-Inspect, a digital pre-use equipment inspection system built for SAIT Main Campus.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%23101720%27/%3E%3Cpath d=%27M7 20h18M7 24h18%27 stroke=%27%23e9a13b%27 stroke-width=%273%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
 <style>
   :root {
     --ground: #101720;
-    --panel: #18212b;
-    --panel-2: #1e2934;
     --rule: #2b3945;
     --text: #e9eef2;
+    --body-text: #c6d1da;
     --muted: #8fa0ae;
     --amber: #e9a13b;
     --green: #4fb286;
     --red: #d8553f;
+    --accent: var(--amber);
 
     --display: "Oswald", "Arial Narrow", sans-serif;
     --body: "IBM Plex Sans", system-ui, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, monospace;
-
-    --pad: clamp(1.5rem, 4vw, 4.5rem);
+    --pad: clamp(1.5rem, 5vw, 5rem);
   }
 
   * { box-sizing: border-box; }
@@ -41,57 +39,140 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ---------- frame ---------- */
+  .deck { position: relative; height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; }
 
-  .deck {
-    position: relative;
-    height: 100dvh;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-  }
-
-  .track {
-    display: flex;
-    gap: 3px;
-    padding: 0 var(--pad);
-    margin-top: 14px;
-  }
-  .seg {
-    flex: 1;
-    height: 3px;
-    background: var(--rule);
-    overflow: hidden;
-  }
-  .seg span {
-    display: block;
-    height: 100%;
-    width: 0;
-    background: var(--amber);
-  }
+  .track { display: flex; gap: 3px; padding: 0 var(--pad); margin-top: 14px; }
+  .seg { flex: 1; height: 4px; background: var(--rule); overflow: hidden; }
+  .seg span { display: block; height: 100%; width: 0; background: var(--accent); transition: background .5s ease; }
   .seg.done span { width: 100%; }
 
-  .stage {
-    position: relative;
-    overflow: hidden;
-  }
+  .stage { position: relative; overflow: hidden; }
 
   .slide {
     position: absolute;
     inset: 0;
-    padding: clamp(1rem, 3vh, 2.5rem) var(--pad);
+    padding: clamp(1rem, 4vh, 3rem) var(--pad);
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: clamp(0.9rem, 2.2vh, 2rem);
+    gap: clamp(1rem, 3vh, 2.4rem);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(14px);
-    transition: opacity .55s ease, transform .55s ease, visibility .55s;
+    transition: opacity .5s ease, visibility .5s;
   }
-  .slide.active {
-    opacity: 1;
-    visibility: visible;
-    transform: none;
+  .slide.active { opacity: 1; visibility: visible; }
+
+  /* staggered entrance for each direct child */
+  .slide.active > * { animation: rise .6s cubic-bezier(.2,.7,.3,1) backwards; }
+  .slide.active > *:nth-child(1) { animation-delay: .05s; }
+  .slide.active > *:nth-child(2) { animation-delay: .17s; }
+  .slide.active > *:nth-child(3) { animation-delay: .29s; }
+  .slide.active > *:nth-child(4) { animation-delay: .41s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: clamp(.7rem, 1.1vw, .95rem);
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(3rem, 11vw, 10rem);
+    line-height: .92;
+    letter-spacing: -.005em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(2.4rem, 7.2vw, 6.2rem);
+    line-height: .98;
+    margin: 0;
+    text-wrap: balance;
+    max-width: 18ch;
+  }
+  h2 em { font-style: normal; color: var(--accent); }
+
+  .say {
+    font-size: clamp(1.05rem, 2.1vw, 1.8rem);
+    line-height: 1.4;
+    color: var(--body-text);
+    max-width: 34ch;
+    margin: 0;
+  }
+
+  /* three-beat */
+  .beats { display: flex; flex-wrap: wrap; gap: clamp(1rem, 4vw, 3.5rem); align-items: flex-start; }
+  .beat { display: flex; flex-direction: column; gap: .3rem; }
+  .beat b {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(2rem, 5.2vw, 4.4rem);
+    line-height: 1;
+    color: var(--accent);
+  }
+  .beat span { font-size: clamp(.9rem, 1.35vw, 1.15rem); color: var(--muted); max-width: 20ch; }
+
+  /* lockout stamp */
+  .stamp {
+    align-self: flex-start;
+    font-family: var(--display);
+    font-weight: 600;
+    letter-spacing: .12em;
+    font-size: clamp(1.3rem, 3.4vw, 2.8rem);
+    color: var(--red);
+    border: 4px solid var(--red);
+    padding: .4rem 1.2rem;
+    text-transform: uppercase;
+  }
+  .slide.active .stamp { animation: stamp .5s cubic-bezier(.2,1.4,.4,1) .55s backwards; }
+  @keyframes stamp {
+    from { opacity: 0; transform: scale(1.7) rotate(-6deg); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* big numbers */
+  .figures { display: flex; flex-wrap: wrap; gap: clamp(1.4rem, 5vw, 4.5rem); }
+  .fig { display: flex; flex-direction: column; gap: .25rem; }
+  .fig b {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(3rem, 9vw, 7.5rem);
+    line-height: .9;
+    font-variant-numeric: tabular-nums;
+  }
+  .fig span {
+    font-family: var(--mono);
+    font-size: clamp(.68rem, 1vw, .85rem);
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* closing slide */
+  .close { display: flex; flex-wrap: wrap; gap: clamp(1.5rem, 5vw, 4rem); align-items: center; }
+  .qr-plate { background: #f2f5f7; padding: .6rem; width: clamp(120px, 15vw, 175px); flex: none; }
+  .qr-plate svg { width: 100%; height: auto; display: block; }
+  .close-copy { display: flex; flex-direction: column; gap: .7rem; }
+  .names {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: clamp(1.1rem, 2.2vw, 1.9rem);
+    line-height: 1.45;
+    color: var(--body-text);
+    max-width: 24ch;
+    margin: 0;
+  }
+  .url {
+    font-family: var(--mono);
+    font-size: clamp(.75rem, 1.2vw, 1rem);
+    letter-spacing: .06em;
+    color: var(--accent);
   }
 
   .foot {
@@ -99,15 +180,17 @@
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    padding: 0 var(--pad) 14px;
+    padding: 0 var(--pad) 16px;
     font-family: var(--mono);
-    font-size: clamp(.6rem, .82vw, .74rem);
+    font-size: clamp(.6rem, .82vw, .72rem);
     letter-spacing: .14em;
     text-transform: uppercase;
     color: var(--muted);
   }
   .foot .hint { color: #5f7080; }
-  .foot .right { display: flex; align-items: center; gap: 1.1rem; }
+  .foot .paused { color: var(--amber); display: none; }
+  body.is-paused .foot .paused { display: inline; }
+  body.is-paused .foot .hint { display: none; }
 
   .fs {
     font: inherit;
@@ -125,487 +208,107 @@
   .fs:hover { color: var(--amber); border-color: var(--amber); }
   .fs:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   .fs[hidden] { display: none; }
-  .foot .paused { color: var(--amber); display: none; }
-  body.is-paused .foot .paused { display: inline; }
-  body.is-paused .foot .hint { display: none; }
 
-  /* hazard edge */
   .deck::after {
     content: "";
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    height: 4px;
-    background: repeating-linear-gradient(
-      -45deg,
-      var(--amber) 0 10px,
-      #101720 10px 20px
-    );
-    opacity: .55;
-  }
-
-  /* ---------- type ---------- */
-
-  .eyebrow {
-    font-family: var(--mono);
-    font-size: clamp(.65rem, .9vw, .8rem);
-    letter-spacing: .22em;
-    text-transform: uppercase;
-    color: var(--amber);
-    display: flex;
-    align-items: center;
-    gap: .8rem;
-  }
-  .eyebrow::after {
-    content: "";
-    height: 1px;
-    flex: 1;
-    max-width: 8rem;
-    background: var(--rule);
-  }
-
-  h1, h2 {
-    font-family: var(--display);
-    font-weight: 500;
-    margin: 0;
-    line-height: 1.05;
-    text-wrap: balance;
-    letter-spacing: .005em;
-  }
-  h1 { font-size: clamp(2.6rem, 7.4vw, 6.6rem); font-weight: 600; }
-  h2 { font-size: clamp(1.7rem, 3.7vw, 3.3rem); }
-
-  .lede {
-    font-size: clamp(1rem, 1.55vw, 1.4rem);
-    line-height: 1.5;
-    color: #c6d1da;
-    max-width: 60ch;
-    margin: 0;
-  }
-  .lede strong { color: var(--text); font-weight: 600; }
-
-  p.small {
-    font-size: clamp(.85rem, 1.15vw, 1.02rem);
-    line-height: 1.55;
-    color: var(--muted);
-    max-width: 62ch;
-    margin: 0;
-  }
-
-  /* ---------- pieces ---------- */
-
-  .plate {
-    display: inline-flex;
-    align-items: baseline;
-    gap: .9rem;
-    font-family: var(--mono);
-    font-size: clamp(.66rem, .95vw, .8rem);
-    letter-spacing: .2em;
-    text-transform: uppercase;
-    color: var(--muted);
-    border: 1px solid var(--rule);
-    padding: .5rem .9rem;
-    align-self: flex-start;
-  }
-  .plate b { color: var(--text); font-weight: 500; letter-spacing: .2em; }
-
-  .cols {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
-    gap: clamp(.7rem, 1.4vw, 1.3rem);
-  }
-
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--rule);
-    padding: clamp(.85rem, 1.5vw, 1.4rem);
-    display: flex;
-    flex-direction: column;
-    gap: .45rem;
-  }
-  .card .k {
-    font-family: var(--mono);
-    font-size: .68rem;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-    color: var(--amber);
-  }
-  .card h3 {
-    font-family: var(--display);
-    font-weight: 500;
-    font-size: clamp(1.05rem, 1.7vw, 1.5rem);
-    margin: 0;
-    line-height: 1.15;
-  }
-  .card p {
-    margin: 0;
-    font-size: clamp(.82rem, 1.05vw, .96rem);
-    line-height: 1.5;
-    color: var(--muted);
-  }
-
-  /* numbered flow */
-  .flow {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
-    gap: clamp(.6rem, 1.2vw, 1.1rem);
-    counter-reset: step;
-  }
-  .step {
-    border-top: 2px solid var(--rule);
-    padding-top: .8rem;
-    display: flex;
-    flex-direction: column;
-    gap: .35rem;
-  }
-  .step::before {
-    counter-increment: step;
-    content: "0" counter(step);
-    font-family: var(--mono);
-    font-size: .72rem;
-    letter-spacing: .16em;
-    color: var(--amber);
-  }
-  .step b {
-    font-family: var(--display);
-    font-weight: 500;
-    font-size: clamp(1rem, 1.5vw, 1.35rem);
-    letter-spacing: .01em;
-  }
-  .step span {
-    font-size: clamp(.78rem, 1vw, .92rem);
-    line-height: 1.45;
-    color: var(--muted);
-  }
-
-  /* status row */
-  .status {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .6rem;
-  }
-  .tag {
-    font-family: var(--mono);
-    font-size: clamp(.66rem, .92vw, .78rem);
-    letter-spacing: .16em;
-    text-transform: uppercase;
-    padding: .45rem .85rem;
-    border: 1px solid currentColor;
-    display: inline-flex;
-    align-items: center;
-    gap: .55rem;
-  }
-  .tag .dot { width: .5rem; height: .5rem; background: currentColor; border-radius: 50%; }
-  .tag.ok { color: var(--green); }
-  .tag.no { color: var(--red); }
-  .tag.hold { color: var(--amber); }
-
-  /* stats */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(150px, 45%), 1fr));
-    gap: clamp(.7rem, 1.6vw, 1.6rem);
-  }
-  .stat { display: flex; flex-direction: column; gap: .2rem; border-left: 2px solid var(--amber); padding-left: .9rem; }
-  .stat b {
-    font-family: var(--display);
-    font-weight: 600;
-    font-size: clamp(2.1rem, 4.4vw, 3.8rem);
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-  .stat span {
-    font-family: var(--mono);
-    font-size: clamp(.62rem, .85vw, .74rem);
-    letter-spacing: .16em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  /* architecture diagram */
-  .arch { width: 100%; height: 54vh; display: block; }
-  .arch text { font-family: "IBM Plex Mono", monospace; fill: var(--text); }
-  .arch .lbl { font-size: 11px; letter-spacing: .1em; fill: var(--muted); }
-  .arch .name { font-size: 13px; fill: var(--text); }
-  .arch .box { fill: var(--panel-2); stroke: var(--rule); }
-  .arch .edge { stroke: var(--rule); stroke-width: 1.5; fill: none; }
-  .arch .flowline { stroke: var(--amber); stroke-width: 1.5; fill: none; }
-
-  /* ledger list */
-  .ledger { display: flex; flex-direction: column; gap: .55rem; }
-  .row {
-    display: grid;
-    grid-template-columns: minmax(9rem, 14rem) 1fr;
-    gap: clamp(.7rem, 2vw, 2rem);
-    align-items: baseline;
-    border-bottom: 1px solid var(--rule);
-    padding-bottom: .55rem;
-  }
-  .row dt {
-    font-family: var(--mono);
-    font-size: clamp(.66rem, .9vw, .78rem);
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--amber);
-  }
-  .row dd {
-    margin: 0;
-    font-size: clamp(.85rem, 1.12vw, 1.02rem);
-    line-height: 1.5;
-    color: #c6d1da;
-  }
-  .row.off dt { color: var(--muted); }
-  .row.off dd { color: var(--muted); }
-
-  .team {
-    font-family: var(--display);
-    font-weight: 300;
-    font-size: clamp(1.15rem, 2.5vw, 2.1rem);
-    line-height: 1.5;
-    color: #c6d1da;
-    max-width: 22ch;
-    margin: 0;
+    height: 5px;
+    background: repeating-linear-gradient(-45deg, var(--accent) 0 12px, #101720 12px 24px);
+    opacity: .6;
+    transition: background .5s ease;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .slide { transition: opacity .01s; transform: none; }
-    .seg span { transition: none !important; }
+    .slide, .slide.active > *, .slide.active .stamp { transition: opacity .01s; animation: none; }
   }
 </style>
-
 </head>
 <body>
+
 <div class="deck">
   <div class="track" id="track"></div>
 
   <main class="stage" id="stage">
 
-    <!-- 1 -->
-    <section class="slide" data-dur="16">
-      <div class="eyebrow">SAIT Main Campus &nbsp;/&nbsp; Capstone 2026</div>
+    <section class="slide" data-dur="14" data-accent="amber">
+      <div class="kicker">SAIT Main Campus</div>
       <h1>MAT&#8209;Inspect</h1>
-      <p class="lede">Pre&#8209;use equipment inspection, off paper and onto a phone. Cranes, forklifts, trucks, and a pallet jack: checked, recorded, and locked out when they fail.</p>
-      <div class="plate"><b>10 units</b> &nbsp;·&nbsp; 4 overhead cranes · 3 forklifts · 2 trucks · 1 pallet jack</div>
+      <p class="say">Every crane, forklift, and truck gets checked before anyone uses it. On a phone, before the shift starts.</p>
     </section>
 
-    <!-- 2 -->
-    <section class="slide" data-dur="20">
-      <div class="eyebrow">The problem</div>
-      <h2>A paper sheet cannot prove anything</h2>
-      <div class="cols">
-        <div class="card">
-          <div class="k">Today</div>
-          <h3>Binders in a shop</h3>
-          <p>Inspection sheets are filled in by hand, filed in a binder, and read only when someone goes looking. A missing page looks exactly like a page that was never filled in.</p>
+    <section class="slide" data-dur="14" data-accent="amber">
+      <div class="kicker">The old way</div>
+      <h2>A paper sheet in a binder <em>proves nothing</em></h2>
+      <p class="say">A missing page looks exactly like a page nobody filled in.</p>
+    </section>
+
+    <section class="slide" data-dur="18" data-accent="amber">
+      <div class="kicker">The new way</div>
+      <div class="beats">
+        <div class="beat"><b>Scan</b><span>Point the phone at the tag on the machine</span></div>
+        <div class="beat"><b>Check</b><span>Work the list, item by item</span></div>
+        <div class="beat"><b>Done</b><span>Confirmed, timestamped, filed instantly</span></div>
+      </div>
+      <p class="say">The checklist that opens is the right one for that exact machine.</p>
+    </section>
+
+    <section class="slide" data-dur="16" data-accent="red">
+      <div class="kicker">When something is wrong</div>
+      <h2>The machine stops. <em>Right then.</em></h2>
+      <div class="stamp">Out of service</div>
+      <p class="say">A failed check locks the equipment out and tells a supervisor. Nobody has to notice a note.</p>
+    </section>
+
+    <section class="slide" data-dur="14" data-accent="amber">
+      <div class="kicker">Gloves on, hands dirty</div>
+      <h2>Just <em>say</em> what is broken</h2>
+      <p class="say">Speak the defect and it becomes text. The audio never leaves our own machines.</p>
+    </section>
+
+    <section class="slide" data-dur="14" data-accent="green">
+      <div class="kicker">Why it holds up</div>
+      <h2>Once written, it <em>cannot be changed</em></h2>
+      <p class="say">Every inspection is sealed in a tamper-evident log. Not by policy. By the way it is built.</p>
+    </section>
+
+    <section class="slide" data-dur="16" data-accent="amber">
+      <div class="kicker">The project</div>
+      <div class="figures">
+        <div class="fig"><b>10</b><span>Machines covered</span></div>
+        <div class="fig"><b>5</b><span>Students</span></div>
+        <div class="fig"><b>13</b><span>Weeks</span></div>
+      </div>
+      <p class="say">One rule shaped all of it: a trained human does the inspection. The software never decides for them.</p>
+    </section>
+
+    <section class="slide" data-dur="20" data-accent="amber">
+      <div class="kicker">Come say hello</div>
+      <div class="close">
+        <div class="qr-plate">
+          <svg viewBox="0 0 41 41" shape-rendering="crispEdges" role="img" aria-label="QR code linking to the MAT-Inspect team page">
+            <path fill="#f2f5f7" d="M0 0h41v41H0z"/><path stroke="#101720" d="M4 4.5h7m1 0h6m2 0h4m3 0h1m2 0h7M4 5.5h1m5 0h1m1 0h2m2 0h2m4 0h1m1 0h4m2 0h1m5 0h1M4 6.5h1m1 0h3m1 0h1m2 0h2m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m3 0h1m1 0h3m1 0h1M4 7.5h1m1 0h3m1 0h1m1 0h3m3 0h1m1 0h1m2 0h6m1 0h1m1 0h3m1 0h1M4 8.5h1m1 0h3m1 0h1m2 0h2m1 0h3m5 0h1m2 0h1m2 0h1m1 0h3m1 0h1M4 9.5h1m5 0h1m2 0h3m1 0h1m3 0h4m3 0h1m1 0h1m5 0h1M4 10.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M12 11.5h3m1 0h1m4 0h1m2 0h1m1 0h1m1 0h1M4 12.5h1m1 0h2m1 0h3m2 0h3m1 0h1m1 0h4m1 0h1m1 0h1m2 0h1m2 0h1m1 0h2M8 13.5h1m6 0h1m6 0h4m1 0h1m2 0h2m1 0h2m1 0h1M4 14.5h1m1 0h1m3 0h1m2 0h2m3 0h1m2 0h1m5 0h1m2 0h4m1 0h2M4 15.5h4m3 0h1m2 0h1m2 0h4m1 0h1m1 0h1m5 0h2m1 0h1M4 16.5h1m2 0h1m2 0h1m1 0h2m2 0h1m2 0h1m2 0h2m1 0h1m2 0h2m2 0h2m1 0h2M4 17.5h2m1 0h1m1 0h1m1 0h2m1 0h1m2 0h1m2 0h3m2 0h2m2 0h1m1 0h1m1 0h1m1 0h1M7 18.5h4m2 0h2m1 0h2m1 0h4m2 0h1m4 0h1m2 0h1M6 19.5h4m2 0h2m3 0h2m1 0h1m2 0h3m3 0h2m1 0h3M4 20.5h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h4m2 0h4m1 0h4m1 0h1m1 0h1M4 21.5h2m2 0h1m4 0h1m3 0h3m1 0h1m2 0h5m1 0h1m1 0h2m1 0h2M4 22.5h1m1 0h1m3 0h3m1 0h2m1 0h5m4 0h1m4 0h2m1 0h2M9 23.5h1m1 0h2m2 0h3m2 0h1m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1m2 0h1M4 24.5h2m1 0h5m1 0h1m1 0h4m3 0h1m1 0h1m3 0h1m4 0h2m1 0h1M4 25.5h1m2 0h1m3 0h1m2 0h1m1 0h1m2 0h1m1 0h2m4 0h1m2 0h1m2 0h2m1 0h1M6 26.5h1m3 0h1m1 0h2m3 0h2m1 0h2m4 0h3m1 0h2m1 0h1m1 0h2M5 27.5h2m4 0h1m4 0h3m1 0h1m1 0h2m3 0h1m2 0h1m4 0h1M4 28.5h1m1 0h1m1 0h1m1 0h1m1 0h5m2 0h3m4 0h1m1 0h5m2 0h2M12 29.5h1m1 0h3m2 0h5m3 0h2m3 0h2M4 30.5h7m1 0h1m3 0h1m3 0h1m2 0h2m1 0h3m1 0h1m1 0h1m2 0h1M4 31.5h1m5 0h1m1 0h2m5 0h1m4 0h5m3 0h5M4 32.5h1m1 0h3m1 0h1m2 0h1m2 0h1m2 0h1m1 0h1m1 0h2m2 0h6m1 0h2M4 33.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h2m3 0h3m6 0h1m1 0h4M4 34.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h3m4 0h1m3 0h5m1 0h2M4 35.5h1m5 0h1m4 0h2m2 0h3m1 0h1m2 0h7m3 0h1M4 36.5h7m1 0h1m1 0h1m1 0h1m2 0h4m2 0h3m4 0h1m1 0h1"/>
+          </svg>
         </div>
-        <div class="card">
-          <div class="k">The risk</div>
-          <h3>Nothing stops the lift</h3>
-          <p>A failed crane can be used again ten minutes later. Nothing connects the failure to the equipment, and no one is told.</p>
-        </div>
-        <div class="card">
-          <div class="k">The obligation</div>
-          <h3>Records must hold up</h3>
-          <p>Alberta OHS requires a log book of pre&#8209;use inspections. Handwriting on a shelf is a weak answer to an inspector.</p>
+        <div class="close-copy">
+          <p class="names">Changbeom Noh &#183; Fathema Begum Ema &#183; Enzo Campana &#183; Adan Hernandez Rodriguez &#183; Sophia Canonizado</p>
+          <p class="url">Scan to meet the team</p>
         </div>
       </div>
-    </section>
-
-    <!-- 3 -->
-    <section class="slide" data-dur="26">
-      <div class="eyebrow">Operator, on a phone, before the shift</div>
-      <h2>Five steps, under two minutes</h2>
-      <div class="flow">
-        <div class="step"><b>Scan</b><span>Point the phone at the QR tag on the machine. The right checklist opens for that class of equipment.</span></div>
-        <div class="step"><b>Check</b><span>Work the list item by item. Pass or fail, in the order a trained operator already walks the machine.</span></div>
-        <div class="step"><b>Describe</b><span>Speak a defect note instead of typing it. Add a photo of what you found.</span></div>
-        <div class="step"><b>Confirm</b><span>Read back every answer on one screen, then attest that you performed the inspection yourself.</span></div>
-        <div class="step"><b>Submit</b><span>The record is written once, stamped with the server's time, and never edited again.</span></div>
-      </div>
-    </section>
-
-    <!-- 4 -->
-    <section class="slide" data-dur="22">
-      <div class="eyebrow">When something fails</div>
-      <h2>The failure moves the machine, not just a form</h2>
-      <p class="lede">A blocking failure takes the equipment out of service immediately. A supervisor is notified. Readiness is recomputed on every read, so no stale row can say a locked&#8209;out machine is fine.</p>
-      <div class="status">
-        <span class="tag ok"><span class="dot"></span>Ready · passed today</span>
-        <span class="tag hold"><span class="dot"></span>Warning · recorded, still usable</span>
-        <span class="tag no"><span class="dot"></span>Out of service · blocking failure</span>
-      </div>
-      <p class="small">Equipment returns to service only when a supervisor clears the defect, and only a fresh passing inspection dated the same day makes it ready again.</p>
-    </section>
-
-    <!-- 5 -->
-    <section class="slide" data-dur="24">
-      <div class="eyebrow">The constraint that shapes everything</div>
-      <h2>A competent human performs the inspection</h2>
-      <p class="lede">Alberta OHS puts the inspection in a trained operator's hands. That is not a feature we chose, and it rules out the obvious shortcuts.</p>
-      <div class="cols">
-        <div class="card">
-          <div class="k">AI is assistive</div>
-          <h3>It listens, it never decides</h3>
-          <p>The AI service turns a spoken defect note into text. No model can pass or fail an inspection. There is no code path where it could.</p>
-        </div>
-        <div class="card">
-          <div class="k">Privacy</div>
-          <h3>Audio stays on our machines</h3>
-          <p>Voice is biometric information under FOIP. Transcription runs on&#8209;premise, the clip is never sent to an outside service, and the audio is not kept.</p>
-        </div>
-        <div class="card">
-          <div class="k">Identity</div>
-          <h3>Every record names a person</h3>
-          <p>The operator comes from a validated sign&#8209;in token, never from what the app claims. Anonymous submission is not possible.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- 6 -->
-    <section class="slide" data-dur="26">
-      <div class="eyebrow">How it is built</div>
-      <h2>Two apps, four services, two databases</h2>
-      <svg class="arch" viewBox="0 0 900 400" role="img" aria-label="The operator phone and the manager dashboard both call the edge proxy with a signed-in token. The edge routes to the media service, core-api, and the audit service. Core-api writes the operational database and proxies to the AI service, which has no route at the edge. The audit service writes the hash-chained audit database.">
-        <!-- clients -->
-        <rect class="box" x="60" y="8" width="290" height="40"/>
-        <text class="name" x="205" y="33" text-anchor="middle">Operator phone</text>
-        <rect class="box" x="550" y="8" width="290" height="40"/>
-        <text class="name" x="695" y="33" text-anchor="middle">Manager dashboard</text>
-
-        <path class="flowline" d="M205 48 L205 86"/>
-        <path class="flowline" d="M695 48 L695 86"/>
-        <text class="lbl" x="450" y="72" text-anchor="middle">signed-in token on every call</text>
-
-        <!-- edge -->
-        <rect class="box" x="60" y="86" width="780" height="42"/>
-        <text class="name" x="450" y="112" text-anchor="middle">Edge proxy &#183; terminates TLS, routes by path</text>
-
-        <path class="edge" d="M175 128 L175 170"/>
-        <path class="edge" d="M450 128 L450 170"/>
-        <path class="edge" d="M725 128 L725 170"/>
-        <text class="lbl" x="183" y="153">/media</text>
-        <text class="lbl" x="458" y="153">/api</text>
-        <text class="lbl" x="733" y="153">/reports</text>
-
-        <!-- services -->
-        <rect class="box" x="60" y="170" width="230" height="64"/>
-        <text class="name" x="175" y="196" text-anchor="middle">Media service</text>
-        <text class="lbl" x="175" y="216" text-anchor="middle">photos to blob storage</text>
-
-        <rect class="box" x="335" y="170" width="230" height="64"/>
-        <text class="name" x="450" y="196" text-anchor="middle">core-api</text>
-        <text class="lbl" x="450" y="216" text-anchor="middle">inspections, equipment</text>
-
-        <rect class="box" x="610" y="170" width="230" height="64"/>
-        <text class="name" x="725" y="196" text-anchor="middle">Audit service</text>
-        <text class="lbl" x="725" y="216" text-anchor="middle">signed PDF and CSV</text>
-
-        <!-- databases -->
-        <path class="edge" d="M450 234 L450 274"/>
-        <path class="edge" d="M725 234 L725 274"/>
-
-        <rect class="box" x="335" y="274" width="230" height="44"/>
-        <text class="name" x="450" y="301" text-anchor="middle">Operational database</text>
-
-        <rect class="box" x="610" y="274" width="230" height="44"/>
-        <text class="name" x="725" y="301" text-anchor="middle">Audit database</text>
-        <text class="lbl" x="610" y="336">append-only, hash-chained</text>
-
-        <!-- AI service, reachable only through core-api -->
-        <path class="edge" d="M335 202 L312 202 L312 366 L335 366"/>
-        <rect class="box" x="335" y="344" width="230" height="44" stroke-dasharray="4 4"/>
-        <text class="name" x="450" y="371" text-anchor="middle">AI service &#183; transcription</text>
-        <text class="lbl" x="590" y="365">no route at the edge;</text>
-        <text class="lbl" x="590" y="382">reached only through core-api</text>
-      </svg>
-    </section>
-
-    <!-- 7 -->
-    <section class="slide" data-dur="26">
-      <div class="eyebrow">Why the record can be trusted</div>
-      <h2>Built to fail closed</h2>
-      <div class="cols">
-        <div class="card">
-          <div class="k">Immutable</div>
-          <h3>Written once</h3>
-          <p>Inspections, their answers, and audit entries cannot be updated or deleted. The database itself refuses, not just the application.</p>
-        </div>
-        <div class="card">
-          <div class="k">Hash chain</div>
-          <h3>History that shows its seams</h3>
-          <p>Each audit entry carries the hash of the one before it. Any edit to the past breaks the chain, and the service will not start on a broken chain.</p>
-        </div>
-        <div class="card">
-          <div class="k">Outbox</div>
-          <h3>The two logs cannot disagree</h3>
-          <p>An inspection and its audit entry are committed in a single transaction, so a service being down at submit time cannot lose the trail.</p>
-        </div>
-        <div class="card">
-          <div class="k">Auth</div>
-          <h3>A missed check stops the boot</h3>
-          <p>Any route without an authentication handler crashes the service at startup. A forgotten role check becomes a failed deploy, never an open endpoint.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- 8 -->
-    <section class="slide" data-dur="18">
-      <div class="eyebrow">The project by the numbers</div>
-      <h2>Thirteen weeks, five students</h2>
-      <div class="stats">
-        <div class="stat"><b>8</b><span>Two-week sprints</span></div>
-        <div class="stat"><b>27</b><span>Decision records</span></div>
-        <div class="stat"><b>6</b><span>Containers in the stack</span></div>
-        <div class="stat"><b>10</b><span>Machines covered</span></div>
-      </div>
-      <p class="small">Every commit and pull request leads with its ticket key, so any line of code traces back to the reason it was written. Compliance&#8209;critical paths carry a second named reviewer.</p>
-    </section>
-
-    <!-- 9 -->
-    <section class="slide" data-dur="24">
-      <div class="eyebrow">What gets handed over</div>
-      <h2>An artifact, not a promise</h2>
-      <dl class="ledger">
-        <div class="row">
-          <dt>Delivered</dt>
-          <dd>The complete containerized stack: operator app, dashboard, four services, databases, and the compose files that stand it all up. Running today on a team&#8209;operated mini&#8209;PC.</dd>
-        </div>
-        <div class="row">
-          <dt>Delivered</dt>
-          <dd>A governance package: runbooks, restore drills, change management, vulnerability handling, and the licence and copyright terms.</dd>
-        </div>
-        <div class="row">
-          <dt>Demonstrated</dt>
-          <dd>The same images running on managed cloud infrastructure with synthetic data, to prove that path works before anyone commits to it. Torn down at handover.</dd>
-        </div>
-        <div class="row off">
-          <dt>Not in scope</dt>
-          <dd>A campus&#8209;hosted production deployment. SAIT ITS declined to host during the capstone, so the system is built to be self&#8209;hosted or moved to campus infrastructure later without redesign.</dd>
-        </div>
-      </dl>
-    </section>
-
-    <!-- 10 -->
-    <section class="slide" data-dur="16">
-      <div class="eyebrow">Team</div>
-      <p class="team">Changbeom Noh · Fathema Begum Ema · Enzo Campana · Adan Hernandez Rodriguez · Sophia Canonizado</p>
-      <div class="plate"><b>MAT-Inspect</b> &nbsp;·&nbsp; SAIT Main Campus &nbsp;·&nbsp; May to August 2026</div>
-      <p class="small">Meet the team: <a href="./" style="color:var(--amber)">stephen-c-noh.github.io/mat-inspect</a></p>
     </section>
 
   </main>
 
   <div class="foot">
-    <span id="counter">01 / 10</span>
-    <span class="hint">Space pauses &nbsp;·&nbsp; arrow keys step &nbsp;·&nbsp; F for full screen</span>
+    <span id="counter">01 / 08</span>
+    <span class="hint">Space pauses &nbsp;&#183;&nbsp; arrow keys step &nbsp;&#183;&nbsp; F for full screen</span>
     <span class="paused">Paused</span>
-    <span class="right">
-      <button class="fs" id="fsBtn" type="button" aria-label="Toggle full screen">
-        <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4">
-          <path d="M1 4V1h3M8 1h3v3M11 8v3H8M4 11H1V8"/>
-        </svg>
-        <span id="fsLabel">Full screen</span>
-      </button>
-    </span>
+    <button class="fs" id="fsBtn" type="button" aria-label="Toggle full screen">
+      <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M1 4V1h3M8 1h3v3M11 8v3H8M4 11H1V8"/>
+      </svg>
+      <span id="fsLabel">Full screen</span>
+    </button>
   </div>
 </div>
 
@@ -613,7 +316,7 @@
   const slides = Array.from(document.querySelectorAll('.slide'));
   const track = document.getElementById('track');
   const counter = document.getElementById('counter');
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const accents = { amber: 'var(--amber)', red: 'var(--red)', green: 'var(--green)' };
 
   const segs = slides.map(() => {
     const seg = document.createElement('div');
@@ -623,12 +326,7 @@
     return seg.firstElementChild;
   });
 
-  let manualPause = false;
-  let index = 0;
-  let paused = false;
-  let start = 0;      // timestamp the current slide began (excluding paused time)
-  let elapsed = 0;    // ms already spent on the current slide
-
+  let index = 0, paused = false, manualPause = false, start = 0, elapsed = 0;
   const durationOf = (i) => Number(slides[i].dataset.dur) * 1000;
 
   function paint() {
@@ -637,6 +335,8 @@
       s.parentElement.classList.toggle('done', i < index);
       if (i !== index) s.style.width = i < index ? '100%' : '0';
     });
+    // The whole frame takes the slide's accent, so the mood shifts with the message.
+    document.documentElement.style.setProperty('--accent', accents[slides[index].dataset.accent] || accents.amber);
     counter.textContent = String(index + 1).padStart(2, '0') + ' / ' + String(slides.length).padStart(2, '0');
   }
 
@@ -664,6 +364,22 @@
     if (!paused) start = performance.now() - elapsed;
   }
 
+  const fsBtn = document.getElementById('fsBtn');
+  const fsLabel = document.getElementById('fsLabel');
+  const root = document.documentElement;
+  if (!root.requestFullscreen) fsBtn.hidden = true;
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    const req = root.requestFullscreen();
+    if (req && req.catch) req.catch(() => { fsLabel.textContent = 'Full screen unavailable'; fsBtn.disabled = true; });
+  }
+
+  fsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
+  document.addEventListener('fullscreenchange', () => {
+    fsLabel.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === ' ') { e.preventDefault(); manualPause = !paused; setPaused(manualPause); }
     if (e.key === 'ArrowRight') { e.preventDefault(); go(index + 1); }
@@ -675,37 +391,7 @@
     go(e.clientX < window.innerWidth / 2 ? index - 1 : index + 1);
   });
 
-  // A hidden tab freezes the deck, but resuming must not override a manual pause.
-  // The deck is embedded in a frame, so full screen has to be requested explicitly.
-  const fsBtn = document.getElementById('fsBtn');
-  const fsLabel = document.getElementById('fsLabel');
-  const root = document.documentElement;
-
-  if (!root.requestFullscreen) fsBtn.hidden = true;
-
-  function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-      return;
-    }
-    const req = root.requestFullscreen();
-    if (req && req.catch) {
-      req.catch(() => {
-        // Blocked by the embedding frame. Say what actually works instead.
-        fsLabel.textContent = 'Open this page in its own tab';
-        fsBtn.disabled = true;
-      });
-    }
-  }
-
-  fsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
-  document.addEventListener('fullscreenchange', () => {
-    fsLabel.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
-  });
-
   document.addEventListener('visibilitychange', () => setPaused(document.hidden || manualPause));
-
-  if (reduced) segs.forEach(s => s.style.transition = 'none');
 
   go(0);
   requestAnimationFrame(tick);
