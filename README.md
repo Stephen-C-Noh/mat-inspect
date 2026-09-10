@@ -38,13 +38,9 @@ It runs from a clean checkout on synthetic data, with no dependency on SAIT infr
 
 ## Live demo
 
-A demo runs on Azure (team-owned tenant, synthetic data only):
-
-- Operator PWA: https://mat-inspect-pwa-cpacesfdf2frgnaw.z01.azurefd.net
-- Manager dashboard: https://mat-inspect-dashboard-hpfnb8b5cfbjereu.z01.azurefd.net
-
-Both require an Azure Entra ID sign-in. Evaluation credentials are provided with the submission,
-not stored in this repository.
+The hosted Azure demo was decommissioned after the capstone submission. See the
+[Screenshots](#screenshots) above for a walkthrough, or run the full stack locally on
+synthetic data with the instructions below.
 
 ## Running the project
 
