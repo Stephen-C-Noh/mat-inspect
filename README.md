@@ -11,6 +11,17 @@ suggest defect categories, and they never pass or fail an inspection.
 Capstone project, Team Meridian, SAIT MAT (Manufacturing, Automation, Transportation) School,
 Summer 2026.
 
+## Screenshots
+
+| | |
+| --- | --- |
+| ![App selector](docs/images/mat-inspect-landing-page-clean.jpg) | ![Operator home on mobile](docs/images/mat-inspect-pwa-home-mobile.jpg) |
+| App selector routing operators and managers to the right app before Microsoft sign-in | Operator PWA home at phone width: QR scan entry point and equipment search |
+| ![Inspection checklist](docs/images/mat-inspect-pwa-inspection-checklist.jpg) | ![Digital lockout](docs/images/mat-inspect-pwa-lockout.jpg) |
+| Live pre-use inspection checklist with per-item Blocking / Warning severity | "DO NOT OPERATE" digital lockout, enforced automatically the moment a blocking item fails |
+| ![Failure queue](docs/images/mat-inspect-dashboard-failure-queue.jpg) | ![Signed export](docs/images/mat-inspect-dashboard-signed-export.jpg) |
+| Manager dashboard Failure Queue picking up the lockout in real time | Signed export screen for tamper-evident PDF/CSV reports from the hash-chained audit log |
+
 ## What is in this repository
 
 The full self-contained containerized stack:
