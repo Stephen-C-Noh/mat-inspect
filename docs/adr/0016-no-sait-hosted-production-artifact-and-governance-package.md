@@ -6,7 +6,7 @@ Amended by: ADR 0024 (adds a team-owned Azure demo deployment for the capstone; 
 
 ## Context
 
-SAIT ITS Cloud & Server Infrastructure replied on 2026-06-24 (Rudy Li, Supervisor) to the
+SAIT ITS Cloud & Server Infrastructure replied on 2026-06-24 (the Supervisor) to the
 project sponsor's hosting and architecture questions. ITS declined to host MAT-Inspect in the
 SAIT Azure environment now, and gave no commitment for handover. The stated reasons:
 
