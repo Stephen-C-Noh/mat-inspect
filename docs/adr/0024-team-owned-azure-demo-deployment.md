@@ -15,8 +15,7 @@ exercised in a real Azure environment.
 
 Leaving those halves unexercised until after handover has two costs: the first real production run
 happens under a future owner with no team member present, and the DEV-44 handover documents would be
-hypotheticals. The team already owns an Azure tenant (the `lowell2753` personal tenant, `fa517e85`,
-subscription `cbdba940`) that holds the Entra app registration (ADR 0002) and the Application
+hypotheticals. The team already owns a personal Azure tenant that holds the Entra app registration (ADR 0002) and the Application
 Insights workspace (ADR 0003). Standing up the rest of the stack there for the live demo, on
 synthetic data, de-risks both costs.
 
@@ -32,7 +31,7 @@ demo is a better fit than a VM and proves the managed compute path, not only the
 
 ## Decision
 
-Deploy the stack to the team-owned `lowell2753` Azure tenant for the live demo, on Azure Container
+Deploy the stack to the team-owned personal Azure tenant for the live demo, on Azure Container
 Apps, with Azure Front Door as the edge. This is a demo and de-risking exercise, not a production
 adoption. ADR 0016's core decision holds: the capstone does not depend on SAIT hosting, and no
 SAIT-hosted production runs. What changes is that the managed compute and data path is exercised once,
@@ -40,7 +39,7 @@ on team-owned Azure, before handover.
 
 Specifics:
 
-- **Tenant and region.** The existing `lowell2753` tenant. All resources in Canada Central for data
+- **Tenant and region.** The existing personal tenant. All resources in Canada Central for data
   residency. No new Entra app registration; the current one gains the Front Door custom-domain
   hostnames as SPA redirect URIs.
 - **Compute is Azure Container Apps.** Each service is its own container app in one ACA environment:
@@ -117,6 +116,6 @@ configuration for the path split. Teardown is a required step, not optional.
 - **Azure managed AI service (Azure OpenAI / Foundry) instead of the self-hosted model.** Rejected.
   Its FOIP-safe use needs an organization tenant with modified abuse monitoring and a Canada-region
   deployment (ADR 0016, ADR 0018), which a personal tenant cannot obtain.
-- **Fresh tenant (for example a stephen.c.noh tenant).** Rejected. It would duplicate the Entra app
+- **Fresh tenant.** Rejected. It would duplicate the Entra app
   registration, the API scope, the five App Roles, and the role assignments that already exist on the
-  `lowell2753` tenant, for no benefit.
+  existing tenant, for no benefit.
